@@ -1,6 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
+from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Optional
 from services.supabase_client import supabase
 from services.ai_matching import score_consultants_batch
 from routers.auth import get_current_user, require_admin
@@ -10,60 +9,80 @@ router = APIRouter(prefix="/matching", tags=["matching"])
 
 class MatchRequest(BaseModel):
     ao_id: str
-    top_n: int = 3  # Return top N results
+    top_n: int = 3
 
 
 @router.post("/run")
 async def run_matching(body: MatchRequest, user: dict = Depends(require_admin)):
     """
-    Trigger AI matching for an AO against all consultants.
-    Returns top N scored consultants with explanations.
+    Score all consultants who have submitted a CV to this AO.
+    Returns the top N scored submissions with breakdown + explanation.
     Admin only.
     """
-    # Fetch AO
     try:
-        ao_response = supabase.table("appels_offres").select("*").eq("id", body.ao_id).single().execute()
-        ao = ao_response.data
+        ao = supabase.table("appels_offres").select("*").eq("id", body.ao_id).single().execute().data
     except Exception:
         raise HTTPException(status_code=404, detail="AO introuvable")
 
-    # Fetch all consultants with CV text
+    # Fetch submissions joined with consultant info
     try:
-        consultants_response = supabase.table("consultants").select(
-            "id, name, tjm, skills, experience_years, cv_text"
-        ).execute()
-        consultants = consultants_response.data
+        submissions = supabase.table("submissions").select(
+            "id, cv_text, consultant_id, consultants(id, name, tjm, skills, experience_years, employment_type)"
+        ).eq("ao_id", body.ao_id).execute().data
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur récupération consultants: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"Erreur récupération soumissions: {str(e)}")
 
-    if not consultants:
-        raise HTTPException(status_code=404, detail="Aucun consultant disponible pour le matching")
+    if not submissions:
+        raise HTTPException(status_code=404, detail="Aucun CV soumis pour cet AO")
 
-    # Filter out consultants without CV text
-    valid_consultants = [c for c in consultants if c.get("cv_text")]
-    if not valid_consultants:
-        raise HTTPException(status_code=422, detail="Aucun consultant avec un CV lisible")
+    # Build the list the AI service expects. We pass submission.id as the id so
+    # results round-trip back to the right submission row.
+    valid = []
+    for s in submissions:
+        c = s.get("consultants") or {}
+        if not s.get("cv_text"):
+            continue
+        valid.append({
+            "id": s["id"],
+            "consultant_id": s["consultant_id"],
+            "name": c.get("name", "Inconnu"),
+            "tjm": c.get("tjm"),
+            "skills": c.get("skills", ""),
+            "experience_years": c.get("experience_years"),
+            "cv_text": s["cv_text"],
+        })
 
-    # Run AI scoring
+    if not valid:
+        raise HTTPException(status_code=422, detail="Aucun CV lisible pour cet AO")
+
     try:
-        all_scores = await score_consultants_batch(ao, valid_consultants)
+        all_scores = await score_consultants_batch(ao, valid)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
-    # Take top N
     top_results = all_scores[:body.top_n]
 
-    # Save results to database
-    try:
-        # Clear previous matching for this AO
-        supabase.table("matchings").delete().eq("ao_id", body.ao_id).execute()
+    # Re-map AI results: ai_matching uses "consultant_id" key but we passed
+    # submission.id there. Recover both ids for storage.
+    sub_index = {s["id"]: s for s in valid}
+    for r in top_results:
+        sub_id = r.get("consultant_id")  # this is submission.id from our perspective
+        sub = sub_index.get(sub_id, {})
+        r["submission_id"] = sub_id
+        r["consultant_id"] = sub.get("consultant_id")
+        r["consultant_name"] = sub.get("name")
+        r["consultant_tjm"] = sub.get("tjm")
+        r["consultant_skills"] = sub.get("skills")
 
-        # Insert new results
+    # Persist results: clear previous, insert new
+    try:
+        supabase.table("matchings").delete().eq("ao_id", body.ao_id).execute()
         for rank, result in enumerate(top_results, start=1):
             supabase.table("matchings").insert({
                 "ao_id": body.ao_id,
+                "submission_id": result["submission_id"],
                 "consultant_id": result["consultant_id"],
                 "score_total": result["score_total"],
                 "breakdown": result["breakdown"],
@@ -74,15 +93,13 @@ async def run_matching(body: MatchRequest, user: dict = Depends(require_admin)):
                 "rank": rank,
                 "ran_by": user["sub"],
             }).execute()
-
     except Exception as e:
-        # Don't fail the response if save fails — return results anyway
         print(f"Warning: Could not save matching results: {e}")
 
     return {
         "ao_id": body.ao_id,
         "ao_title": ao["title"],
-        "total_consultants_evaluated": len(valid_consultants),
+        "total_consultants_evaluated": len(valid),
         "top_n": body.top_n,
         "results": top_results,
     }
@@ -90,16 +107,25 @@ async def run_matching(body: MatchRequest, user: dict = Depends(require_admin)):
 
 @router.get("/results/{ao_id}")
 async def get_matching_results(ao_id: str, user: dict = Depends(require_admin)):
-    """Get stored matching results for an AO."""
     try:
         response = supabase.table("matchings").select(
-            "*, consultants(name, tjm, skills, cv_url)"
+            "*, consultants(name, tjm, skills, employment_type), submissions(cv_url, cv_filename)"
         ).eq("ao_id", ao_id).order("rank").execute()
+
+        # Flatten useful fields for the UI
+        for r in response.data or []:
+            c = r.get("consultants") or {}
+            s = r.get("submissions") or {}
+            r["consultant_name"] = c.get("name")
+            r["consultant_tjm"] = c.get("tjm")
+            r["consultant_skills"] = c.get("skills")
+            r["employment_type"] = c.get("employment_type")
+            r["cv_url"] = s.get("cv_url")
+            r["cv_filename"] = s.get("cv_filename")
 
         return {
             "ao_id": ao_id,
             "results": response.data,
         }
-
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
