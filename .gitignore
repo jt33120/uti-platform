@@ -1,0 +1,17 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+backend/venv/
+backend/.env
+
+# Node
+node_modules/
+frontend/node_modules/
+frontend/dist/
+frontend/.env
+package-lock.json
+
+# Misc
+.DS_Store
+*.log
