@@ -1,22 +1,31 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
-import { ArrowLeft, FileText, Loader2 } from 'lucide-react'
+import { ArrowLeft, FileText, Loader2, ChevronDown } from 'lucide-react'
 
 export default function NewAOPage() {
   const navigate = useNavigate()
+  const [clients, setClients] = useState([])
   const [form, setForm] = useState({
-    title: '', description: '', skills_required: '',
+    client_id: '', title: '', description: '', skills_required: '',
     budget_max: '', location: '', duration: '', context: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.get('/clients').then(r => {
+      setClients(r.data)
+      if (r.data.length === 1) setForm(p => ({ ...p, client_id: r.data[0].id }))
+    })
+  }, [])
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
+    if (!form.client_id) { setError('Veuillez sélectionner un client'); return }
     setLoading(true)
     try {
       const payload = { ...form }
@@ -46,7 +55,32 @@ export default function NewAOPage() {
 
       <form onSubmit={handleSubmit} className="space-y-5">
         <div className="card p-5 space-y-4">
-          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Informations générales</h2>
+          <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Client & Mission</h2>
+
+          <div>
+            <label className="label">Client *</label>
+            <div className="relative">
+              <select
+                value={form.client_id}
+                onChange={set('client_id')}
+                required
+                className="input appearance-none pr-9"
+              >
+                <option value="" className="bg-navy-900">— Sélectionner un client —</option>
+                {clients.map(c => (
+                  <option key={c.id} value={c.id} className="bg-navy-900">
+                    {c.name}{c.sector ? ` · ${c.sector}` : ''}
+                  </option>
+                ))}
+              </select>
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            </div>
+            {clients.length === 0 && (
+              <p className="text-[11px] text-amber-400 mt-1.5">
+                Aucun client. Créez-en un d'abord depuis « Clients ».
+              </p>
+            )}
+          </div>
 
           <div>
             <label className="label">Titre de la mission *</label>
@@ -104,9 +138,6 @@ export default function NewAOPage() {
             value={form.context}
             onChange={set('context')}
           />
-          <p className="text-[11px] text-slate-600 mt-1.5">
-            Ces informations enrichissent le scoring IA mais ne sont pas obligatoires
-          </p>
         </div>
 
         {error && (

@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
-from routers import auth, consultants, aos, matching
+from routers import auth, consultants, aos, matching, clients, partners, submissions
 
 app = FastAPI(
     title="G-IT Plateforme Partenaires — POC",
@@ -57,8 +57,11 @@ async def cors_middleware(request: Request, call_next):
 
 # ── Routers ───────────────────────────────────────────────────
 app.include_router(auth.router)
+app.include_router(clients.router)
+app.include_router(partners.router)
 app.include_router(consultants.router)
 app.include_router(aos.router)
+app.include_router(submissions.router)
 app.include_router(matching.router)
 
 @app.get("/")

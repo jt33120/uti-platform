@@ -9,6 +9,8 @@ import AOSPage from './pages/AOSPage'
 import AODetailPage from './pages/AODetailPage'
 import NewConsultantPage from './pages/NewConsultantPage'
 import NewAOPage from './pages/NewAOPage'
+import ClientsPage from './pages/ClientsPage'
+import PartnerAccessPage from './pages/PartnerAccessPage'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user } = useAuth()
@@ -33,11 +35,13 @@ export default function App() {
 
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<DashboardPage />} />
+          <Route path="/clients" element={<ClientsPage />} />
           <Route path="/consultants" element={<ConsultantsPage />} />
           <Route path="/consultants/new" element={<NewConsultantPage />} />
           <Route path="/aos" element={<AOSPage />} />
           <Route path="/aos/new" element={<ProtectedRoute adminOnly><NewAOPage /></ProtectedRoute>} />
           <Route path="/aos/:id" element={<AODetailPage />} />
+          <Route path="/partners-access" element={<ProtectedRoute adminOnly><PartnerAccessPage /></ProtectedRoute>} />
         </Route>
       </Routes>
     </AuthProvider>
