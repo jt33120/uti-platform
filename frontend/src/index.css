@@ -66,6 +66,41 @@
   }
 }
 
+/* ── Light mode overrides ─────────────────────────────────── */
+html.light body { background-color: #f1f5f9 !important; color: #1e293b !important; }
+html.light aside { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+html.light main  { background-color: #f1f5f9 !important; }
+html.light .card { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+
+html.light .text-white     { color: #0f172a !important; }
+html.light .text-slate-200 { color: #1e293b !important; }
+html.light .text-slate-300 { color: #334155 !important; }
+html.light .text-slate-400 { color: #475569 !important; }
+html.light .text-slate-500 { color: #64748b !important; }
+html.light .text-slate-600 { color: #94a3b8 !important; }
+
+html.light .bg-white\/5  { background-color: #f1f5f9 !important; }
+html.light .bg-white\/3  { background-color: #f8fafc !important; }
+html.light .bg-white\/2  { background-color: #f8fafc !important; }
+html.light .hover\:bg-white\/5:hover  { background-color: #e2e8f0 !important; }
+html.light .hover\:bg-white\/10:hover { background-color: #e2e8f0 !important; }
+
+html.light .border-white\/5  { border-color: #e2e8f0 !important; }
+html.light .border-white\/10 { border-color: #cbd5e1 !important; }
+
+html.light .input {
+  background-color: #f8fafc !important;
+  border-color: #cbd5e1 !important;
+  color: #1e293b !important;
+}
+html.light .btn-ghost {
+  background-color: #e2e8f0 !important;
+  color: #334155 !important;
+}
+html.light select option { background-color: #ffffff; color: #1e293b; }
+html.light ::-webkit-scrollbar-track { background-color: #f1f5f9; }
+html.light ::-webkit-scrollbar-thumb { background-color: #cbd5e1; }
+
 /* Score ring animation */
 @keyframes score-fill {
   from { stroke-dashoffset: 283; }

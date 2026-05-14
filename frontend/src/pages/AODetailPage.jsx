@@ -6,8 +6,13 @@ import {
   ArrowLeft, Zap, Euro, MapPin, Clock, Users, CheckCircle,
   AlertCircle, TrendingUp, Award, ChevronDown, ChevronUp,
   Loader2, FileText, Trash2, RotateCcw, Building2, Plus,
-  Upload, X, UserCircle2, Briefcase
+  Upload, X, UserCircle2, Briefcase, Calendar
 } from 'lucide-react'
+
+const formatDate = (iso) => {
+  if (!iso) return null
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso))
+}
 import clsx from 'clsx'
 
 // ─── Score visuals (same as before) ─────────────────────────────
@@ -549,6 +554,12 @@ export default function AODetailPage() {
             <span className="text-sm font-normal text-slate-400"> reçus</span>
           </span>
         </div>
+        {ao.created_at && (
+          <div className="card p-4 flex flex-col gap-1">
+            <span className="text-xs text-slate-500 flex items-center gap-1"><Calendar size={11} className="text-slate-400" />Date d'ajout</span>
+            <span className="text-sm font-semibold text-white leading-tight">{formatDate(ao.created_at)}</span>
+          </div>
+        )}
       </div>
 
       {/* Description */}
