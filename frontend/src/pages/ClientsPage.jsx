@@ -130,11 +130,16 @@ export default function ClientsPage() {
     }
   }, [searchParams, navigate])
 
+  const [error, setError] = useState('')
+
   const fetchAll = async () => {
     setLoading(true)
+    setError('')
     try {
       const { data } = await api.get('/clients')
       setClients(data)
+    } catch (e) {
+      setError(e.response?.data?.detail || e.message || 'Erreur de chargement')
     } finally {
       setLoading(false)
     }
@@ -185,6 +190,12 @@ export default function ClientsPage() {
         <input type="text" className="input pl-9" placeholder="Rechercher par nom, secteur..."
           value={search} onChange={e => setSearch(e.target.value)} />
       </div>
+
+      {error && (
+        <div className="mb-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-16 text-slate-500 text-sm">Chargement...</div>

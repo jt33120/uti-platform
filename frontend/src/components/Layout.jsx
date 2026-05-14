@@ -1,8 +1,9 @@
+import { useState, useEffect } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
-  Building2, Network
+  Building2, Network, Sun, Moon
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -28,6 +29,13 @@ export default function Layout() {
   const { user, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
 
+  const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
+
+  useEffect(() => {
+    document.documentElement.classList.toggle('light', light)
+    localStorage.setItem('theme', light ? 'light' : 'dark')
+  }, [light])
+
   const handleLogout = () => {
     logout()
     navigate('/login')
@@ -45,9 +53,9 @@ export default function Layout() {
           <p className="text-[10px] uppercase tracking-widest text-slate-600 px-3 mb-2">Navigation</p>
 
           <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" end />
-          <NavItem to="/aos" icon={FileText} label="Appels d'offres" />
-          <NavItem to="/clients" icon={Building2} label="Clients" />
-          <NavItem to="/consultants" icon={Users} label="Consultants" />
+          <NavItem to="/aos" icon={FileText} label={isAdmin ? "Appels d'offres" : "Mes AOs"} />
+          <NavItem to="/clients" icon={Building2} label={isAdmin ? "Clients" : "Mes clients"} />
+          <NavItem to="/consultants" icon={Users} label={isAdmin ? "Consultants" : "Mes consultants"} />
 
           {isAdmin && (
             <>
@@ -88,7 +96,17 @@ export default function Layout() {
       </aside>
 
       <main className="flex-1 overflow-y-auto bg-navy-900">
-        <div className="p-6 max-w-6xl mx-auto animate-fade-in">
+        {/* Top bar */}
+        <div className="flex justify-end items-center px-6 pt-4">
+          <button
+            onClick={() => setLight(l => !l)}
+            className="btn-ghost p-2 rounded-lg"
+            title={light ? 'Passer en mode sombre' : 'Passer en mode clair'}
+          >
+            {light ? <Moon size={15} /> : <Sun size={15} />}
+          </button>
+        </div>
+        <div className="px-6 pb-6 max-w-6xl mx-auto animate-fade-in">
           <Outlet />
         </div>
       </main>

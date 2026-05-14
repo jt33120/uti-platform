@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const DEPLOYED_BACKEND_URL = 'https://your-backend-url.com'; // TODO: replace with your deployed backend URL
+const DEPLOYED_BACKEND_URL = 'https://git-production-af3c.up.railway.app';
 
 export default defineConfig({
   plugins: [react()],
@@ -9,7 +9,7 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: process.env.NODE_ENV === 'production' ? DEPLOYED_BACKEND_URL : 'http://localhost:8000',
+        target: 'http://localhost:8000',
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api/, ''),
       },

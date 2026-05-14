@@ -4,8 +4,13 @@ import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import {
   FileText, Plus, Euro, MapPin, Clock, ArrowRight, Search,
-  Building2, Users, Star, ListChecks
+  Building2, Users, Star, ListChecks, Calendar
 } from 'lucide-react'
+
+const formatDate = (iso) => {
+  if (!iso) return null
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))
+}
 import clsx from 'clsx'
 
 function TierBadge({ tier }) {
@@ -86,6 +91,12 @@ function AOCard({ ao, isAdmin }) {
             {ao.duration}
           </span>
         )}
+        {ao.created_at && (
+          <span className="flex items-center gap-1">
+            <Calendar size={10} />
+            {formatDate(ao.created_at)}
+          </span>
+        )}
         {isAdmin && (
           <span className="flex items-center gap-1 ml-auto text-brand-300">
             <Users size={10} />
@@ -102,12 +113,16 @@ export default function AOSPage() {
   const { isAdmin } = useAuth()
   const [aos, setAos] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [groupBy, setGroupBy] = useState('client') // 'client' | 'none'
 
   useEffect(() => {
-    api.get('/aos').then(r => setAos(r.data)).finally(() => setLoading(false))
+    api.get('/aos')
+      .then(r => setAos(r.data))
+      .catch(e => setError(e.response?.data?.detail || e.message || 'Erreur de chargement'))
+      .finally(() => setLoading(false))
   }, [])
 
   const filtered = useMemo(() => aos.filter(ao => {
@@ -207,6 +222,12 @@ export default function AOSPage() {
           ))}
         </div>
       </div>
+
+      {error && (
+        <div className="mb-4 text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+          {error}
+        </div>
+      )}
 
       {loading ? (
         <div className="text-center py-16 text-slate-500 text-sm">Chargement...</div>
