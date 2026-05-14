@@ -65,6 +65,19 @@ async def upsert_access(body: AccessUpsert, user: dict = Depends(require_admin))
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/{partner_id}/suspend")
+async def suspend_partner_globally(partner_id: str, user: dict = Depends(require_admin)):
+    """Set all existing partner_clients rows for this partner to 'suspended'."""
+    try:
+        supabase.table("partner_clients").update({
+            "tier": "suspended",
+            "assigned_by": user["sub"],
+        }).eq("partner_id", partner_id).execute()
+        return {"message": "Partenaire suspendu sur tous les clients"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/access")
 async def remove_access(partner_id: str, client_id: str, user: dict = Depends(require_admin)):
     """Remove a partner's access to a client entirely."""

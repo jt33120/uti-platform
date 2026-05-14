@@ -435,6 +435,13 @@ export default function AODetailPage() {
         if (!isAdmin) {
           const rosterRes = await api.get('/consultants')
           setRoster(rosterRes.data)
+
+          if (subs.length > 0) {
+            try {
+              const cached = await api.get(`/matching/results/${id}`)
+              if (cached.data.results?.length > 0) setMatchResults(cached.data.results)
+            } catch { /* scoring not run yet */ }
+          }
         }
 
         if (isAdmin && subs.length > 0) {
@@ -498,7 +505,7 @@ export default function AODetailPage() {
   if (!ao) return null
 
   return (
-    <div className="max-w-4xl animate-slide-up">
+    <div className="animate-slide-up">
       {/* Header */}
       <div className="flex items-start gap-3 mb-5">
         <button onClick={() => navigate('/aos')} className="btn-ghost p-2 mt-0.5">
@@ -630,6 +637,27 @@ export default function AODetailPage() {
                 ))}
               </div>
             </div>
+          )}
+
+          {/* Partner: own match scores */}
+          {!isAdmin && submissions.length > 0 && (
+            matchResults && matchResults.length > 0 ? (
+              <div className="card p-4">
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
+                  <TrendingUp size={12} className="text-brand-400" /> Vos scores IA
+                </p>
+                <div className="space-y-3">
+                  {matchResults.map((result, i) => (
+                    <MatchCard key={result.submission_id || i} result={result} rank={i + 1} />
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="card p-4 border-dashed border-white/10 text-center">
+                <TrendingUp size={22} className="mx-auto text-slate-700 mb-2" />
+                <p className="text-xs text-slate-500">Scoring IA en attente — l'administrateur analysera vos CVs prochainement</p>
+              </div>
+            )
           )}
 
           {/* Admin: matching results / controls */}

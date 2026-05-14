@@ -61,7 +61,7 @@ export default function Layout() {
             <>
               <p className="text-[10px] uppercase tracking-widest text-slate-600 px-3 mt-5 mb-2">Admin</p>
               <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" />
-              <NavItem to="/clients?new=1" icon={Plus} label="Nouveau client" />
+              <NavItem to="/clients/new" icon={Plus} label="Nouveau client" />
               <NavItem to="/partners-access" icon={Network} label="Gestion partenaires" />
             </>
           )}

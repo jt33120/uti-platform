@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Link, useSearchParams, useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
-import { Building2, Plus, Pencil, Trash2, Search, Briefcase } from 'lucide-react'
+import { Building2, Plus, Pencil, Trash2, Search, Briefcase, UserCircle2, Mail } from 'lucide-react'
 import clsx from 'clsx'
 
 function TierBadge({ tier }) {
@@ -32,7 +32,13 @@ function ClientRow({ client, isAdmin, onEdit, onDelete }) {
             </span>
           )}
         </div>
-        {client.description && (
+        {client.contact_name && (
+          <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1">
+            <UserCircle2 size={10} /> {client.contact_name}
+            {client.contact_email && <span className="text-slate-600">· {client.contact_email}</span>}
+          </p>
+        )}
+        {!client.contact_name && client.description && (
           <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{client.description}</p>
         )}
       </div>
@@ -56,6 +62,8 @@ function ClientModal({ client, onClose, onSaved }) {
     name: client?.name || '',
     description: client?.description || '',
     sector: client?.sector || '',
+    contact_name: client?.contact_name || '',
+    contact_email: client?.contact_email || '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -100,6 +108,18 @@ function ClientModal({ client, onClose, onSaved }) {
             <textarea className="input h-24 resize-none" value={form.description}
               onChange={e => setForm(p => ({ ...p, description: e.target.value }))} />
           </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label flex items-center gap-1"><UserCircle2 size={11} /> Contact</label>
+              <input className="input" placeholder="Nom du contact" value={form.contact_name}
+                onChange={e => setForm(p => ({ ...p, contact_name: e.target.value }))} />
+            </div>
+            <div>
+              <label className="label flex items-center gap-1"><Mail size={11} /> Email</label>
+              <input className="input" type="email" placeholder="email@..." value={form.contact_email}
+                onChange={e => setForm(p => ({ ...p, contact_email: e.target.value }))} />
+            </div>
+          </div>
           {error && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">{error}</div>}
           <div className="flex gap-2 justify-end pt-2">
             <button type="button" onClick={onClose} className="btn-ghost">Annuler</button>
@@ -118,17 +138,8 @@ export default function ClientsPage() {
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [modal, setModal] = useState(null) // null | {} (new) | client (edit)
-  const [searchParams] = useSearchParams()
+  const [modal, setModal] = useState(null) // null | client (edit only)
   const navigate = useNavigate()
-
-  // Auto-open the "new client" modal when arriving from the sidebar shortcut
-  useEffect(() => {
-    if (searchParams.get('new') === '1') {
-      setModal({})
-      navigate('/clients', { replace: true })
-    }
-  }, [searchParams, navigate])
 
   const [error, setError] = useState('')
 
@@ -178,9 +189,9 @@ export default function ClientsPage() {
         {isAdmin && (
           <div className="flex gap-2">
             <Link to="/partners-access" className="btn-ghost">Gestion partenaires</Link>
-            <button onClick={() => setModal({})} className="btn-primary">
+            <Link to="/clients/new" className="btn-primary">
               <Plus size={15} /> Nouveau client
-            </button>
+            </Link>
           </div>
         )}
       </div>
@@ -206,9 +217,9 @@ export default function ClientsPage() {
             {search ? 'Aucun résultat' : isAdmin ? 'Aucun client pour le moment' : 'Aucun client accessible'}
           </p>
           {isAdmin && !search && (
-            <button onClick={() => setModal({})} className="btn-primary mt-4 mx-auto">
+            <Link to="/clients/new" className="btn-primary mt-4 mx-auto">
               <Plus size={14} /> Créer le premier client
-            </button>
+            </Link>
           )}
         </div>
       ) : (
@@ -222,6 +233,7 @@ export default function ClientsPage() {
 
       {modal && <ClientModal client={modal} onClose={() => setModal(null)}
         onSaved={() => { setModal(null); fetchAll() }} />}
+
     </div>
   )
 }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import api from '../lib/api'
 import {
   Building2, Users, Loader2, AlertCircle, ChevronDown,
-  Star, ListChecks, Ban, UserCircle2
+  Star, ListChecks, Ban, UserCircle2, ShieldOff, CheckCircle2
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -75,6 +75,7 @@ export default function PartnerAccessPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dragTarget, setDragTarget] = useState(null)
+  const [suspending, setSuspending] = useState(null) // partner id being suspended
 
   const fetchAll = async () => {
     setLoading(true)
@@ -140,6 +141,19 @@ export default function PartnerAccessPage() {
       alert(e.response?.data?.detail || 'Erreur lors de la mise à jour')
     } finally {
       setSaving(false)
+    }
+  }
+
+  const handleSuspendGlobally = async (partnerId) => {
+    if (!confirm('Suspendre ce partenaire sur TOUS les clients ?')) return
+    setSuspending(partnerId)
+    try {
+      await api.post(`/partners/${partnerId}/suspend`)
+      await fetchAll()
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Erreur lors de la suspension')
+    } finally {
+      setSuspending(null)
     }
   }
 
@@ -226,6 +240,49 @@ export default function PartnerAccessPage() {
             <Star size={11} className="inline text-emerald-500 mr-1" />
             Les partenaires de la <span className="text-emerald-400">Liste 1</span> sont prioritaires sur les AOs de ce client.
           </p>
+
+          {/* Global partner management */}
+          <div className="mt-8">
+            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
+              <ShieldOff size={13} className="text-red-400" /> Suspension globale
+            </h2>
+            <div className="space-y-2">
+              {partners.map(p => {
+                const partnerAccess = access.filter(r => r.partner_id === p.id)
+                const isSuspendedEverywhere = partnerAccess.length > 0 &&
+                  partnerAccess.every(r => r.tier === 'suspended')
+                const hasAnyAccess = partnerAccess.some(r => r.tier !== 'suspended')
+                return (
+                  <div key={p.id} className="card p-3 flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500/40 to-emerald-500/40 border border-white/10 flex items-center justify-center text-xs font-bold text-white shrink-0">
+                      {p.name?.charAt(0).toUpperCase() || '?'}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="text-xs font-semibold text-white truncate">{p.name}</div>
+                      <div className="text-[10px] text-slate-500 truncate">{p.email}</div>
+                    </div>
+                    {isSuspendedEverywhere ? (
+                      <span className="badge bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] flex items-center gap-1">
+                        <AlertCircle size={10} /> Suspendu partout
+                      </span>
+                    ) : hasAnyAccess ? (
+                      <button
+                        onClick={() => handleSuspendGlobally(p.id)}
+                        disabled={suspending === p.id}
+                        className="btn-danger text-xs px-3 py-1.5 flex items-center gap-1.5"
+                      >
+                        {suspending === p.id
+                          ? <><Loader2 size={12} className="animate-spin" />Suspension...</>
+                          : <><ShieldOff size={12} />Suspendre partout</>}
+                      </button>
+                    ) : (
+                      <span className="text-[10px] text-slate-600">Aucun accès actif</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </>
       )}
     </div>

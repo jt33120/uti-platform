@@ -157,6 +157,17 @@ async def list_submissions_for_ao(ao_id: str, user: dict = Depends(get_current_u
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/mine")
+async def list_my_submissions(user: dict = Depends(get_current_user)):
+    """Return all submissions made by the current user, with AO title."""
+    try:
+        return supabase.table("submissions").select(
+            "id, ao_id, submitted_at, appels_offres(title)"
+        ).eq("submitted_by", user["sub"]).order("submitted_at", desc=True).execute().data
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/{submission_id}")
 async def delete_submission(submission_id: str, user: dict = Depends(get_current_user)):
     try:

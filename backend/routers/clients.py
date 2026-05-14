@@ -12,6 +12,8 @@ class ClientCreate(BaseModel):
     description: Optional[str] = None
     sector: Optional[str] = None
     logo_url: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
 
 
 class ClientUpdate(BaseModel):
@@ -19,6 +21,8 @@ class ClientUpdate(BaseModel):
     description: Optional[str] = None
     sector: Optional[str] = None
     logo_url: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_email: Optional[str] = None
 
 
 @router.post("")
@@ -29,6 +33,8 @@ async def create_client(body: ClientCreate, user: dict = Depends(require_admin))
             "description": body.description,
             "sector": body.sector,
             "logo_url": body.logo_url,
+            "contact_name": body.contact_name,
+            "contact_email": body.contact_email,
             "created_by": user["sub"],
         }).execute()
         return response.data[0]
