@@ -9,6 +9,7 @@ import AOSPage from './pages/AOSPage'
 import AODetailPage from './pages/AODetailPage'
 import NewConsultantPage from './pages/NewConsultantPage'
 import NewAOPage from './pages/NewAOPage'
+import NewClientPage from './pages/NewClientPage'
 import ClientsPage from './pages/ClientsPage'
 import PartnerAccessPage from './pages/PartnerAccessPage'
 
@@ -40,6 +41,7 @@ export default function App() {
           <Route path="/consultants/new" element={<NewConsultantPage />} />
           <Route path="/aos" element={<AOSPage />} />
           <Route path="/aos/new" element={<ProtectedRoute adminOnly><NewAOPage /></ProtectedRoute>} />
+          <Route path="/clients/new" element={<ProtectedRoute adminOnly><NewClientPage /></ProtectedRoute>} />
           <Route path="/aos/:id" element={<AODetailPage />} />
           <Route path="/partners-access" element={<ProtectedRoute adminOnly><PartnerAccessPage /></ProtectedRoute>} />
         </Route>

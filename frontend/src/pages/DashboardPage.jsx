@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
-import { Users, FileText, Plus, ArrowRight, TrendingUp, Zap } from 'lucide-react'
+import { Users, FileText, Plus, ArrowRight, TrendingUp, Send } from 'lucide-react'
 
 function StatCard({ icon: Icon, label, value, color = 'brand', to }) {
   const colors = {
@@ -27,20 +27,20 @@ function StatCard({ icon: Icon, label, value, color = 'brand', to }) {
 
 export default function DashboardPage() {
   const { user, isAdmin } = useAuth()
-  const [stats, setStats] = useState({ consultants: null, aos: null })
+  const [stats, setStats] = useState({ consultants: null, aos: null, submissions: null })
   const [recentAOs, setRecentAOs] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const [consultantsRes, aosRes] = await Promise.all([
-          api.get('/consultants'),
-          api.get('/aos'),
-        ])
+        const requests = [api.get('/consultants'), api.get('/aos')]
+        if (!isAdmin) requests.push(api.get('/submissions/mine'))
+        const [consultantsRes, aosRes, subsRes] = await Promise.all(requests)
         setStats({
           consultants: consultantsRes.data.length,
           aos: aosRes.data.length,
+          submissions: subsRes?.data.length ?? null,
         })
         setRecentAOs(aosRes.data.slice(0, 5))
       } catch (e) {
@@ -50,7 +50,7 @@ export default function DashboardPage() {
       }
     }
     fetchData()
-  }, [])
+  }, [isAdmin])
 
   return (
     <div className="animate-slide-up">
@@ -70,24 +70,23 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
         <StatCard
           icon={Users}
-          label="Consultants"
+          label={isAdmin ? 'Consultants' : 'Mes consultants'}
           value={stats.consultants}
           color="emerald"
           to="/consultants"
         />
         <StatCard
           icon={FileText}
-          label="Appels d'offres"
+          label={isAdmin ? "Appels d'offres" : "Mes AOs"}
           value={stats.aos}
           color="brand"
           to="/aos"
         />
-        <StatCard
-          icon={TrendingUp}
-          label="Matching IA"
-          value={isAdmin ? 'Actif' : '—'}
-          color="purple"
-        />
+        {isAdmin ? (
+          <StatCard icon={TrendingUp} label="Matching IA" value="Actif" color="purple" />
+        ) : (
+          <StatCard icon={Send} label="CVs soumis" value={stats.submissions} color="purple" />
+        )}
       </div>
 
       {/* Quick actions */}

@@ -106,13 +106,23 @@ async def run_matching(body: MatchRequest, user: dict = Depends(require_admin)):
 
 
 @router.get("/results/{ao_id}")
-async def get_matching_results(ao_id: str, user: dict = Depends(require_admin)):
+async def get_matching_results(ao_id: str, user: dict = Depends(get_current_user)):
     try:
-        response = supabase.table("matchings").select(
+        query = supabase.table("matchings").select(
             "*, consultants(name, tjm, skills, employment_type), submissions(cv_url, cv_filename)"
-        ).eq("ao_id", ao_id).order("rank").execute()
+        ).eq("ao_id", ao_id).order("rank")
 
-        # Flatten useful fields for the UI
+        if user["role"] == "ao":
+            # Partners only see results for their own submissions
+            own_subs = supabase.table("submissions").select("id").eq(
+                "ao_id", ao_id
+            ).eq("submitted_by", user["sub"]).execute().data or []
+            own_ids = [s["id"] for s in own_subs]
+            if not own_ids:
+                return {"ao_id": ao_id, "results": []}
+            query = query.in_("submission_id", own_ids)
+
+        response = query.execute()
         for r in response.data or []:
             c = r.get("consultants") or {}
             s = r.get("submissions") or {}
@@ -123,9 +133,6 @@ async def get_matching_results(ao_id: str, user: dict = Depends(require_admin)):
             r["cv_url"] = s.get("cv_url")
             r["cv_filename"] = s.get("cv_filename")
 
-        return {
-            "ao_id": ao_id,
-            "results": response.data,
-        }
+        return {"ao_id": ao_id, "results": response.data}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
