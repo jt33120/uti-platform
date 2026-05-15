@@ -1,8 +1,9 @@
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
+from typing import Optional
 from jose import jwt, JWTError
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from services.supabase_client import supabase
 from config import settings
 import traceback
@@ -19,6 +20,7 @@ class RegisterRequest(BaseModel):
     password: str
     name: str
     role: str  # "admin" or "ao"
+    invite_token: Optional[str] = None
 
 
 class LoginRequest(BaseModel):
@@ -115,6 +117,29 @@ def _parse_supabase_error(error_msg: str) -> tuple[int, str]:
 
 @router.post("/register")
 async def register(body: RegisterRequest):
+    # ── Validate and consume invite token (if provided) ───────────
+    invitation = None
+    if body.invite_token:
+        try:
+            inv_result = supabase.table("invitations").select("*") \
+                .eq("token", body.invite_token).single().execute()
+            invitation = inv_result.data
+        except Exception:
+            invitation = None
+
+        if not invitation or invitation.get("used_at"):
+            raise HTTPException(status_code=400, detail="Lien d'invitation invalide ou déjà utilisé.")
+
+        inv_expires = datetime.fromisoformat(invitation["expires_at"].replace("Z", "+00:00"))
+        if inv_expires < datetime.now(timezone.utc):
+            raise HTTPException(status_code=410, detail="Ce lien d'invitation a expiré.")
+
+        if invitation["email"].lower() != body.email.lower():
+            raise HTTPException(status_code=400, detail="L'email ne correspond pas à l'invitation.")
+
+        # Force role from invitation — prevents privilege escalation
+        body.role = invitation["role"]
+
     if body.role not in ("admin", "ao"):
         raise HTTPException(status_code=400, detail="Rôle invalide. Utilisez 'admin' ou 'ao'.")
 
@@ -174,6 +199,16 @@ async def register(body: RegisterRequest):
     if hasattr(profile_resp, 'error') and profile_resp.error:
         status, detail = _parse_supabase_error(profile_resp.error.message)
         raise HTTPException(status_code=status, detail=detail)
+
+    # ── Consume invitation token ──────────────────────────────────
+    if invitation:
+        try:
+            supabase.table("invitations").update({
+                "used_at": datetime.now(timezone.utc).isoformat(),
+                "used_by": user_id,
+            }).eq("token", body.invite_token).execute()
+        except Exception as e:
+            print(f"[AUTH] Warning: could not mark invitation as used: {e}")
 
     token = create_token(user_id, body.email, body.role)
 

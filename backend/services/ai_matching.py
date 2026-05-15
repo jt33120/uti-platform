@@ -6,6 +6,17 @@ from config import settings
 
 client = AsyncOpenAI(api_key=settings.openai_api_key)
 
+# GPT-4o pricing (as of 2024)
+GPT4O_INPUT_COST_PER_MILLION = 2.50  # $2.50 per 1M input tokens
+GPT4O_OUTPUT_COST_PER_MILLION = 10.00  # $10.00 per 1M output tokens
+
+
+def calculate_cost(input_tokens: int, output_tokens: int) -> float:
+    """Calculate cost in USD for GPT-4o API usage."""
+    input_cost = (input_tokens / 1_000_000) * GPT4O_INPUT_COST_PER_MILLION
+    output_cost = (output_tokens / 1_000_000) * GPT4O_OUTPUT_COST_PER_MILLION
+    return input_cost + output_cost
+
 
 SCORING_SYSTEM_PROMPT = """Tu es un expert en recrutement IT et consulting, spécialisé dans l'évaluation de profils techniques.
 
@@ -81,18 +92,19 @@ Score les {len(consultants)} consultant(s) fourni(s).
 """
 
 
-async def score_consultants(ao: dict, consultants: list[dict]) -> list[dict]:
+async def score_consultants(ao: dict, consultants: list[dict]) -> tuple[list[dict], float]:
     """
     Core AI matching function.
     Uses GPT-4o with structured JSON output for reliable, explainable scoring.
-    
+    Returns (scored_results, cost_usd).
+
     Strategy:
     1. Send AO + all CVs texts in a single prompt
     2. GPT-4o scores each consultant with breakdown + explanation
     3. Sort by total score, return top results
     """
     if not consultants:
-        return []
+        return [], 0.0
 
     prompt = build_matching_prompt(ao, consultants)
 
@@ -112,6 +124,10 @@ async def score_consultants(ao: dict, consultants: list[dict]) -> list[dict]:
         result = json.loads(content)
         scored = result.get("consultants", [])
 
+        # Calculate cost
+        usage = response.usage
+        cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens)
+
         # Sort by total score descending
         scored.sort(key=lambda x: x.get("score_total", 0), reverse=True)
 
@@ -125,7 +141,7 @@ async def score_consultants(ao: dict, consultants: list[dict]) -> list[dict]:
                 item["consultant_tjm"] = c.get("tjm")
                 item["consultant_skills"] = c.get("skills", "")
 
-        return scored
+        return scored, cost
 
     except json.JSONDecodeError as e:
         raise ValueError(f"GPT response parsing error: {e}")
@@ -133,11 +149,12 @@ async def score_consultants(ao: dict, consultants: list[dict]) -> list[dict]:
         raise RuntimeError(f"OpenAI API error: {e}")
 
 
-async def score_consultants_batch(ao: dict, consultants: list[dict], batch_size: int = 5) -> list[dict]:
+async def score_consultants_batch(ao: dict, consultants: list[dict], batch_size: int = 5) -> tuple[list[dict], float]:
     """
     Handle large number of consultants by batching.
     GPT-4o context window allows ~10 CVs at once safely.
     For more, we batch and merge results.
+    Returns (scored_results, total_cost_usd).
     """
     if len(consultants) <= batch_size:
         return await score_consultants(ao, consultants)
@@ -145,14 +162,16 @@ async def score_consultants_batch(ao: dict, consultants: list[dict], batch_size:
     # Process in batches
     batches = [consultants[i:i+batch_size] for i in range(0, len(consultants), batch_size)]
     all_results = []
+    total_cost = 0.0
 
     tasks = [score_consultants(ao, batch) for batch in batches]
     batch_results = await asyncio.gather(*tasks)
 
-    for results in batch_results:
+    for results, cost in batch_results:
         all_results.extend(results)
+        total_cost += cost
 
     # Re-sort globally after merging
     all_results.sort(key=lambda x: x.get("score_total", 0), reverse=True)
 
-    return all_results
+    return all_results, total_cost

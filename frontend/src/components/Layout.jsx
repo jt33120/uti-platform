@@ -3,9 +3,10 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
-  Building2, Network, Sun, Moon
+  Building2, Network, Sun, Moon, UserPlus
 } from 'lucide-react'
 import clsx from 'clsx'
+import InviteModal from './InviteModal'
 
 const NavItem = ({ to, icon: Icon, label, end = false }) => (
   <NavLink
@@ -30,6 +31,7 @@ export default function Layout() {
   const navigate = useNavigate()
 
   const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
+  const [inviteOpen, setInviteOpen] = useState(false)
 
   useEffect(() => {
     document.documentElement.classList.toggle('light', light)
@@ -59,9 +61,16 @@ export default function Layout() {
 
           {isAdmin && (
             <>
-              <p className="text-[10px] uppercase tracking-widest text-slate-600 px-3 mt-5 mb-2">Admin</p>
+              <p className="text-[10px] uppercase tracking-widest text-slate-600 px-3 mt-5 mb-2">Raccourcis</p>
               <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" />
               <NavItem to="/clients/new" icon={Plus} label="Nouveau client" />
+              <button
+                onClick={() => setInviteOpen(true)}
+                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 text-slate-400 hover:text-slate-200 hover:bg-white/5 w-full"
+              >
+                <UserPlus size={16} className="shrink-0" />
+                Inviter partenaire
+              </button>
               <NavItem to="/partners-access" icon={Network} label="Gestion partenaires" />
             </>
           )}
@@ -94,6 +103,8 @@ export default function Layout() {
           </div>
         </div>
       </aside>
+
+      {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
 
       <main className="flex-1 overflow-y-auto bg-navy-900">
         {/* Top bar */}

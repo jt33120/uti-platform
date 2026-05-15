@@ -27,10 +27,10 @@ export function AuthProvider({ children }) {
     }
   }
 
-  const register = async (email, password, name, role) => {
+  const register = async (email, password, name, role, inviteToken = null) => {
     setLoading(true)
     try {
-      const { data } = await api.post('/auth/register', { email, password, name, role })
+      const { data } = await api.post('/auth/register', { email, password, name, role, invite_token: inviteToken || undefined })
       localStorage.setItem('token', data.token)
       localStorage.setItem('user', JSON.stringify(data.user))
       setUser(data.user)
