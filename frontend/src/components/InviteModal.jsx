@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { X, Mail, Copy, Check, UserPlus } from 'lucide-react'
+import { useState, useEffect } from 'react'
+import { X, Copy, Check } from 'lucide-react'
 import api from '../lib/api'
 
 export default function InviteModal({ onClose }) {
@@ -8,6 +8,12 @@ export default function InviteModal({ onClose }) {
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  useEffect(() => {
+    const handler = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [onClose])
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -30,66 +36,72 @@ export default function InviteModal({ onClose }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
-      <div className="relative w-full max-w-md card p-6 animate-slide-up">
-        <button
-          onClick={onClose}
-          className="absolute top-4 right-4 text-slate-500 hover:text-slate-300 transition-colors"
-        >
-          <X size={18} />
-        </button>
-
-        <div className="flex items-center gap-3 mb-5">
-          <div className="w-9 h-9 rounded-lg bg-brand-600/20 flex items-center justify-center">
-            <UserPlus size={18} className="text-brand-400" />
-          </div>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ background: 'rgba(0, 0, 0, 0.4)' }}
+      onClick={onClose}
+    >
+      <div
+        className="relative w-full max-w-[420px] card p-5"
+        style={{ boxShadow: '0 20px 50px -12px rgba(0, 0, 0, 0.25)' }}
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-start justify-between mb-4">
           <div>
-            <h2 className="text-sm font-semibold text-white">Inviter un partenaire</h2>
-            <p className="text-xs text-slate-500">Lien valable 7 jours, usage unique</p>
+            <h2 className="text-[15px] font-semibold tracking-tightest text-[var(--text)]">
+              Inviter un partenaire
+            </h2>
+            <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
+              Lien valable 7 jours, à usage unique
+            </p>
           </div>
+          <button
+            onClick={onClose}
+            className="text-[var(--text-faint)] hover:text-[var(--text)] transition-colors -mt-1 -mr-1 p-1 rounded"
+          >
+            <X size={16} strokeWidth={1.75} />
+          </button>
         </div>
 
         {!inviteUrl ? (
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
               <label className="label">Email du partenaire</label>
-              <div className="relative">
-                <Mail size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-                <input
-                  type="email"
-                  className="input pl-8"
-                  placeholder="partenaire@exemple.com"
-                  value={email}
-                  onChange={e => setEmail(e.target.value)}
-                  required
-                  autoFocus
-                />
-              </div>
+              <input
+                type="email"
+                className="input"
+                placeholder="partenaire@exemple.com"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                required
+                autoFocus
+              />
             </div>
 
             {error && (
-              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
+              <div
+                className="text-[13px] rounded-md px-3 py-2"
+                style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+              >
                 {error}
               </div>
             )}
 
             <div className="flex gap-2 pt-1">
-              <button type="button" onClick={onClose} className="btn-ghost flex-1 justify-center py-2">
+              <button type="button" onClick={onClose} className="btn-ghost flex-1 justify-center">
                 Annuler
               </button>
-              <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center py-2">
-                {loading ? (
-                  <span className="flex items-center gap-2">
-                    <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Génération...
-                  </span>
-                ) : "Générer le lien"}
+              <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center">
+                {loading ? 'Génération...' : 'Générer le lien'}
               </button>
             </div>
           </form>
         ) : (
-          <div className="space-y-4">
-            <div className="text-sm text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 rounded-lg px-3 py-2">
+          <div className="space-y-3.5">
+            <div
+              className="text-[13px] rounded-md px-3 py-2"
+              style={{ background: 'var(--success-soft)', color: 'var(--success)' }}
+            >
               Invitation créée pour <span className="font-medium">{email}</span>
             </div>
 
@@ -99,27 +111,26 @@ export default function InviteModal({ onClose }) {
                 <input
                   readOnly
                   value={inviteUrl}
-                  className="input text-xs text-slate-400 flex-1 truncate"
+                  className="input flex-1 text-[12px] tabular truncate"
                   onClick={e => e.target.select()}
                 />
                 <button
                   onClick={handleCopy}
-                  className={`shrink-0 px-3 rounded-lg border text-sm font-medium flex items-center gap-1.5 transition-all ${
-                    copied
-                      ? 'border-emerald-500/40 bg-emerald-600/10 text-emerald-400'
-                      : 'border-white/10 bg-white/5 text-slate-300 hover:border-white/20 hover:text-white'
-                  }`}
+                  className="btn-ghost shrink-0 !px-3"
                 >
-                  {copied ? <Check size={13} /> : <Copy size={13} />}
-                  {copied ? 'Copié' : 'Copier'}
+                  {copied ? (
+                    <><Check size={13} strokeWidth={2} /> Copié</>
+                  ) : (
+                    <><Copy size={13} strokeWidth={1.75} /> Copier</>
+                  )}
                 </button>
               </div>
-              <p className="text-xs text-slate-500 mt-1.5">
-                Envoyez ce lien au partenaire par email ou message. Il expire dans 7 jours.
+              <p className="text-[11px] text-[var(--text-faint)] mt-1.5">
+                Envoyez ce lien par email ou message au partenaire.
               </p>
             </div>
 
-            <button onClick={onClose} className="btn-primary w-full justify-center py-2">
+            <button onClick={onClose} className="btn-primary w-full justify-center">
               Fermer
             </button>
           </div>

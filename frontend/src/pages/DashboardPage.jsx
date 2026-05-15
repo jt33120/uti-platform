@@ -2,29 +2,38 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
-import { Users, FileText, Plus, ArrowRight, TrendingUp, Send, Building2, UserPlus } from 'lucide-react'
+import { Users, FileText, Plus, ArrowRight, Building2, UserPlus, Send, Sparkles } from 'lucide-react'
 import InviteModal from '../components/InviteModal'
 
-function StatCard({ icon: Icon, label, value, color = 'brand', to }) {
-  const colors = {
-    brand: 'bg-brand-600/10 text-brand-400 border-brand-500/20',
-    emerald: 'bg-emerald-600/10 text-emerald-400 border-emerald-500/20',
-    purple: 'bg-purple-600/10 text-purple-400 border-purple-500/20',
-    amber: 'bg-amber-600/10 text-amber-400 border-amber-500/20',
-  }
-  const content = (
-    <div className="card p-5 flex items-center gap-4 hover:border-white/10 transition-all duration-150">
-      <div className={`p-2.5 rounded-lg border ${colors[color]}`}>
-        <Icon size={18} />
+function StatTile({ label, value, to, sublabel }) {
+  const inner = (
+    <div className="stat-tile group">
+      <div className="stat-label">{label}</div>
+      <div className="flex items-baseline justify-between">
+        <div className="stat-value">{value ?? '—'}</div>
+        {to && <ArrowRight size={14} className="text-[var(--text-faint)] group-hover:text-[var(--text)] transition-colors" strokeWidth={1.75} />}
       </div>
-      <div>
-        <div className="text-2xl font-bold text-white">{value ?? '—'}</div>
-        <div className="text-xs text-slate-500">{label}</div>
-      </div>
-      {to && <ArrowRight size={14} className="ml-auto text-slate-600" />}
+      {sublabel && <div className="text-[11px] text-[var(--text-faint)] mt-0.5">{sublabel}</div>}
     </div>
   )
-  return to ? <Link to={to}>{content}</Link> : content
+  return to ? <Link to={to} className="block">{inner}</Link> : inner
+}
+
+function QuickAction({ to, onClick, icon: Icon, title, desc }) {
+  const inner = (
+    <div className="card p-3.5 flex items-center gap-3 transition-colors hover:bg-[var(--surface-2)] group cursor-pointer">
+      <div className="w-8 h-8 rounded-md flex items-center justify-center surface-2 border border-[var(--border)]">
+        <Icon size={15} strokeWidth={1.75} className="text-[var(--text)]" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[13px] font-medium text-[var(--text)]">{title}</div>
+        <div className="text-[11px] text-[var(--text-faint)] truncate">{desc}</div>
+      </div>
+      <ArrowRight size={14} strokeWidth={1.75} className="text-[var(--text-faint)] group-hover:text-[var(--text)] transition-colors" />
+    </div>
+  )
+  if (to) return <Link to={to}>{inner}</Link>
+  return <button onClick={onClick} className="text-left w-full">{inner}</button>
 }
 
 export default function DashboardPage() {
@@ -62,158 +71,101 @@ export default function DashboardPage() {
   }, [isAdmin])
 
   return (
-    <div className="animate-slide-up">
-      {/* Welcome */}
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-white">
-          Bonjour, <span className="text-brand-400">{user?.name}</span> 👋
-        </h1>
-        <p className="text-slate-400 text-sm mt-1">
-          {isAdmin
-            ? 'Gérez vos appels d\'offres et lancez le scoring IA.'
-            : 'Soumettez des consultants et suivez les appels d\'offres.'}
-        </p>
+    <div>
+      {/* Header */}
+      <div className="flex items-end justify-between mb-7">
+        <div>
+          <h1 className="text-[22px] font-semibold tracking-tightest text-[var(--text)]">
+            Bonjour, {user?.name?.split(' ')[0]}
+          </h1>
+          <p className="text-[13px] text-[var(--text-muted)] mt-0.5">
+            {isAdmin
+              ? "Gérez vos appels d'offres et lancez le scoring IA."
+              : "Soumettez des consultants et suivez les appels d'offres."}
+          </p>
+        </div>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        <StatCard
-          icon={Users}
-          label={isAdmin ? 'Consultants' : 'Mes consultants'}
-          value={stats.consultants}
-          color="emerald"
-          to="/consultants"
-        />
-        <StatCard
-          icon={FileText}
-          label={isAdmin ? "Appels d'offres" : "Mes AOs"}
-          value={stats.aos}
-          color="brand"
-          to="/aos"
-        />
-        <StatCard
-          icon={Building2}
-          label="Clients"
-          value={stats.clients}
-          color="amber"
-          to="/clients"
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
+        <StatTile label="Consultants" value={stats.consultants} to="/consultants" />
+        <StatTile label={isAdmin ? "Appels d'offres" : 'Mes AOs'} value={stats.aos} to="/aos" />
+        <StatTile label="Clients" value={stats.clients} to="/clients" />
         {isAdmin ? (
-          <div className="card p-5 flex flex-col justify-between">
-            <div className="flex items-start gap-4">
-              <div className="p-2.5 rounded-lg border bg-purple-600/10 text-purple-400 border-purple-500/20">
-                <TrendingUp size={18} />
-              </div>
-              <div className="flex-1">
-                <div className="text-2xl font-bold text-white">{stats.matchings ?? '—'}</div>
-                <div className="text-xs text-slate-500 mb-2">Matchings effectués</div>
-                <div className="text-xs text-slate-400 space-y-0.5">
-                  <div>{stats.aiModel}</div>
-                  {stats.cost !== null && <div className="text-slate-300 font-medium">${stats.cost}</div>}
-                </div>
-              </div>
-            </div>
-          </div>
+          <StatTile
+            label="Matchings IA"
+            value={stats.matchings}
+            sublabel={stats.cost !== null ? `${stats.aiModel} · $${stats.cost}` : stats.aiModel}
+          />
         ) : (
-          <StatCard icon={Send} label="CVs soumis" value={stats.submissions} color="purple" />
+          <StatTile label="CVs soumis" value={stats.submissions} />
         )}
       </div>
 
       {/* Quick actions */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-        {isAdmin && (
-          <Link to="/aos/new" className="card p-4 border-dashed border-white/10 hover:border-brand-500/40 hover:bg-brand-600/5 transition-all duration-150 flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-lg bg-brand-600/20 flex items-center justify-center group-hover:bg-brand-600/30 transition-colors">
-              <Plus size={18} className="text-brand-400" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-white">Créer un Appel d'Offres</div>
-              <div className="text-xs text-slate-500">Publier un nouveau AO pour matching</div>
-            </div>
-            <ArrowRight size={14} className="ml-auto text-slate-600 group-hover:text-brand-400 transition-colors" />
-          </Link>
-        )}
-        {isAdmin && (
-          <Link to="/clients/new" className="card p-4 border-dashed border-white/10 hover:border-amber-500/40 hover:bg-amber-600/5 transition-all duration-150 flex items-center gap-3 group">
-            <div className="w-9 h-9 rounded-lg bg-amber-600/20 flex items-center justify-center group-hover:bg-amber-600/30 transition-colors">
-              <Plus size={18} className="text-amber-400" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-white">Ajouter un Client</div>
-              <div className="text-xs text-slate-500">Créer un nouveau dossier client</div>
-            </div>
-            <ArrowRight size={14} className="ml-auto text-slate-600 group-hover:text-amber-400 transition-colors" />
-          </Link>
-        )}
-        <Link to="/consultants/new" className="card p-4 border-dashed border-white/10 hover:border-emerald-500/40 hover:bg-emerald-600/5 transition-all duration-150 flex items-center gap-3 group">
-          <div className="w-9 h-9 rounded-lg bg-emerald-600/20 flex items-center justify-center group-hover:bg-emerald-600/30 transition-colors">
-            <Plus size={18} className="text-emerald-400" />
+      <div className="mb-8">
+        <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold text-[var(--text-faint)] mb-2.5">Raccourcis</h2>
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+          {isAdmin && <QuickAction to="/aos/new" icon={Plus} title="Nouvel appel d'offres" desc="Publier un nouveau AO" />}
+          {isAdmin && <QuickAction to="/clients/new" icon={Building2} title="Nouveau client" desc="Créer un dossier client" />}
+          <QuickAction to="/consultants/new" icon={Users} title="Ajouter un consultant" desc="Profil + CV PDF" />
+          {isAdmin && <QuickAction onClick={() => setInviteOpen(true)} icon={UserPlus} title="Inviter un partenaire" desc="Lien sécurisé à 7 jours" />}
+        </div>
+      </div>
+
+      {/* Recent AOs */}
+      <div className="card overflow-hidden">
+        <div className="flex items-center justify-between px-4 h-11" style={{ borderBottom: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2 text-[13px] font-medium text-[var(--text)]">
+            <FileText size={14} strokeWidth={1.75} />
+            Derniers appels d'offres
           </div>
-          <div>
-            <div className="text-sm font-medium text-white">Ajouter un Consultant</div>
-            <div className="text-xs text-slate-500">Uploader un profil + CV PDF</div>
+          <Link to="/aos" className="text-[12px] font-medium text-[var(--text-muted)] hover:text-[var(--text)] flex items-center gap-1">
+            Voir tout <ArrowRight size={11} strokeWidth={2} />
+          </Link>
+        </div>
+        {loading ? (
+          <div className="px-4 py-10 text-center text-[13px] text-[var(--text-faint)]">Chargement...</div>
+        ) : recentAOs.length === 0 ? (
+          <div className="px-4 py-10 text-center text-[13px] text-[var(--text-faint)]">
+            Aucun appel d'offres pour le moment.
           </div>
-          <ArrowRight size={14} className="ml-auto text-slate-600 group-hover:text-emerald-400 transition-colors" />
-        </Link>
-        {isAdmin && (
-          <button onClick={() => setInviteOpen(true)} className="card p-4 border-dashed border-white/10 hover:border-purple-500/40 hover:bg-purple-600/5 transition-all duration-150 flex items-center gap-3 group text-left w-full">
-            <div className="w-9 h-9 rounded-lg bg-purple-600/20 flex items-center justify-center group-hover:bg-purple-600/30 transition-colors">
-              <UserPlus size={18} className="text-purple-400" />
-            </div>
-            <div>
-              <div className="text-sm font-medium text-white">Inviter un partenaire</div>
-              <div className="text-xs text-slate-500">Générer un lien d'inscription sécurisé</div>
-            </div>
-            <ArrowRight size={14} className="ml-auto text-slate-600 group-hover:text-purple-400 transition-colors" />
-          </button>
+        ) : (
+          <ul>
+            {recentAOs.map((ao, i) => (
+              <li key={ao.id} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
+                <Link
+                  to={`/aos/${ao.id}`}
+                  className="flex items-center gap-3 px-4 h-12 hover:bg-[var(--surface-2)] transition-colors group"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[13px] font-medium text-[var(--text)] truncate">{ao.title}</div>
+                    <div className="text-[11px] text-[var(--text-faint)] truncate">{ao.skills_required}</div>
+                  </div>
+                  <div className="flex items-center gap-2.5 shrink-0">
+                    {ao.budget_max && (
+                      <span className="text-[11px] text-[var(--text-muted)] tabular">{ao.budget_max}€/j</span>
+                    )}
+                    <span
+                      className="badge"
+                      style={{
+                        background: ao.status === 'open' ? 'var(--success-soft)' : 'var(--surface-2)',
+                        color: ao.status === 'open' ? 'var(--success)' : 'var(--text-faint)',
+                      }}
+                    >
+                      <span className="w-1 h-1 rounded-full" style={{ background: 'currentColor' }} />
+                      {ao.status === 'open' ? 'Ouvert' : 'Fermé'}
+                    </span>
+                    <ArrowRight size={12} strokeWidth={2} className="text-[var(--text-faint)] group-hover:text-[var(--text)] transition-colors" />
+                  </div>
+                </Link>
+              </li>
+            ))}
+          </ul>
         )}
       </div>
 
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
-
-      {/* Recent AOs */}
-      <div className="card overflow-hidden">
-        <div className="flex items-center justify-between px-5 py-4 border-b border-white/5">
-          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
-            <FileText size={15} className="text-brand-400" />
-            Derniers Appels d'Offres
-          </h2>
-          <Link to="/aos" className="text-xs text-brand-400 hover:text-brand-300 flex items-center gap-1">
-            Voir tout <ArrowRight size={12} />
-          </Link>
-        </div>
-        {loading ? (
-          <div className="px-5 py-8 text-center text-slate-500 text-sm">Chargement...</div>
-        ) : recentAOs.length === 0 ? (
-          <div className="px-5 py-8 text-center text-slate-500 text-sm">
-            Aucun appel d'offres pour le moment
-          </div>
-        ) : (
-          <div className="divide-y divide-white/5">
-            {recentAOs.map(ao => (
-              <Link
-                key={ao.id}
-                to={`/aos/${ao.id}`}
-                className="flex items-center gap-4 px-5 py-3.5 hover:bg-white/3 transition-colors group"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-200 truncate group-hover:text-white">{ao.title}</div>
-                  <div className="text-xs text-slate-500 mt-0.5 truncate">{ao.skills_required}</div>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {ao.budget_max && (
-                    <span className="text-xs text-slate-500">{ao.budget_max}€/j</span>
-                  )}
-                  <span className={`badge ${ao.status === 'open' ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-slate-500/10 text-slate-400'}`}>
-                    {ao.status === 'open' ? 'Ouvert' : 'Fermé'}
-                  </span>
-                  <ArrowRight size={12} className="text-slate-600 group-hover:text-brand-400 transition-colors" />
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

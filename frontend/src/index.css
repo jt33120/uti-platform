@@ -2,111 +2,250 @@
 @tailwind components;
 @tailwind utilities;
 
-@layer base {
-  * {
-    box-sizing: border-box;
-  }
+/* ════════════════════════════════════════════════════════════════
+   Design tokens — semantic, theme-aware via CSS variables
+   ════════════════════════════════════════════════════════════════ */
+:root {
+  /* Surfaces */
+  --bg:           #fafafa;
+  --surface:     #ffffff;
+  --surface-2:   #f5f5f5;
+  --surface-hover:#f5f5f5;
 
-  body {
-    @apply bg-navy-900 text-slate-200 antialiased;
-    font-family: 'Inter', system-ui, sans-serif;
-  }
+  /* Borders */
+  --border:      #e5e5e5;
+  --border-strong:#d4d4d4;
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
-  }
-  ::-webkit-scrollbar-track { @apply bg-navy-900; }
-  ::-webkit-scrollbar-thumb { @apply bg-navy-800 rounded-full; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-brand-600; }
+  /* Text */
+  --text:        #0a0a0a;
+  --text-muted:  #525252;
+  --text-faint:  #a3a3a3;
+
+  /* Accent */
+  --accent:      #4f46e5;
+  --accent-soft: #eef2ff;
+  --accent-text: #4338ca;
+
+  /* Primary action (Vercel/Linear style — near-black on light, near-white on dark) */
+  --action-bg:   #0a0a0a;
+  --action-text: #ffffff;
+  --action-bg-hover: #262626;
+
+  /* Status */
+  --success:     #16a34a;
+  --success-soft:#dcfce7;
+  --warning:     #d97706;
+  --warning-soft:#fef3c7;
+  --danger:      #dc2626;
+  --danger-soft: #fee2e2;
+
+  /* Focus ring */
+  --ring:        rgba(99, 102, 241, 0.35);
 }
 
+html.dark {
+  --bg:           #0a0a0a;
+  --surface:     #141414;
+  --surface-2:   #1c1c1c;
+  --surface-hover:#1c1c1c;
+
+  --border:      #262626;
+  --border-strong:#404040;
+
+  --text:        #fafafa;
+  --text-muted:  #a3a3a3;
+  --text-faint:  #737373;
+
+  --accent:      #818cf8;
+  --accent-soft: rgba(129, 140, 248, 0.12);
+  --accent-text: #a5b4fc;
+
+  --action-bg:   #fafafa;
+  --action-text: #0a0a0a;
+  --action-bg-hover: #e5e5e5;
+
+  --success-soft:rgba(34, 197, 94, 0.12);
+  --warning-soft:rgba(217, 119, 6, 0.15);
+  --danger-soft: rgba(220, 38, 38, 0.15);
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Base
+   ════════════════════════════════════════════════════════════════ */
+@layer base {
+  * { box-sizing: border-box; }
+
+  html, body {
+    background-color: var(--bg);
+    color: var(--text);
+    font-feature-settings: 'cv11', 'ss01', 'ss03';
+  }
+  body {
+    font-family: 'Inter var', 'Inter', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  ::selection { background: var(--accent-soft); color: var(--accent-text); }
+
+  ::-webkit-scrollbar { width: 8px; height: 8px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border-strong); border-radius: 4px; }
+  ::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
+
+  /* Numbers — tabular, easier to scan in tables/stats */
+  .tabular { font-variant-numeric: tabular-nums; }
+}
+
+/* ════════════════════════════════════════════════════════════════
+   Components
+   ════════════════════════════════════════════════════════════════ */
 @layer components {
+  /* Surface card — flat, hairline border, no glow */
   .card {
-    @apply bg-navy-800 border border-white/5 rounded-xl;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
   }
 
+  .surface-2 {
+    background-color: var(--surface-2);
+  }
+
+  /* Primary action — near-black on light, near-white on dark */
   .btn-primary {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-brand-600 hover:bg-brand-500
-           text-white text-sm font-medium rounded-lg transition-all duration-150
-           disabled:opacity-40 disabled:cursor-not-allowed;
+    @apply inline-flex items-center gap-2 px-3.5 h-9 text-sm font-medium rounded-md
+           transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+    background-color: var(--action-bg);
+    color: var(--action-text);
   }
+  .btn-primary:hover:not(:disabled) { background-color: var(--action-bg-hover); }
 
+  /* Ghost / secondary */
   .btn-ghost {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-white/5 hover:bg-white/10
-           text-slate-300 text-sm font-medium rounded-lg transition-all duration-150;
+    @apply inline-flex items-center gap-2 px-3.5 h-9 text-sm font-medium rounded-md transition-colors;
+    background-color: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
   }
+  .btn-ghost:hover { background-color: var(--surface-hover); border-color: var(--border-strong); }
 
+  /* Danger */
   .btn-danger {
-    @apply inline-flex items-center gap-2 px-4 py-2 bg-red-600/20 hover:bg-red-600/30
-           text-red-400 text-sm font-medium rounded-lg transition-all duration-150 border border-red-500/20;
+    @apply inline-flex items-center gap-2 px-3.5 h-9 text-sm font-medium rounded-md transition-colors;
+    background-color: var(--danger-soft);
+    color: var(--danger);
+    border: 1px solid transparent;
   }
+  .btn-danger:hover { filter: brightness(0.97); }
 
+  /* Input */
   .input {
-    @apply w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-sm
-           text-slate-200 placeholder-slate-500
-           focus:outline-none focus:ring-1 focus:ring-brand-500 focus:border-brand-500
-           transition-all duration-150;
+    @apply w-full px-3 h-9 text-sm rounded-md transition-colors;
+    background-color: var(--surface);
+    color: var(--text);
+    border: 1px solid var(--border);
   }
+  .input:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--ring);
+  }
+  .input::placeholder { color: var(--text-faint); }
+  .input[readonly] { background-color: var(--surface-2); cursor: not-allowed; }
 
+  /* Textarea variant uses .input but needs height freedom */
+  textarea.input { @apply h-auto py-2; }
+
+  /* Label */
   .label {
-    @apply block text-xs font-medium text-slate-400 mb-1.5 uppercase tracking-wide;
+    @apply block text-xs font-medium mb-1.5;
+    color: var(--text-muted);
   }
 
+  /* Badge */
   .badge {
-    @apply inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-medium;
   }
 
+  /* Section title */
   .section-title {
-    @apply text-xl font-semibold text-white;
+    @apply text-lg font-semibold;
+    letter-spacing: -0.02em;
+    color: var(--text);
   }
 
   .page-header {
     @apply flex items-center justify-between mb-6;
   }
+
+  /* Stat: vertical numeric tile */
+  .stat-tile {
+    @apply card p-5 flex flex-col gap-1.5 transition-colors;
+  }
+  .stat-tile:hover { border-color: var(--border-strong); }
+
+  .stat-label {
+    @apply text-xs font-medium uppercase tracking-wide;
+    color: var(--text-faint);
+  }
+  .stat-value {
+    @apply text-3xl font-semibold tabular;
+    letter-spacing: -0.02em;
+    color: var(--text);
+  }
 }
 
-/* ── Light mode overrides ─────────────────────────────────── */
-html.light body { background-color: #f1f5f9 !important; color: #1e293b !important; }
-html.light aside { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
-html.light main  { background-color: #f1f5f9 !important; }
-html.light .card { background-color: #ffffff !important; border-color: #e2e8f0 !important; }
+/* ════════════════════════════════════════════════════════════════
+   Legacy color overrides — bridge old tailwind classes to new tokens
+   so existing pages render correctly without rewriting every file.
+   ════════════════════════════════════════════════════════════════ */
+.bg-navy-950, .bg-navy-900 { background-color: var(--bg) !important; }
+.bg-navy-800 { background-color: var(--surface) !important; }
 
-html.light .text-white     { color: #0f172a !important; }
-html.light .text-slate-200 { color: #1e293b !important; }
-html.light .text-slate-300 { color: #334155 !important; }
-html.light .text-slate-400 { color: #475569 !important; }
-html.light .text-slate-500 { color: #64748b !important; }
-html.light .text-slate-600 { color: #94a3b8 !important; }
+.text-white, .text-slate-100, .text-slate-200 { color: var(--text) !important; }
+.text-slate-300 { color: var(--text) !important; }
+.text-slate-400 { color: var(--text-muted) !important; }
+.text-slate-500 { color: var(--text-faint) !important; }
+.text-slate-600 { color: var(--text-faint) !important; }
+.text-brand-400 { color: var(--accent-text) !important; }
 
-html.light .bg-white\/5  { background-color: #f1f5f9 !important; }
-html.light .bg-white\/3  { background-color: #f8fafc !important; }
-html.light .bg-white\/2  { background-color: #f8fafc !important; }
-html.light .hover\:bg-white\/5:hover  { background-color: #e2e8f0 !important; }
-html.light .hover\:bg-white\/10:hover { background-color: #e2e8f0 !important; }
-
-html.light .border-white\/5  { border-color: #e2e8f0 !important; }
-html.light .border-white\/10 { border-color: #cbd5e1 !important; }
-
-html.light .input {
-  background-color: #f8fafc !important;
-  border-color: #cbd5e1 !important;
-  color: #1e293b !important;
+.border-white\/5, .border-white\/10 { border-color: var(--border) !important; }
+.bg-white\/3, .bg-white\/5 { background-color: var(--surface-2) !important; }
+.bg-white\/2 { background-color: var(--surface-2) !important; }
+.hover\:bg-white\/3:hover, .hover\:bg-white\/5:hover, .hover\:bg-white\/10:hover {
+  background-color: var(--surface-hover) !important;
 }
-html.light .btn-ghost {
-  background-color: #e2e8f0 !important;
-  color: #334155 !important;
-}
-html.light select option { background-color: #ffffff; color: #1e293b; }
-html.light ::-webkit-scrollbar-track { background-color: #f1f5f9; }
-html.light ::-webkit-scrollbar-thumb { background-color: #cbd5e1; }
 
-/* Score ring animation */
+.bg-brand-600 { background-color: var(--accent) !important; }
+.bg-brand-600\/10, .bg-brand-600\/20 { background-color: var(--accent-soft) !important; }
+.hover\:bg-brand-500:hover, .hover\:bg-brand-600:hover {
+  background-color: var(--accent-text) !important;
+}
+
+/* Score ring animation — kept but no auto-playing slide-ups elsewhere */
 @keyframes score-fill {
   from { stroke-dashoffset: 283; }
   to { stroke-dashoffset: var(--score-offset); }
 }
-
 .score-ring circle:last-child {
-  animation: score-fill 1s ease-out forwards;
+  animation: score-fill 0.6s ease-out forwards;
 }
+
+/* Kill the global slide-up / fade-in noise — keep classes but no-op them */
+.animate-slide-up,
+.animate-fade-in { animation: none; }
+
+/* Neutralise gradient avatar styles from older pages */
+.bg-gradient-to-br {
+  background-image: none !important;
+  background-color: var(--surface-2) !important;
+}
+.bg-gradient-to-br.text-white,
+.bg-gradient-to-br .text-white {
+  color: var(--text) !important;
+}
+
+/* Tighten any leftover rounded-2xl to feel more corporate */
+.rounded-2xl { border-radius: 10px !important; }
+.rounded-xl  { border-radius: 8px !important; }

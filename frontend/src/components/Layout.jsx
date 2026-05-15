@@ -14,29 +14,47 @@ const NavItem = ({ to, icon: Icon, label, end = false }) => (
     end={end}
     className={({ isActive }) =>
       clsx(
-        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 group',
+        'flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] font-medium transition-colors',
         isActive
-          ? 'bg-brand-600/20 text-brand-400 border border-brand-500/20'
-          : 'text-slate-400 hover:text-slate-200 hover:bg-white/5'
+          ? 'bg-[var(--surface-2)] text-[var(--text)]'
+          : 'text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]'
       )
     }
   >
-    <Icon size={16} className="shrink-0" />
-    {label}
+    <Icon size={15} className="shrink-0" strokeWidth={1.75} />
+    <span className="truncate">{label}</span>
   </NavLink>
+)
+
+const NavButton = ({ onClick, icon: Icon, label }) => (
+  <button
+    onClick={onClick}
+    className="flex items-center gap-2.5 px-2.5 h-8 rounded-md text-[13px] font-medium transition-colors w-full text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]"
+  >
+    <Icon size={15} className="shrink-0" strokeWidth={1.75} />
+    <span className="truncate">{label}</span>
+  </button>
+)
+
+const SectionLabel = ({ children }) => (
+  <p className="text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--text-faint)] px-2.5 mt-5 mb-1.5">
+    {children}
+  </p>
 )
 
 export default function Layout() {
   const { user, logout, isAdmin } = useAuth()
   const navigate = useNavigate()
 
-  const [light, setLight] = useState(() => localStorage.getItem('theme') === 'light')
+  const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
   const [inviteOpen, setInviteOpen] = useState(false)
 
   useEffect(() => {
-    document.documentElement.classList.toggle('light', light)
-    localStorage.setItem('theme', light ? 'light' : 'dark')
-  }, [light])
+    document.documentElement.classList.toggle('dark', dark)
+    // Keep legacy `light` class out of the way
+    document.documentElement.classList.remove('light')
+    localStorage.setItem('theme', dark ? 'dark' : 'light')
+  }, [dark])
 
   const handleLogout = () => {
     logout()
@@ -46,14 +64,21 @@ export default function Layout() {
   return (
     <div className="flex h-screen overflow-hidden">
       {/* Sidebar */}
-      <aside className="w-60 shrink-0 flex flex-col bg-navy-950 border-r border-white/5">
-        <div className="px-4 py-4 border-b border-white/5">
-          <img src="/logo.jpeg" alt="UTI Group" className="h-12 w-auto object-contain rounded-xl shadow-md ring-1 ring-white/10" />
+      <aside
+        className="w-[232px] shrink-0 flex flex-col"
+        style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)' }}
+      >
+        {/* Brand */}
+        <div className="px-4 h-14 flex items-center gap-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+          <img src="/logo.jpeg" alt="UTI Group" className="h-7 w-7 rounded object-cover" />
+          <div className="leading-tight">
+            <div className="text-[13px] font-semibold tracking-tightest text-[var(--text)]">UTI Group</div>
+            <div className="text-[10px] text-[var(--text-faint)]">Plateforme Partenaires</div>
+          </div>
         </div>
 
-        <nav className="flex-1 px-3 py-4 space-y-1 overflow-y-auto">
-          <p className="text-[10px] uppercase tracking-widest text-slate-600 px-3 mb-2">Navigation</p>
-
+        {/* Nav */}
+        <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" end />
           <NavItem to="/aos" icon={FileText} label={isAdmin ? "Appels d'offres" : "Mes AOs"} />
           <NavItem to="/clients" icon={Building2} label={isAdmin ? "Clients" : "Mes clients"} />
@@ -61,44 +86,41 @@ export default function Layout() {
 
           {isAdmin && (
             <>
-              <p className="text-[10px] uppercase tracking-widest text-slate-600 px-3 mt-5 mb-2">Raccourcis</p>
+              <SectionLabel>Raccourcis</SectionLabel>
               <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" />
               <NavItem to="/clients/new" icon={Plus} label="Nouveau client" />
-              <button
-                onClick={() => setInviteOpen(true)}
-                className="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150 text-slate-400 hover:text-slate-200 hover:bg-white/5 w-full"
-              >
-                <UserPlus size={16} className="shrink-0" />
-                Inviter partenaire
-              </button>
+              <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter partenaire" />
               <NavItem to="/partners-access" icon={Network} label="Gestion partenaires" />
             </>
           )}
 
           {!isAdmin && (
             <>
-              <p className="text-[10px] uppercase tracking-widest text-slate-600 px-3 mt-5 mb-2">Actions</p>
+              <SectionLabel>Raccourcis</SectionLabel>
               <NavItem to="/consultants/new" icon={Plus} label="Ajouter consultant" />
             </>
           )}
         </nav>
 
-        <div className="px-3 py-4 border-t border-white/5">
-          <div className="flex items-center gap-3 px-3 py-2">
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500 to-brand-700 flex items-center justify-center text-xs font-bold text-white shrink-0">
+        {/* User */}
+        <div className="p-2" style={{ borderTop: '1px solid var(--border)' }}>
+          <div className="flex items-center gap-2.5 px-2 h-11">
+            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
+                 style={{ background: 'var(--surface-2)', color: 'var(--text)' }}>
               {user?.name?.charAt(0).toUpperCase()}
             </div>
             <div className="flex-1 min-w-0">
-              <div className="text-xs font-medium text-slate-200 truncate">{user?.name}</div>
-              <div className={clsx(
-                'text-[10px] font-medium uppercase tracking-wide',
-                user?.role === 'admin' ? 'text-brand-400' : 'text-emerald-400'
-              )}>
+              <div className="text-[12px] font-medium truncate text-[var(--text)]">{user?.name}</div>
+              <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">
                 {user?.role === 'admin' ? 'Administrateur' : 'Partenaire'}
               </div>
             </div>
-            <button onClick={handleLogout} className="text-slate-600 hover:text-red-400 transition-colors" title="Déconnexion">
-              <LogOut size={14} />
+            <button
+              onClick={handleLogout}
+              className="p-1.5 rounded text-[var(--text-faint)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
+              title="Déconnexion"
+            >
+              <LogOut size={14} strokeWidth={1.75} />
             </button>
           </div>
         </div>
@@ -106,18 +128,22 @@ export default function Layout() {
 
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
 
-      <main className="flex-1 overflow-y-auto bg-navy-900">
+      {/* Main */}
+      <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
         {/* Top bar */}
-        <div className="flex justify-end items-center px-6 pt-4">
+        <div
+          className="h-14 flex items-center justify-end px-6"
+          style={{ borderBottom: '1px solid var(--border)' }}
+        >
           <button
-            onClick={() => setLight(l => !l)}
-            className="btn-ghost p-2 rounded-lg"
-            title={light ? 'Passer en mode sombre' : 'Passer en mode clair'}
+            onClick={() => setDark(d => !d)}
+            className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+            title={dark ? 'Passer en clair' : 'Passer en sombre'}
           >
-            {light ? <Moon size={15} /> : <Sun size={15} />}
+            {dark ? <Sun size={15} strokeWidth={1.75} /> : <Moon size={15} strokeWidth={1.75} />}
           </button>
         </div>
-        <div className="px-6 pb-6 max-w-6xl mx-auto animate-fade-in">
+        <div className="px-6 py-6 max-w-6xl mx-auto">
           <Outlet />
         </div>
       </main>
