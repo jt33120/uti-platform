@@ -56,7 +56,7 @@ async def run_matching(body: MatchRequest, user: dict = Depends(require_admin)):
         raise HTTPException(status_code=422, detail="Aucun CV lisible pour cet AO")
 
     try:
-        all_scores = await score_consultants_batch(ao, valid)
+        all_scores, cost_usd = await score_consultants_batch(ao, valid)
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
@@ -91,6 +91,7 @@ async def run_matching(body: MatchRequest, user: dict = Depends(require_admin)):
                 "resume_matching": result["resume_matching"],
                 "recommandation": result["recommandation"],
                 "rank": rank,
+                "cost_usd": cost_usd,
                 "ran_by": user["sub"],
             }).execute()
     except Exception as e:
@@ -103,6 +104,28 @@ async def run_matching(body: MatchRequest, user: dict = Depends(require_admin)):
         "top_n": body.top_n,
         "results": top_results,
     }
+
+
+@router.get("/stats")
+async def get_matching_stats(user: dict = Depends(require_admin)):
+    """Get AI matching statistics: total matchings, model used, total cost."""
+    try:
+        # Try with cost_usd column; fall back if column doesn't exist yet
+        try:
+            matchings = supabase.table("matchings").select("id, cost_usd").execute().data or []
+            total_cost = sum(float(m.get("cost_usd") or 0) for m in matchings)
+        except Exception:
+            matchings = supabase.table("matchings").select("id").execute().data or []
+            total_cost = 0.0
+
+        return {
+            "total_matchings": len(matchings),
+            "model_used": "GPT-4o",
+            "total_cost_usd": round(total_cost, 2),
+            "status": "active",
+        }
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 
 @router.get("/results/{ao_id}")

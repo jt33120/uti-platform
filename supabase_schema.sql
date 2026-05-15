@@ -54,8 +54,22 @@ CREATE TABLE IF NOT EXISTS public.matchings (
   resume_matching  TEXT,
   recommandation   TEXT,
   rank             INT,
+  cost_usd         NUMERIC(10, 4) DEFAULT 0,  -- Cost in USD for this matching run
   ran_by           UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- 5. Partner invitations
+CREATE TABLE IF NOT EXISTS public.invitations (
+  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  token      TEXT NOT NULL UNIQUE,
+  email      TEXT NOT NULL,
+  role       TEXT NOT NULL DEFAULT 'ao' CHECK (role IN ('admin', 'ao')),
+  invited_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  expires_at TIMESTAMPTZ NOT NULL,
+  used_at    TIMESTAMPTZ,
+  used_by    UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- ============================================================
@@ -66,6 +80,7 @@ ALTER TABLE public.profiles       ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.consultants    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.appels_offres  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.matchings      ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.invitations    ENABLE ROW LEVEL SECURITY;
 
 -- profiles: read own, backend writes via service role
 CREATE POLICY "profiles_select_own" ON public.profiles

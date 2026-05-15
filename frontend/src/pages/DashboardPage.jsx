@@ -2,13 +2,15 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
-import { Users, FileText, Plus, ArrowRight, TrendingUp, Send } from 'lucide-react'
+import { Users, FileText, Plus, ArrowRight, TrendingUp, Send, Building2, UserPlus } from 'lucide-react'
+import InviteModal from '../components/InviteModal'
 
 function StatCard({ icon: Icon, label, value, color = 'brand', to }) {
   const colors = {
     brand: 'bg-brand-600/10 text-brand-400 border-brand-500/20',
     emerald: 'bg-emerald-600/10 text-emerald-400 border-emerald-500/20',
     purple: 'bg-purple-600/10 text-purple-400 border-purple-500/20',
+    amber: 'bg-amber-600/10 text-amber-400 border-amber-500/20',
   }
   const content = (
     <div className="card p-5 flex items-center gap-4 hover:border-white/10 transition-all duration-150">
@@ -27,27 +29,34 @@ function StatCard({ icon: Icon, label, value, color = 'brand', to }) {
 
 export default function DashboardPage() {
   const { user, isAdmin } = useAuth()
-  const [stats, setStats] = useState({ consultants: null, aos: null, submissions: null })
+  const [inviteOpen, setInviteOpen] = useState(false)
+  const [stats, setStats] = useState({ consultants: null, aos: null, clients: null, submissions: null, matchings: null, aiModel: 'GPT-4o', cost: null })
   const [recentAOs, setRecentAOs] = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     const fetchData = async () => {
-      try {
-        const requests = [api.get('/consultants'), api.get('/aos')]
-        if (!isAdmin) requests.push(api.get('/submissions/mine'))
-        const [consultantsRes, aosRes, subsRes] = await Promise.all(requests)
-        setStats({
-          consultants: consultantsRes.data.length,
-          aos: aosRes.data.length,
-          submissions: subsRes?.data.length ?? null,
-        })
-        setRecentAOs(aosRes.data.slice(0, 5))
-      } catch (e) {
-        console.error(e)
-      } finally {
-        setLoading(false)
-      }
+      const settle = (p) => p.then(r => ({ ok: true, data: r.data })).catch(() => ({ ok: false, data: null }))
+
+      const [consultantsR, aosR, clientsR, subsR, matchingR] = await Promise.all([
+        settle(api.get('/consultants')),
+        settle(api.get('/aos')),
+        settle(api.get('/clients')),
+        isAdmin ? Promise.resolve({ ok: false, data: null }) : settle(api.get('/submissions/mine')),
+        isAdmin ? settle(api.get('/matching/stats')) : Promise.resolve({ ok: false, data: null }),
+      ])
+
+      setStats({
+        consultants: consultantsR.ok ? consultantsR.data.length : null,
+        aos: aosR.ok ? aosR.data.length : null,
+        clients: clientsR.ok ? clientsR.data.length : null,
+        submissions: subsR.ok ? subsR.data.length : null,
+        matchings: matchingR.ok ? matchingR.data.total_matchings : null,
+        aiModel: matchingR.ok ? matchingR.data.model_used : 'GPT-4o',
+        cost: matchingR.ok ? matchingR.data.total_cost_usd : null,
+      })
+      if (aosR.ok) setRecentAOs(aosR.data.slice(0, 5))
+      setLoading(false)
     }
     fetchData()
   }, [isAdmin])
@@ -67,7 +76,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
         <StatCard
           icon={Users}
           label={isAdmin ? 'Consultants' : 'Mes consultants'}
@@ -82,8 +91,29 @@ export default function DashboardPage() {
           color="brand"
           to="/aos"
         />
+        <StatCard
+          icon={Building2}
+          label="Clients"
+          value={stats.clients}
+          color="amber"
+          to="/clients"
+        />
         {isAdmin ? (
-          <StatCard icon={TrendingUp} label="Matching IA" value="Actif" color="purple" />
+          <div className="card p-5 flex flex-col justify-between">
+            <div className="flex items-start gap-4">
+              <div className="p-2.5 rounded-lg border bg-purple-600/10 text-purple-400 border-purple-500/20">
+                <TrendingUp size={18} />
+              </div>
+              <div className="flex-1">
+                <div className="text-2xl font-bold text-white">{stats.matchings ?? '—'}</div>
+                <div className="text-xs text-slate-500 mb-2">Matchings effectués</div>
+                <div className="text-xs text-slate-400 space-y-0.5">
+                  <div>{stats.aiModel}</div>
+                  {stats.cost !== null && <div className="text-slate-300 font-medium">${stats.cost}</div>}
+                </div>
+              </div>
+            </div>
+          </div>
         ) : (
           <StatCard icon={Send} label="CVs soumis" value={stats.submissions} color="purple" />
         )}
@@ -103,6 +133,18 @@ export default function DashboardPage() {
             <ArrowRight size={14} className="ml-auto text-slate-600 group-hover:text-brand-400 transition-colors" />
           </Link>
         )}
+        {isAdmin && (
+          <Link to="/clients/new" className="card p-4 border-dashed border-white/10 hover:border-amber-500/40 hover:bg-amber-600/5 transition-all duration-150 flex items-center gap-3 group">
+            <div className="w-9 h-9 rounded-lg bg-amber-600/20 flex items-center justify-center group-hover:bg-amber-600/30 transition-colors">
+              <Plus size={18} className="text-amber-400" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-white">Ajouter un Client</div>
+              <div className="text-xs text-slate-500">Créer un nouveau dossier client</div>
+            </div>
+            <ArrowRight size={14} className="ml-auto text-slate-600 group-hover:text-amber-400 transition-colors" />
+          </Link>
+        )}
         <Link to="/consultants/new" className="card p-4 border-dashed border-white/10 hover:border-emerald-500/40 hover:bg-emerald-600/5 transition-all duration-150 flex items-center gap-3 group">
           <div className="w-9 h-9 rounded-lg bg-emerald-600/20 flex items-center justify-center group-hover:bg-emerald-600/30 transition-colors">
             <Plus size={18} className="text-emerald-400" />
@@ -113,7 +155,21 @@ export default function DashboardPage() {
           </div>
           <ArrowRight size={14} className="ml-auto text-slate-600 group-hover:text-emerald-400 transition-colors" />
         </Link>
+        {isAdmin && (
+          <button onClick={() => setInviteOpen(true)} className="card p-4 border-dashed border-white/10 hover:border-purple-500/40 hover:bg-purple-600/5 transition-all duration-150 flex items-center gap-3 group text-left w-full">
+            <div className="w-9 h-9 rounded-lg bg-purple-600/20 flex items-center justify-center group-hover:bg-purple-600/30 transition-colors">
+              <UserPlus size={18} className="text-purple-400" />
+            </div>
+            <div>
+              <div className="text-sm font-medium text-white">Inviter un partenaire</div>
+              <div className="text-xs text-slate-500">Générer un lien d'inscription sécurisé</div>
+            </div>
+            <ArrowRight size={14} className="ml-auto text-slate-600 group-hover:text-purple-400 transition-colors" />
+          </button>
+        )}
       </div>
+
+      {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
 
       {/* Recent AOs */}
       <div className="card overflow-hidden">
