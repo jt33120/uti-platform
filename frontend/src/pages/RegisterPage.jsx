@@ -25,7 +25,7 @@ export default function RegisterPage() {
     if (!inviteToken) return
     api.get(`/invitations/validate/${inviteToken}`)
       .then(res => {
-        setForm(f => ({ ...f, email: res.data.email, role: 'ao' }))
+        setForm(f => ({ ...f, email: res.data.email, name: res.data.name || '', role: 'ao' }))
         setInviteStatus('valid')
       })
       .catch(err => {
@@ -121,8 +121,14 @@ export default function RegisterPage() {
                 placeholder="Jean Dupont"
                 value={form.name}
                 onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+                readOnly={!!inviteToken && inviteStatus === 'valid'}
                 required
               />
+              {inviteToken && inviteStatus === 'valid' && (
+                <p className="text-[11px] text-[var(--text-faint)] mt-1">
+                  Nom défini par l'administrateur de la plateforme.
+                </p>
+              )}
             </div>
 
             <div>
