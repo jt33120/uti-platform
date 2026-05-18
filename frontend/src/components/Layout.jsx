@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
-  Building2, Network, Sun, Moon, UserPlus
+  Building2, Network, Sun, Moon, UserPlus, UserCheck
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
@@ -87,10 +87,11 @@ export default function Layout() {
           {isAdmin && (
             <>
               <SectionLabel>Raccourcis</SectionLabel>
+              <NavItem to="/partners" icon={UserCheck} label="Partenaires" />
               <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" />
               <NavItem to="/clients/new" icon={Plus} label="Nouveau client" />
               <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter partenaire" />
-              <NavItem to="/partners-access" icon={Network} label="Gestion partenaires" />
+              <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
             </>
           )}
 

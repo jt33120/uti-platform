@@ -190,7 +190,7 @@ export default function PartnerAccessPage() {
         <div>
           <h1 className="section-title flex items-center gap-2">
             <Users size={20} className="text-brand-400" />
-            Gestion partenaires
+            Accès partenaires
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             Sélectionnez un client, puis glissez-déposez les partenaires entre les listes

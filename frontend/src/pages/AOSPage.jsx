@@ -1,10 +1,11 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import {
   FileText, Plus, Euro, MapPin, Clock, ArrowRight, Search,
-  Building2, Users, Star, ListChecks, Calendar
+  Building2, Users, Star, ListChecks, Calendar,
+  Pencil, Trash2, X, Loader2, ChevronDown,
 } from 'lucide-react'
 
 const formatDate = (iso) => {
@@ -29,10 +30,157 @@ function TierBadge({ tier }) {
   )
 }
 
-function AOCard({ ao, isAdmin }) {
+// ── Edit modal ────────────────────────────────────────────────────────────────
+function AOEditModal({ ao, onClose, onSaved }) {
+  const AO_TYPES = ['Assurance', 'Banque / Finance', 'IT / Dev', 'Énergie', 'Retail', 'Public', 'Santé', 'Autre']
+  const [clients, setClients] = useState([])
+  const [form, setForm] = useState({
+    client_id: ao.client_id || '',
+    title: ao.title || '',
+    description: ao.description || '',
+    skills_required: ao.skills_required || '',
+    budget_max: ao.budget_max?.toString() || '',
+    location: ao.location || '',
+    duration: ao.duration || '',
+    context: ao.context || '',
+    ao_type: ao.ao_type || '',
+    status: ao.status || 'open',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.get('/clients').then(r => setClients(r.data)).catch(() => {})
+  }, [])
+
+  const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setLoading(true); setError('')
+    try {
+      const payload = { ...form }
+      if (!payload.budget_max) delete payload.budget_max
+      else payload.budget_max = parseInt(payload.budget_max)
+      await api.patch(`/aos/${ao.id}`, payload)
+      onSaved()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Erreur lors de la mise à jour')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Pencil size={14} className="text-brand-400" /> Modifier l'AO
+          </h2>
+          <button onClick={onClose} className="btn-ghost p-1.5"><X size={14} /></button>
+        </div>
+
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="label">Client *</label>
+              <div className="relative">
+                <select className="input appearance-none pr-9" value={form.client_id} onChange={set('client_id')} required>
+                  <option value="" className="bg-navy-900">— Choisir un client —</option>
+                  {clients.map(c => <option key={c.id} value={c.id} className="bg-navy-900">{c.name}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Titre *</label>
+              <input className="input" required value={form.title} onChange={set('title')} />
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Description *</label>
+            <textarea className="input min-h-[80px] resize-y" required value={form.description} onChange={set('description')} />
+          </div>
+
+          <div>
+            <label className="label">
+              Compétences requises * <span className="text-slate-500 font-normal">(séparées par des virgules)</span>
+            </label>
+            <input className="input" required value={form.skills_required} onChange={set('skills_required')} placeholder="Python, React, AWS..." />
+          </div>
+
+          <div>
+            <label className="label">Contexte / Notes IA</label>
+            <textarea className="input min-h-[60px] resize-y" value={form.context} onChange={set('context')} />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="label">Budget max (€/j)</label>
+              <input className="input" type="number" min="0" value={form.budget_max} onChange={set('budget_max')} />
+            </div>
+            <div>
+              <label className="label">Localisation</label>
+              <input className="input" value={form.location} onChange={set('location')} />
+            </div>
+            <div>
+              <label className="label">Durée</label>
+              <input className="input" value={form.duration} onChange={set('duration')} />
+            </div>
+            <div>
+              <label className="label">Type AO</label>
+              <div className="relative">
+                <select className="input appearance-none pr-9" value={form.ao_type} onChange={set('ao_type')}>
+                  <option value="" className="bg-navy-900">—</option>
+                  {AO_TYPES.map(t => <option key={t} value={t} className="bg-navy-900">{t}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Statut</label>
+            <div className="flex gap-2">
+              {[{ v: 'open', l: 'Ouvert' }, { v: 'closed', l: 'Fermé' }].map(o => (
+                <button key={o.v} type="button"
+                  onClick={() => setForm(p => ({ ...p, status: o.v }))}
+                  className={clsx(
+                    'px-4 py-2 text-xs rounded-lg border font-medium transition-all',
+                    form.status === o.v
+                      ? 'bg-brand-600/20 border-brand-500/40 text-brand-300'
+                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-200'
+                  )}>
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && <p className="text-xs text-red-400">{error}</p>}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn-ghost text-xs px-3">Annuler</button>
+            <button type="submit" disabled={loading} className="btn-primary text-xs px-4 flex items-center gap-1.5">
+              {loading ? <Loader2 size={13} className="animate-spin" /> : 'Enregistrer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
+// ── AO card ───────────────────────────────────────────────────────────────────
+function AOCard({ ao, isAdmin, onEdit, onDelete, navigate }) {
   const isOpen = ao.status === 'open'
   return (
-    <Link to={`/aos/${ao.id}`} className="card p-4 hover:border-white/10 transition-all duration-150 group block">
+    <div
+      className="card p-4 hover:border-white/10 transition-all duration-150 group cursor-pointer"
+      onClick={() => navigate(`/aos/${ao.id}`)}
+    >
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="flex-1 min-w-0">
           {ao.clients?.name && (
@@ -102,26 +250,66 @@ function AOCard({ ao, isAdmin }) {
             {formatDate(ao.created_at)}
           </span>
         )}
-        {isAdmin && (
-          <span className="flex items-center gap-1 ml-auto text-brand-300">
-            <Users size={10} />
-            {ao.submission_count ?? 0} CV{(ao.submission_count ?? 0) > 1 ? 's' : ''}
-          </span>
+        {isAdmin ? (
+          <>
+            <span className="flex items-center gap-1 ml-auto text-brand-300">
+              <Users size={10} />
+              {ao.submission_count ?? 0} CV{(ao.submission_count ?? 0) > 1 ? 's' : ''}
+            </span>
+            <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button
+                onClick={e => { e.stopPropagation(); onEdit(ao) }}
+                className="btn-ghost p-1.5"
+                title="Modifier"
+              >
+                <Pencil size={12} />
+              </button>
+              <button
+                onClick={e => { e.stopPropagation(); onDelete(ao) }}
+                className="btn-ghost p-1.5 hover:text-red-400"
+                title="Supprimer"
+              >
+                <Trash2 size={12} />
+              </button>
+            </div>
+          </>
+        ) : (
+          <ArrowRight size={12} className="text-slate-700 group-hover:text-brand-400 transition-colors ml-auto" />
         )}
-        <ArrowRight size={12} className={clsx('text-slate-700 group-hover:text-brand-400 transition-colors', !isAdmin && 'ml-auto')} />
       </div>
-    </Link>
+    </div>
   )
 }
 
 export default function AOSPage() {
   const { isAdmin } = useAuth()
+  const navigate = useNavigate()
   const [aos, setAos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [groupBy, setGroupBy] = useState('client') // 'client' | 'none'
+  const [editAo, setEditAo] = useState(null)
+  const [deleting, setDeleting] = useState(null)
+
+  const fetchAos = () =>
+    api.get('/aos')
+      .then(r => setAos(r.data))
+      .catch(e => setError(e.response?.data?.detail || e.message || 'Erreur de chargement'))
+
+  const handleDeleteAo = async (ao) => {
+    if (!confirm(`Supprimer l'AO « ${ao.title} » ? Cette action est irréversible.`)) return
+    setDeleting(ao.id)
+    try {
+      await api.delete(`/aos/${ao.id}`)
+      setAos(p => p.filter(a => a.id !== ao.id))
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Erreur lors de la suppression')
+    } finally {
+      setDeleting(null)
+    }
+  }
 
   useEffect(() => {
     api.get('/aos')
@@ -259,15 +447,35 @@ export default function AOSPage() {
                 <div className="flex-1 h-px bg-white/5 ml-2" />
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {group.items.map(ao => <AOCard key={ao.id} ao={ao} isAdmin={isAdmin} />)}
+                {group.items.map(ao => (
+                  <AOCard key={ao.id} ao={ao} isAdmin={isAdmin}
+                    navigate={navigate}
+                    onEdit={setEditAo}
+                    onDelete={handleDeleteAo}
+                  />
+                ))}
               </div>
             </div>
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {sorted.map(ao => <AOCard key={ao.id} ao={ao} isAdmin={isAdmin} />)}
+          {sorted.map(ao => (
+            <AOCard key={ao.id} ao={ao} isAdmin={isAdmin}
+              navigate={navigate}
+              onEdit={setEditAo}
+              onDelete={handleDeleteAo}
+            />
+          ))}
         </div>
+      )}
+
+      {editAo && (
+        <AOEditModal
+          ao={editAo}
+          onClose={() => setEditAo(null)}
+          onSaved={() => { setEditAo(null); fetchAos() }}
+        />
       )}
     </div>
   )

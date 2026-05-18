@@ -3,6 +3,8 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 from services.supabase_client import supabase
 from routers.auth import get_current_user, require_admin
+from config import settings
+import httpx
 
 router = APIRouter(prefix="/partners", tags=["partners"])
 
@@ -11,6 +13,10 @@ class AccessUpsert(BaseModel):
     partner_id: str
     client_id: str
     tier: Literal["list_1", "list_2", "suspended"]
+
+
+class PartnerUpdate(BaseModel):
+    name: str
 
 
 @router.get("")
@@ -86,5 +92,49 @@ async def remove_access(partner_id: str, client_id: str, user: dict = Depends(re
             "partner_id", partner_id
         ).eq("client_id", client_id).execute()
         return {"message": "Accès retiré"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.patch("/{partner_id}")
+async def update_partner(partner_id: str, body: PartnerUpdate, user: dict = Depends(require_admin)):
+    """Update a partner's display name."""
+    name = body.name.strip()
+    if len(name) < 2:
+        raise HTTPException(status_code=422, detail="Le nom doit contenir au moins 2 caractères.")
+    try:
+        response = supabase.table("profiles").update({"name": name}).eq(
+            "id", partner_id
+        ).eq("role", "ao").execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Partenaire introuvable.")
+        return response.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/{partner_id}")
+async def delete_partner(partner_id: str, user: dict = Depends(require_admin)):
+    """
+    Permanently delete a partner: removes their profile row (which cascades
+    to partner_clients) and their Supabase Auth account.
+    """
+    try:
+        # Delete profile row — partner_clients FK cascades automatically
+        supabase.table("profiles").delete().eq("id", partner_id).eq("role", "ao").execute()
+        # Delete Supabase Auth user via direct HTTP (bypasses gotrue-py header bug)
+        with httpx.Client(timeout=10) as client:
+            client.delete(
+                f"{settings.supabase_url}/auth/v1/admin/users/{partner_id}",
+                headers={
+                    "apikey": settings.supabase_service_key,
+                    "Authorization": f"Bearer {settings.supabase_service_key}",
+                },
+            )
+        return {"message": "Partenaire supprimé"}
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
