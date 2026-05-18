@@ -3,6 +3,7 @@ import { X, Copy, Check } from 'lucide-react'
 import api from '../lib/api'
 
 export default function InviteModal({ onClose }) {
+  const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [inviteUrl, setInviteUrl] = useState(null)
   const [copied, setCopied] = useState(false)
@@ -20,7 +21,7 @@ export default function InviteModal({ onClose }) {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post('/invitations', { email })
+      const res = await api.post('/invitations', { name, email })
       setInviteUrl(res.data.url)
     } catch (err) {
       setError(err.response?.data?.detail || "Erreur lors de la création de l'invitation")
@@ -66,6 +67,23 @@ export default function InviteModal({ onClose }) {
         {!inviteUrl ? (
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
+              <label className="label">Nom du partenaire</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="ex: Partenaire Île-de-France"
+                value={name}
+                onChange={e => setName(e.target.value)}
+                required
+                autoFocus
+                minLength={2}
+              />
+              <p className="text-[11px] text-[var(--text-faint)] mt-1">
+                Ce nom sera fixé sur le compte — le partenaire ne pourra pas le modifier.
+              </p>
+            </div>
+
+            <div>
               <label className="label">Email du partenaire</label>
               <input
                 type="email"
@@ -74,7 +92,6 @@ export default function InviteModal({ onClose }) {
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
-                autoFocus
               />
             </div>
 
@@ -102,7 +119,7 @@ export default function InviteModal({ onClose }) {
               className="text-[13px] rounded-md px-3 py-2"
               style={{ background: 'var(--success-soft)', color: 'var(--success)' }}
             >
-              Invitation créée pour <span className="font-medium">{email}</span>
+              Invitation créée pour <span className="font-medium">{name}</span> ({email})
             </div>
 
             <div>

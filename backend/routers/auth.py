@@ -139,6 +139,9 @@ async def register(body: RegisterRequest):
 
         # Force role from invitation — prevents privilege escalation
         body.role = invitation["role"]
+        # Force name from invitation — admin sets the partner display name
+        if invitation.get("name"):
+            body.name = invitation["name"]
 
     if body.role not in ("admin", "ao"):
         raise HTTPException(status_code=400, detail="Rôle invalide. Utilisez 'admin' ou 'ao'.")
@@ -161,8 +164,7 @@ async def register(body: RegisterRequest):
         raw_error = str(e)
         print(f"[AUTH] create_user failed — raw error: {raw_error}\n{tb}")
         status, detail = _parse_supabase_error(raw_error)
-        # Append raw for debugging (remove once fixed)
-        raise HTTPException(status_code=status, detail=f"{detail} [debug: {raw_error}]")
+        raise HTTPException(status_code=status, detail=detail)
 
     # ── Validate response ─────────────────────────────────────────
     if hasattr(auth_response, 'error') and auth_response.error:
@@ -286,3 +288,51 @@ async def me(user: dict = Depends(get_current_user)):
         return profile.data
     except Exception:
         raise HTTPException(status_code=404, detail="Profil introuvable")
+
+
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    access_token: str
+    new_password: str
+
+
+@router.post("/forgot-password")
+async def forgot_password(body: ForgotPasswordRequest):
+    """
+    Sends a Supabase password-reset email. Always returns 200 to avoid
+    leaking whether the email exists in the system.
+    """
+    try:
+        supabase.auth.reset_password_for_email(
+            body.email,
+            options={"redirect_to": f"{settings.frontend_url}/reset-password"},
+        )
+    except Exception as e:
+        print(f"[AUTH] forgot-password error (non-fatal): {e}")
+    return {"message": "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé."}
+
+
+@router.post("/reset-password")
+async def reset_password(body: ResetPasswordRequest):
+    """
+    Validates the Supabase recovery token and updates the password.
+    The access_token comes from the URL hash after the user clicks the reset link.
+    """
+    if len(body.new_password) < 6:
+        raise HTTPException(status_code=422, detail="Le mot de passe doit contenir au moins 6 caractères.")
+    try:
+        # Verify the recovery token and get the user
+        user_resp = supabase.auth.get_user(body.access_token)
+        if not user_resp or not user_resp.user:
+            raise HTTPException(status_code=400, detail="Lien de réinitialisation invalide ou expiré.")
+        user_id = user_resp.user.id
+        supabase.auth.admin.update_user_by_id(user_id, {"password": body.new_password})
+        return {"message": "Mot de passe mis à jour avec succès."}
+    except HTTPException:
+        raise
+    except Exception as e:
+        print(f"[AUTH] reset-password error: {e}")
+        raise HTTPException(status_code=400, detail="Lien de réinitialisation invalide ou expiré.")

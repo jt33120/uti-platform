@@ -119,6 +119,7 @@ CREATE TABLE IF NOT EXISTS public.invitations (
   id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   token      TEXT NOT NULL UNIQUE,
   email      TEXT NOT NULL,
+  name       TEXT,
   role       TEXT NOT NULL DEFAULT 'ao' CHECK (role IN ('admin', 'ao')),
   invited_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL,
