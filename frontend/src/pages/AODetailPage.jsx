@@ -6,7 +6,7 @@ import {
   ArrowLeft, Zap, Euro, MapPin, Clock, Users, CheckCircle,
   AlertCircle, TrendingUp, Award, ChevronDown, ChevronUp,
   Loader2, FileText, Trash2, RotateCcw, Building2, Plus,
-  Upload, X, UserCircle2, Briefcase, Calendar
+  Upload, X, UserCircle2, Briefcase, Calendar, Pencil
 } from 'lucide-react'
 
 const formatDate = (iso) => {
@@ -429,6 +429,149 @@ function SubmissionRow({ sub, onDelete, canDelete, isAdmin, aoSkillsRequired }) 
   )
 }
 
+// ─── AO edit modal ──────────────────────────────────────────────
+function AOEditModal({ ao, onClose, onSaved }) {
+  const AO_TYPES = ['Assurance', 'Banque / Finance', 'IT / Dev', 'Énergie', 'Retail', 'Public', 'Santé', 'Autre']
+  const [clients, setClients] = useState([])
+  const [form, setForm] = useState({
+    client_id: ao.client_id || '',
+    title: ao.title || '',
+    description: ao.description || '',
+    skills_required: ao.skills_required || '',
+    budget_max: ao.budget_max?.toString() || '',
+    location: ao.location || '',
+    duration: ao.duration || '',
+    context: ao.context || '',
+    ao_type: ao.ao_type || '',
+    status: ao.status || 'open',
+  })
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    api.get('/clients').then(r => setClients(r.data)).catch(() => {})
+  }, [])
+
+  const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
+
+  const submit = async (e) => {
+    e.preventDefault()
+    setLoading(true); setError('')
+    try {
+      const payload = { ...form }
+      if (!payload.budget_max) delete payload.budget_max
+      else payload.budget_max = parseInt(payload.budget_max)
+      await api.patch(`/aos/${ao.id}`, payload)
+      onSaved()
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Erreur lors de la mise à jour')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="card p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-sm font-semibold text-white flex items-center gap-2">
+            <Pencil size={14} className="text-brand-400" /> Modifier l'AO
+          </h2>
+          <button onClick={onClose} className="btn-ghost p-1.5"><X size={14} /></button>
+        </div>
+
+        <form onSubmit={submit} className="space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2">
+              <label className="label">Client *</label>
+              <div className="relative">
+                <select className="input appearance-none pr-9" value={form.client_id} onChange={set('client_id')} required>
+                  <option value="" className="bg-navy-900">— Choisir un client —</option>
+                  {clients.map(c => <option key={c.id} value={c.id} className="bg-navy-900">{c.name}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              </div>
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Titre *</label>
+              <input className="input" required value={form.title} onChange={set('title')} />
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Description *</label>
+            <textarea className="input min-h-[80px] resize-y" required value={form.description} onChange={set('description')} />
+          </div>
+
+          <div>
+            <label className="label">
+              Compétences requises * <span className="text-slate-500 font-normal">(séparées par des virgules)</span>
+            </label>
+            <input className="input" required value={form.skills_required} onChange={set('skills_required')} placeholder="Python, React, AWS..." />
+          </div>
+
+          <div>
+            <label className="label">Contexte / Notes IA</label>
+            <textarea className="input min-h-[60px] resize-y" value={form.context} onChange={set('context')} />
+          </div>
+
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div>
+              <label className="label">Budget max (€/j)</label>
+              <input className="input" type="number" min="0" value={form.budget_max} onChange={set('budget_max')} />
+            </div>
+            <div>
+              <label className="label">Localisation</label>
+              <input className="input" value={form.location} onChange={set('location')} />
+            </div>
+            <div>
+              <label className="label">Durée</label>
+              <input className="input" value={form.duration} onChange={set('duration')} />
+            </div>
+            <div>
+              <label className="label">Type AO</label>
+              <div className="relative">
+                <select className="input appearance-none pr-9" value={form.ao_type} onChange={set('ao_type')}>
+                  <option value="" className="bg-navy-900">—</option>
+                  {AO_TYPES.map(t => <option key={t} value={t} className="bg-navy-900">{t}</option>)}
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="label">Statut</label>
+            <div className="flex gap-2">
+              {[{ v: 'open', l: 'Ouvert' }, { v: 'closed', l: 'Fermé' }].map(o => (
+                <button key={o.v} type="button"
+                  onClick={() => setForm(p => ({ ...p, status: o.v }))}
+                  className={clsx(
+                    'px-4 py-2 text-xs rounded-lg border font-medium transition-all',
+                    form.status === o.v
+                      ? 'bg-brand-600/20 border-brand-500/40 text-brand-300'
+                      : 'bg-white/5 border-white/10 text-slate-400 hover:text-slate-200'
+                  )}>
+                  {o.l}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {error && <p className="text-xs text-red-400">{error}</p>}
+
+          <div className="flex justify-end gap-2 pt-1">
+            <button type="button" onClick={onClose} className="btn-ghost text-xs px-3">Annuler</button>
+            <button type="submit" disabled={loading} className="btn-primary text-xs px-4 flex items-center gap-1.5">
+              {loading ? <Loader2 size={13} className="animate-spin" /> : 'Enregistrer'}
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ──────────────────────────────────────────────────
 export default function AODetailPage() {
   const { id } = useParams()
@@ -443,6 +586,7 @@ export default function AODetailPage() {
   const [matching, setMatching] = useState(false)
   const [matchError, setMatchError] = useState('')
   const [showSubmitModal, setShowSubmitModal] = useState(false)
+  const [showEditModal, setShowEditModal] = useState(false)
 
   const fetchAo = async () => {
     const r = await api.get(`/aos/${id}`)
@@ -574,9 +718,14 @@ export default function AODetailPage() {
           </div>
         </div>
         {isAdmin && (
-          <button onClick={handleDelete} className="btn-danger p-2">
-            <Trash2 size={15} />
-          </button>
+          <div className="flex items-center gap-1">
+            <button onClick={() => setShowEditModal(true)} className="btn-ghost p-2" title="Modifier">
+              <Pencil size={15} />
+            </button>
+            <button onClick={handleDelete} className="btn-danger p-2" title="Supprimer">
+              <Trash2 size={15} />
+            </button>
+          </div>
         )}
       </div>
 
@@ -774,6 +923,13 @@ export default function AODetailPage() {
         <SubmitModal aoId={id} roster={roster}
           onClose={() => setShowSubmitModal(false)}
           onSubmitted={handleSubmissionSuccess} />
+      )}
+      {showEditModal && (
+        <AOEditModal
+          ao={ao}
+          onClose={() => setShowEditModal(false)}
+          onSaved={async () => { setShowEditModal(false); await fetchAo() }}
+        />
       )}
     </div>
   )

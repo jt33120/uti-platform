@@ -238,12 +238,12 @@ export default function ClientsPage() {
             <span className="text-sm font-normal text-slate-500">({clients.length})</span>
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {isAdmin ? 'Gestion des comptes clients et Gestion partenaires' : 'Vos clients accessibles'}
+            {isAdmin ? 'Gestion des comptes clients et Accès partenaires' : 'Vos clients accessibles'}
           </p>
         </div>
         {isAdmin && (
           <div className="flex gap-2">
-            <Link to="/partners-access" className="btn-ghost">Gestion partenaires</Link>
+            <Link to="/partners-access" className="btn-ghost">Accès partenaires</Link>
             <Link to="/clients/new" className="btn-primary">
               <Plus size={15} /> Nouveau client
             </Link>
