@@ -76,9 +76,11 @@ export default function PartnerAccessPage() {
   const [saving, setSaving] = useState(false)
   const [dragTarget, setDragTarget] = useState(null)
   const [suspending, setSuspending] = useState(null) // partner id being suspended
+  const [fetchError, setFetchError] = useState(null)
 
   const fetchAll = async () => {
     setLoading(true)
+    setFetchError(null)
     try {
       const [c, p, a] = await Promise.all([
         api.get('/clients'),
@@ -89,6 +91,8 @@ export default function PartnerAccessPage() {
       setPartners(p.data)
       setAccess(a.data)
       if (!selectedClient && c.data.length) setSelectedClient(c.data[0].id)
+    } catch (e) {
+      setFetchError(e.response?.data?.detail || e.message || 'Erreur de chargement des données')
     } finally {
       setLoading(false)
     }
@@ -163,6 +167,19 @@ export default function PartnerAccessPage() {
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 size={24} className="animate-spin text-brand-400" />
+      </div>
+    )
+  }
+
+  if (fetchError) {
+    return (
+      <div className="card p-6 flex items-start gap-3 border border-red-500/30 bg-red-500/5">
+        <AlertCircle size={18} className="text-red-400 mt-0.5 shrink-0" />
+        <div>
+          <p className="text-sm font-semibold text-red-300">Erreur de chargement</p>
+          <p className="text-xs text-red-400 mt-1">{fetchError}</p>
+          <button onClick={fetchAll} className="mt-3 text-xs text-brand-300 hover:underline">Réessayer</button>
+        </div>
       </div>
     )
   }
