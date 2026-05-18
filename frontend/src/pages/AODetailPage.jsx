@@ -352,37 +352,78 @@ function SubmitModal({ aoId, roster, onClose, onSubmitted }) {
   )
 }
 
-// ─── Submission row (admin sees all, partner sees their own) ────
-function SubmissionRow({ sub, onDelete, canDelete }) {
+// ─── Submission row (admin sees all + partner name, partner sees their own) ────
+function SubmissionRow({ sub, onDelete, canDelete, isAdmin, aoSkillsRequired }) {
   const c = sub.consultants || {}
+  const submitter = sub.submitter || {}
+
+  // Skills match: highlight consultant skills that match AO required skills
+  const aoSkillsNorm = aoSkillsRequired
+    ? aoSkillsRequired.split(',').map(s => s.trim().toLowerCase()).filter(Boolean)
+    : []
+  const cvSkills = c.skills ? c.skills.split(',').map(s => s.trim()).filter(Boolean) : []
+  const matchCount = cvSkills.filter(s =>
+    aoSkillsNorm.some(as => as.includes(s.toLowerCase()) || s.toLowerCase().includes(as))
+  ).length
+
   return (
-    <div className="flex items-center gap-3 p-3 rounded-lg bg-white/3 border border-white/5 hover:border-white/10 transition-all group">
-      <UserCircle2 size={28} className="text-slate-500 shrink-0" />
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-2 flex-wrap">
-          <span className="text-sm font-medium text-white truncate">{c.name || 'Inconnu'}</span>
-          {c.employment_type && (
-            <span className="badge bg-white/5 text-slate-400 text-[10px]">
-              {c.employment_type === 'salarie' ? 'Salarié' : 'Indépendant'}
-            </span>
+    <div className="p-3 rounded-lg bg-white/3 border border-white/5 hover:border-white/10 transition-all group">
+      <div className="flex items-center gap-3">
+        <UserCircle2 size={28} className="text-slate-500 shrink-0" />
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-sm font-medium text-white truncate">{c.name || 'Inconnu'}</span>
+            {c.employment_type && (
+              <span className="badge bg-white/5 text-slate-400 text-[10px]">
+                {c.employment_type === 'salarie' ? 'Salarié' : 'Indépendant'}
+              </span>
+            )}
+            {c.tjm && (
+              <span className="text-[10px] text-emerald-400 inline-flex items-center gap-0.5">
+                <Euro size={9} />{c.tjm}/j
+              </span>
+            )}
+            {isAdmin && submitter.name && (
+              <span className="text-[10px] text-brand-400/70 flex items-center gap-0.5">
+                <UserCircle2 size={9} /> {submitter.name}
+              </span>
+            )}
+          </div>
+        </div>
+        <a href={sub.cv_url} target="_blank" rel="noopener noreferrer"
+           className="text-xs text-slate-400 hover:text-brand-400 inline-flex items-center gap-1 shrink-0">
+          <FileText size={12} /> CV
+        </a>
+        {canDelete && (
+          <button onClick={() => onDelete(sub.id)}
+                  className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity shrink-0">
+            <Trash2 size={13} />
+          </button>
+        )}
+      </div>
+      {cvSkills.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-2 pl-10">
+          {cvSkills.slice(0, 5).map((skill, i) => {
+            const matches = aoSkillsNorm.some(as => as.includes(skill.toLowerCase()) || skill.toLowerCase().includes(as))
+            return (
+              <span key={i} className={clsx('badge text-[9px]',
+                matches
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : 'bg-white/5 text-slate-500 border border-white/5'
+              )}>
+                {skill}
+              </span>
+            )
+          })}
+          {cvSkills.length > 5 && (
+            <span className="badge bg-white/3 text-slate-600 text-[9px] border border-white/3">+{cvSkills.length - 5}</span>
           )}
-          {c.tjm && (
-            <span className="text-[10px] text-emerald-400 inline-flex items-center gap-0.5">
-              <Euro size={9} />{c.tjm}/j
+          {aoSkillsNorm.length > 0 && (
+            <span className="text-[9px] text-slate-600 ml-1 self-center">
+              {matchCount}/{aoSkillsNorm.length} skills AO
             </span>
           )}
         </div>
-        <p className="text-[11px] text-slate-500 truncate mt-0.5">{c.skills}</p>
-      </div>
-      <a href={sub.cv_url} target="_blank" rel="noopener noreferrer"
-         className="text-xs text-slate-400 hover:text-brand-400 inline-flex items-center gap-1">
-        <FileText size={12} /> CV
-      </a>
-      {canDelete && (
-        <button onClick={() => onDelete(sub.id)}
-                className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity">
-          <Trash2 size={13} />
-        </button>
       )}
     </div>
   )
@@ -525,6 +566,11 @@ export default function AODetailPage() {
               : 'bg-slate-500/10 text-slate-400')}>
               {ao.status === 'open' ? 'Ouvert' : 'Fermé'}
             </span>
+            {ao.ao_type && (
+              <span className="badge bg-violet-500/10 text-violet-300 border border-violet-500/20 text-xs">
+                {ao.ao_type}
+              </span>
+            )}
           </div>
         </div>
         {isAdmin && (
@@ -633,6 +679,8 @@ export default function AODetailPage() {
                     sub={s}
                     canDelete={isAdmin || s.submitted_by === user.id}
                     onDelete={handleDeleteSubmission}
+                    isAdmin={isAdmin}
+                    aoSkillsRequired={ao.skills_required}
                   />
                 ))}
               </div>

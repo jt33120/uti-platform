@@ -53,6 +53,11 @@ function AOCard({ ao, isAdmin }) {
           )}>
             {isOpen ? 'Ouvert' : 'Fermé'}
           </span>
+          {ao.ao_type && (
+            <span className="badge bg-violet-500/10 text-violet-300 border border-violet-500/20 text-[10px]">
+              {ao.ao_type}
+            </span>
+          )}
           <TierBadge tier={ao.tier} />
         </div>
       </div>

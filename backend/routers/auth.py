@@ -158,9 +158,11 @@ async def register(body: RegisterRequest):
         })
     except Exception as e:
         tb = traceback.format_exc()
-        print(f"[AUTH] create_user failed:\n{tb}")
-        status, detail = _parse_supabase_error(str(e))
-        raise HTTPException(status_code=status, detail=detail)
+        raw_error = str(e)
+        print(f"[AUTH] create_user failed — raw error: {raw_error}\n{tb}")
+        status, detail = _parse_supabase_error(raw_error)
+        # Append raw for debugging (remove once fixed)
+        raise HTTPException(status_code=status, detail=f"{detail} [debug: {raw_error}]")
 
     # ── Validate response ─────────────────────────────────────────
     if hasattr(auth_response, 'error') and auth_response.error:

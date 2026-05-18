@@ -7,6 +7,18 @@ from routers.auth import get_current_user, require_admin
 router = APIRouter(prefix="/aos", tags=["appels_offres"])
 
 
+AO_TYPES = [
+    "Assurance",
+    "Banque / Finance",
+    "IT / Dev",
+    "Énergie",
+    "Retail",
+    "Public",
+    "Santé",
+    "Autre",
+]
+
+
 class AOCreate(BaseModel):
     client_id: str
     title: str
@@ -16,6 +28,7 @@ class AOCreate(BaseModel):
     location: Optional[str] = None
     duration: Optional[str] = None
     context: Optional[str] = None
+    ao_type: Optional[str] = None
 
 
 class AOUpdate(BaseModel):
@@ -27,6 +40,7 @@ class AOUpdate(BaseModel):
     location: Optional[str] = None
     duration: Optional[str] = None
     context: Optional[str] = None
+    ao_type: Optional[str] = None
     status: Optional[str] = None
 
 
@@ -43,6 +57,11 @@ def _accessible_client_ids(user: dict) -> Optional[list[str]]:
     return [row["client_id"] for row in (access.data or [])]
 
 
+@router.get("/types")
+async def get_ao_types():
+    return AO_TYPES
+
+
 @router.post("")
 async def create_ao(body: AOCreate, user: dict = Depends(require_admin)):
     try:
@@ -55,6 +74,7 @@ async def create_ao(body: AOCreate, user: dict = Depends(require_admin)):
             "location": body.location,
             "duration": body.duration,
             "context": body.context,
+            "ao_type": body.ao_type,
             "status": "open",
             "created_by": user["sub"],
         }).execute()

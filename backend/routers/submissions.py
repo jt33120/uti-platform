@@ -145,9 +145,19 @@ async def list_submissions_for_ao(ao_id: str, user: dict = Depends(get_current_u
     """
     _check_ao_access(ao_id, user)
     try:
-        query = supabase.table("submissions").select(
-            "*, consultants(id, name, tjm, skills, experience_years, employment_type, availability)"
-        ).eq("ao_id", ao_id).order("submitted_at", desc=True)
+        # Admin gets submitter profile; partners only see their own submissions
+        if user["role"] == "admin":
+            select = (
+                "*, "
+                "consultants(id, name, tjm, skills, experience_years, employment_type, availability), "
+                "submitter:profiles!submitted_by(id, name, email)"
+            )
+        else:
+            select = "*, consultants(id, name, tjm, skills, experience_years, employment_type, availability)"
+
+        query = supabase.table("submissions").select(select).eq(
+            "ao_id", ao_id
+        ).order("submitted_at", desc=True)
 
         if user["role"] == "ao":
             query = query.eq("submitted_by", user["sub"])

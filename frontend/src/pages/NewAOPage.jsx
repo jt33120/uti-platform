@@ -9,9 +9,11 @@ import {
 export default function NewAOPage() {
   const navigate = useNavigate()
   const [clients, setClients] = useState([])
+  const AO_TYPES = ['Assurance', 'Banque / Finance', 'IT / Dev', 'Énergie', 'Retail', 'Public', 'Santé', 'Autre']
+
   const [form, setForm] = useState({
     client_id: '', title: '', description: '', skills_required: '',
-    budget_max: '', location: '', duration: '', context: '',
+    budget_max: '', location: '', duration: '', context: '', ao_type: '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -95,6 +97,22 @@ export default function NewAOPage() {
                     Aucun client disponible — créez-en un d'abord depuis « Clients ».
                   </p>
                 )}
+              </div>
+
+              <div>
+                <label className="label">Type d'AO</label>
+                <div className="relative">
+                  <select
+                    value={form.ao_type} onChange={set('ao_type')}
+                    className="input appearance-none pr-9"
+                  >
+                    <option value="" className="bg-navy-900">— Sélectionner un type —</option>
+                    {AO_TYPES.map(t => (
+                      <option key={t} value={t} className="bg-navy-900">{t}</option>
+                    ))}
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                </div>
               </div>
 
               <div>
@@ -203,6 +221,11 @@ export default function NewAOPage() {
               )}
 
               <div className="space-y-2 text-xs">
+                {form.ao_type && (
+                  <div className="flex items-center gap-2 text-slate-400">
+                    <FileText size={11} className="text-violet-400" /> {form.ao_type}
+                  </div>
+                )}
                 {form.budget_max && (
                   <div className="flex items-center gap-2 text-slate-400">
                     <Euro size={11} className="text-emerald-400" /> {form.budget_max}€/j

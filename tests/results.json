@@ -1,0 +1,17 @@
+{
+  "status": "pass",
+  "build_success": true,
+  "tests_passed": 1,
+  "tests_failed": 0,
+  "coverage": null,
+  "severity": "low",
+  "failure_context": {
+    "file": null,
+    "function": null,
+    "message": null,
+    "trace_excerpt": null
+  },
+  "errors": [],
+  "warnings": [],
+  "suggestions": []
+}

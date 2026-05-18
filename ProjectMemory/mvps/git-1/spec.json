@@ -1,0 +1,308 @@
+{
+  "mvp_id": "git-1",
+  "name": "G-IT Plateforme Partenaires",
+  "goal": "Faire évoluer UTI d'un outil de matching générique vers une plateforme structurée AO → CV → partenaire, avec contrôle d'accès par client et reporting partenaire dédié.",
+  "created_at": "2026-05-15T09:37:00Z",
+  "last_updated": "2026-05-15T09:37:00Z",
+  "status": "in_progress",
+  "open_tasks_high": [
+    {
+      "id": "task-001",
+      "title": "Régénérer OPENAI_API_KEY, SUPABASE_SERVICE_KEY, JWT_SECRET — keys were previously committed to GitHub",
+      "priority": "high",
+      "actionable": true,
+      "source": "file:UTI Group/Code/UTI/bfg-1.14.0.jar + backup-git.git",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-04T21:30:00Z",
+      "updated_at": "2026-05-04T21:30:00Z"
+    },
+    {
+      "id": "task-002",
+      "title": "Créer backend/.env avec SUPABASE_URL, SUPABASE_SERVICE_KEY, OPENAI_API_KEY, JWT_SECRET pour débloquer local run",
+      "priority": "high",
+      "actionable": true,
+      "source": "file:UTI Group/Code/UTI/backend/config.py",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-04T21:30:00Z",
+      "updated_at": "2026-05-04T21:30:00Z"
+    },
+    {
+      "id": "task-003",
+      "title": "Proposer 2-3 créneaux de 30 min à 1 h à Romain et Benoît AUMARD pour la session feedback POC",
+      "priority": "high",
+      "actionable": true,
+      "source": "Mail Romain AUMARD 2026-05-06 09:43",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-06T07:43:20Z",
+      "updated_at": "2026-05-06T07:43:20Z"
+    },
+    {
+      "id": "task-004",
+      "title": "Rejoindre la réunion Teams UTI 'Pltfm GIT' (lien fourni par Romain AUMARD)",
+      "priority": "high",
+      "actionable": true,
+      "source": "Mail Romain AUMARD 2026-05-07 09:15 — Pltfm GIT",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-07T07:15:19Z",
+      "updated_at": "2026-05-07T07:15:19Z"
+    },
+    {
+      "id": "task-005",
+      "title": "Préparer une démo / talking points axés Git platform (workflow, repo layout, CI, intégration POC) avant l'appel",
+      "priority": "high",
+      "actionable": true,
+      "source": "Mail Romain AUMARD 2026-05-07 09:15 — Pltfm GIT",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-07T07:15:19Z",
+      "updated_at": "2026-05-07T07:15:19Z"
+    },
+    {
+      "id": "task-006",
+      "title": "Modéliser la relation CV ↔ Appel d'Offre (un CV est rattaché à un AO, formalisme typé AO type Groupama, fournir les skills)",
+      "priority": "high",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-007",
+      "title": "Implémenter l'écran de création d'AO incluant le choix du client",
+      "priority": "high",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-008",
+      "title": "Ajouter une entité Client (nom, description, contact) et un mécanisme de sélection des partenaires ayant accès au client (liste 1 / liste 2 par client)",
+      "priority": "high",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-009",
+      "title": "Dashboard partenaire : afficher uniquement les stats du partenaire connecté (vs admin qui voit toutes les réponses)",
+      "priority": "high",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-010",
+      "title": "Préparer une confrontation/audit RGPD du modèle (partenaires, CV, clients)",
+      "priority": "high",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    }
+  ],
+  "open_tasks_medium": [
+    {
+      "id": "task-011",
+      "title": "Préparer le partage d'écran live du POC (vidéo + site) avant la session",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Mail Romain AUMARD 2026-05-06 09:43",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-06T07:43:20Z",
+      "updated_at": "2026-05-06T07:43:20Z"
+    },
+    {
+      "id": "task-012",
+      "title": "Capturer les retours Romain/Benoît AUMARD pendant la session et créer un follow-up structuré post-meeting",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Mail Romain AUMARD 2026-05-07 09:15 — Pltfm GIT",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-07T07:15:19Z",
+      "updated_at": "2026-05-07T07:15:19Z"
+    },
+    {
+      "id": "task-013",
+      "title": "Ajouter un filtre par client en haut de la liste des appels d'offres",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-014",
+      "title": "Mettre en avant le temps de réponse et les matchings directement associés à chaque AO",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-015",
+      "title": "Vue card : afficher le nombre de réponses des partenaires",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-016",
+      "title": "Humaniser les prompts utilisés dans l'outil",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-017",
+      "title": "Ajouter la fonctionnalité de suspension d'un partenaire (modification client + modifier partenaire)",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-018",
+      "title": "Dissocier les partenaires salariés des indépendants dans le modèle de données",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-019",
+      "title": "Explorer une automatisation pour que le partenaire n'ait pas à répondre/maintenir manuellement",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-020",
+      "title": "Écrire un script de nettoyage des données existantes",
+      "priority": "medium",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    }
+  ],
+  "open_tasks_low": [
+    {
+      "id": "task-021",
+      "title": "UI : passer la description sur toute la largeur (au lieu d'être à gauche)",
+      "priority": "low",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "task-022",
+      "title": "Cadrer le périmètre partenaires : 30 partenaires actuels, préciser le volume cible",
+      "priority": "low",
+      "actionable": true,
+      "source": "Notion UTI 12/05/2026",
+      "status": "open",
+      "assigned_to": null,
+      "created_at": "2026-05-12T09:28:00Z",
+      "updated_at": "2026-05-12T09:28:00Z"
+    }
+  ],
+  "decisions": [
+    {
+      "id": "decision-001",
+      "text": "Le feedback UTI sur le POC se fera en live (visio) plutôt qu'en écrit.",
+      "source": "Romain AUMARD 2026-05-06",
+      "created_at": "2026-05-06T07:43:20Z"
+    },
+    {
+      "id": "decision-002",
+      "text": "La session de feedback POC UTI se tiendra sur Microsoft Teams via le lien envoyé par Romain AUMARD.",
+      "source": "Mail Romain AUMARD 2026-05-07",
+      "created_at": "2026-05-07T07:15:19Z"
+    },
+    {
+      "id": "decision-003",
+      "text": "Focus de la session orienté 'Pltfm GIT' (sujet du mail) — la plateforme Git est le sujet principal.",
+      "source": "Mail Romain AUMARD 2026-05-07 — subject 'Pltfm GIT'",
+      "created_at": "2026-05-07T07:15:19Z"
+    },
+    {
+      "id": "decision-004",
+      "text": "Le modèle pivot devient AO → CV → partenaire, avec le client comme dimension de cloisonnement d'accès.",
+      "source": "Notion UTI 12/05/2026",
+      "created_at": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "decision-005",
+      "text": "Séparation stricte admin / partenaire sur la visibilité des réponses et des stats.",
+      "source": "Notion UTI 12/05/2026",
+      "created_at": "2026-05-12T09:28:00Z"
+    }
+  ],
+  "blocker": {
+    "text": "No .env in backend/ — local and CI startup blocked",
+    "active": true,
+    "severity": "block",
+    "source": "2026-05-04T23:30:00+02:00--UTI--poc-security-missing-env.json",
+    "created_at": "2026-05-04T21:30:00Z"
+  },
+  "acceptance_criteria": [
+    "Backend démarrable avec .env configuré et clés sécurisées",
+    "Session feedback POC UTI effectuée et retours capturés",
+    "Modèle de données AO ↔ CV ↔ partenaire ↔ client implémenté",
+    "Système de contrôle d'accès par client opérationnel",
+    "Dashboard partenaire affichant uniquement les stats du partenaire connecté"
+  ],
+  "ingested_payloads": [
+    "2026-05-04T23:30:00+02:00--UTI--poc-security-missing-env.json",
+    "2026-05-06T09:43:20+02:00--UTI--poc-feedback-meeting-request.json",
+    "2026-05-07T09:15:19+02:00--UTI--pltfm-git-meeting-link.json",
+    "2026-05-12T11:28:00+02:00--UTI--spec-update-ao-cv-partner-client-management.json"
+  ]
+}
