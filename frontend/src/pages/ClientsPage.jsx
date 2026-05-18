@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
-import { Building2, Plus, Pencil, Trash2, Search, Briefcase, UserCircle2, Mail } from 'lucide-react'
+import { Building2, Plus, Pencil, Trash2, Search, Briefcase, UserCircle2, Mail, ArrowRight, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 
 function TierBadge({ tier }) {
@@ -16,15 +16,18 @@ function TierBadge({ tier }) {
   return <span className={clsx('badge text-[10px]', map[tier])}>{label[tier]}</span>
 }
 
-function ClientRow({ client, isAdmin, onEdit, onDelete }) {
+function ClientRow({ client, isAdmin, onEdit, onDelete, navigate }) {
   return (
-    <div className="card p-4 flex items-center gap-4 hover:border-white/10 transition-all duration-150 group">
+    <div
+      className="card p-4 flex items-center gap-4 hover:border-white/10 transition-all duration-150 group cursor-pointer"
+      onClick={() => navigate(`/clients/${client.id}`)}
+    >
       <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-500/30 to-emerald-500/30 border border-white/10 flex items-center justify-center text-sm font-bold text-white shrink-0">
         {client.name.charAt(0).toUpperCase()}
       </div>
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="text-sm font-semibold text-white">{client.name}</div>
+          <div className="text-sm font-semibold text-white group-hover:text-brand-300 transition-colors">{client.name}</div>
           <TierBadge tier={client.tier} />
           {client.sector && (
             <span className="text-[10px] text-slate-500 inline-flex items-center gap-1">
@@ -42,21 +45,24 @@ function ClientRow({ client, isAdmin, onEdit, onDelete }) {
           <p className="text-xs text-slate-500 mt-0.5 line-clamp-1">{client.description}</p>
         )}
       </div>
-      {isAdmin && (
-        <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <button onClick={() => onEdit(client)} className="btn-ghost p-2">
-            <Pencil size={13} />
-          </button>
-          <button onClick={() => onDelete(client.id)} className="btn-danger p-2">
-            <Trash2 size={13} />
-          </button>
-        </div>
-      )}
+      <div className="flex items-center gap-1">
+        {isAdmin && (
+          <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+            <button onClick={e => { e.stopPropagation(); onEdit(client) }} className="btn-ghost p-2">
+              <Pencil size={13} />
+            </button>
+            <button onClick={e => { e.stopPropagation(); onDelete(client.id) }} className="btn-danger p-2">
+              <Trash2 size={13} />
+            </button>
+          </div>
+        )}
+        <ArrowRight size={13} className="text-slate-700 group-hover:text-brand-400 transition-colors ml-1" />
+      </div>
     </div>
   )
 }
 
-function ClientModal({ client, onClose, onSaved }) {
+function ClientModal({ client, onClose, onSaved, existingClients = [] }) {
   const isEdit = !!client?.id
   const [form, setForm] = useState({
     name: client?.name || '',
@@ -67,6 +73,29 @@ function ClientModal({ client, onClose, onSaved }) {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [nameSuggestions, setNameSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  const handleNameChange = (e) => {
+    const val = e.target.value
+    setForm(p => ({ ...p, name: val }))
+    const trimmed = val.trim()
+    if (trimmed.length >= 2) {
+      const matches = existingClients.filter(c =>
+        c.id !== client?.id &&
+        c.name.toLowerCase().includes(trimmed.toLowerCase())
+      )
+      setNameSuggestions(matches)
+      setShowSuggestions(matches.length > 0)
+    } else {
+      setNameSuggestions([])
+      setShowSuggestions(false)
+    }
+  }
+
+  const exactMatch = existingClients.find(
+    c => c.id !== client?.id && c.name.toLowerCase() === form.name.trim().toLowerCase()
+  )
 
   const submit = async (e) => {
     e.preventDefault()
@@ -95,8 +124,34 @@ function ClientModal({ client, onClose, onSaved }) {
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="label">Nom *</label>
-            <input className="input" required value={form.name}
-              onChange={e => setForm(p => ({ ...p, name: e.target.value }))} />
+            <div className="relative">
+              <input className="input" required value={form.name}
+                onChange={handleNameChange}
+                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                onFocus={() => nameSuggestions.length > 0 && setShowSuggestions(true)}
+                autoComplete="off"
+              />
+              {showSuggestions && (
+                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden">
+                  <div className="px-3 py-1.5 text-[10px] text-slate-500 uppercase tracking-widest border-b border-white/5">
+                    Clients existants similaires
+                  </div>
+                  {nameSuggestions.map(c => (
+                    <div key={c.id} className="px-4 py-2.5 text-sm text-slate-200 flex items-center gap-2">
+                      <Building2 size={13} className="text-brand-400 shrink-0" />
+                      <span>{c.name}</span>
+                      {c.sector && <span className="text-slate-500 text-xs ml-auto">{c.sector}</span>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+            {exactMatch && (
+              <div className="mt-2 flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                <AlertTriangle size={13} className="shrink-0" />
+                Un client nommé « {exactMatch.name} » existe déjà.
+              </div>
+            )}
           </div>
           <div>
             <label className="label">Secteur</label>
@@ -226,13 +281,13 @@ export default function ClientsPage() {
         <div className="space-y-2">
           {filtered.map(c => (
             <ClientRow key={c.id} client={c} isAdmin={isAdmin}
-              onEdit={(c) => setModal(c)} onDelete={handleDelete} />
+              onEdit={(c) => setModal(c)} onDelete={handleDelete} navigate={navigate} />
           ))}
         </div>
       )}
 
       {modal && <ClientModal client={modal} onClose={() => setModal(null)}
-        onSaved={() => { setModal(null); fetchAll() }} />}
+        onSaved={() => { setModal(null); fetchAll() }} existingClients={clients} />}
 
     </div>
   )

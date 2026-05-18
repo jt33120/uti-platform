@@ -1,0 +1,9 @@
+{
+  "mvp_id": "git-1",
+  "loop_enabled": false,
+  "consecutive_failures": 0,
+  "last_loop_run": null,
+  "gatekeeper_feedback": null,
+  "current_builder_prompt": null,
+  "last_updated": "2026-05-15T09:37:00Z"
+}

@@ -1,13 +1,40 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
-import { ArrowLeft, Building2, Loader2, Briefcase, FileText, CheckCircle, UserCircle2, Mail } from 'lucide-react'
+import { ArrowLeft, Building2, Loader2, Briefcase, FileText, CheckCircle, UserCircle2, Mail, AlertTriangle } from 'lucide-react'
 
 export default function NewClientPage() {
   const navigate = useNavigate()
   const [form, setForm] = useState({ name: '', sector: '', description: '', contact_name: '', contact_email: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [existingClients, setExistingClients] = useState([])
+  const [nameSuggestions, setNameSuggestions] = useState([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+
+  useEffect(() => {
+    api.get('/clients').then(({ data }) => setExistingClients(data)).catch(() => {})
+  }, [])
+
+  const handleNameChange = (e) => {
+    const val = e.target.value
+    setForm(p => ({ ...p, name: val }))
+    const trimmed = val.trim()
+    if (trimmed.length >= 2) {
+      const matches = existingClients.filter(c =>
+        c.name.toLowerCase().includes(trimmed.toLowerCase())
+      )
+      setNameSuggestions(matches)
+      setShowSuggestions(matches.length > 0)
+    } else {
+      setNameSuggestions([])
+      setShowSuggestions(false)
+    }
+  }
+
+  const exactMatch = existingClients.find(
+    c => c.name.toLowerCase() === form.name.trim().toLowerCase()
+  )
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
 
@@ -59,11 +86,41 @@ export default function NewClientPage() {
 
               <div>
                 <label className="label">Nom du client *</label>
-                <input
-                  type="text" className="input text-base" required
-                  placeholder="ex: Groupama, BNP Paribas, Total Energies..."
-                  value={form.name} onChange={set('name')}
-                />
+                <div className="relative">
+                  <input
+                    type="text" className="input text-base" required
+                    placeholder="ex: Groupama, BNP Paribas, Total Energies..."
+                    value={form.name}
+                    onChange={handleNameChange}
+                    onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
+                    onFocus={() => nameSuggestions.length > 0 && setShowSuggestions(true)}
+                    autoComplete="off"
+                  />
+                  {showSuggestions && (
+                    <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden">
+                      <div className="px-3 py-1.5 text-[10px] text-slate-500 uppercase tracking-widest border-b border-white/5">
+                        Clients existants similaires
+                      </div>
+                      {nameSuggestions.map(c => (
+                        <button
+                          key={c.id} type="button"
+                          onMouseDown={() => navigate(`/clients/${c.id}`)}
+                          className="w-full text-left px-4 py-2.5 text-sm text-slate-200 hover:bg-white/5 flex items-center gap-2 transition-colors"
+                        >
+                          <Building2 size={13} className="text-brand-400 shrink-0" />
+                          <span>{c.name}</span>
+                          {c.sector && <span className="text-slate-500 text-xs ml-auto">{c.sector}</span>}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                {exactMatch && (
+                  <div className="mt-2 flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                    <AlertTriangle size={13} className="shrink-0" />
+                    Un client nommé « {exactMatch.name} » existe déjà.
+                  </div>
+                )}
               </div>
 
               <div>

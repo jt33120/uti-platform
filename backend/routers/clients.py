@@ -28,8 +28,18 @@ class ClientUpdate(BaseModel):
 @router.post("")
 async def create_client(body: ClientCreate, user: dict = Depends(require_admin)):
     try:
+        normalized_name = body.name.strip()
+        if not normalized_name:
+            raise HTTPException(status_code=400, detail="Le nom du client est requis")
+        # Case-insensitive duplicate check
+        existing = supabase.table("clients").select("id, name").ilike("name", normalized_name).execute()
+        if existing.data:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Un client nommé « {existing.data[0]['name']} » existe déjà"
+            )
         response = supabase.table("clients").insert({
-            "name": body.name,
+            "name": normalized_name,
             "description": body.description,
             "sector": body.sector,
             "logo_url": body.logo_url,
@@ -38,6 +48,8 @@ async def create_client(body: ClientCreate, user: dict = Depends(require_admin))
             "created_by": user["sub"],
         }).execute()
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -73,6 +85,29 @@ async def list_clients(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/{client_id}/partners")
+async def list_partners_for_client(client_id: str, user: dict = Depends(require_admin)):
+    """
+    Returns all partners (role='ao') with their access tier for this client.
+    Partners without any row in partner_clients get tier=None.
+    """
+    try:
+        partners = supabase.table("profiles").select(
+            "id, email, name, created_at"
+        ).eq("role", "ao").order("name").execute().data
+
+        access_rows = supabase.table("partner_clients").select("partner_id, tier").eq(
+            "client_id", client_id
+        ).execute().data
+
+        tiers = {row["partner_id"]: row["tier"] for row in access_rows}
+        for p in partners:
+            p["tier"] = tiers.get(p["id"])
+        return partners
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.get("/{client_id}")
 async def get_client(client_id: str, user: dict = Depends(get_current_user)):
     try:
@@ -86,8 +121,21 @@ async def get_client(client_id: str, user: dict = Depends(get_current_user)):
 async def update_client(client_id: str, body: ClientUpdate, user: dict = Depends(require_admin)):
     try:
         update_data = body.model_dump(exclude_none=True)
+        if "name" in update_data:
+            update_data["name"] = update_data["name"].strip()
+            # Case-insensitive duplicate check, excluding this client
+            existing = supabase.table("clients").select("id, name").ilike(
+                "name", update_data["name"]
+            ).neq("id", client_id).execute()
+            if existing.data:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Un client nommé « {existing.data[0]['name']} » existe déjà"
+                )
         response = supabase.table("clients").update(update_data).eq("id", client_id).execute()
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

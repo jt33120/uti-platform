@@ -11,6 +11,7 @@ import NewConsultantPage from './pages/NewConsultantPage'
 import NewAOPage from './pages/NewAOPage'
 import NewClientPage from './pages/NewClientPage'
 import ClientsPage from './pages/ClientsPage'
+import ClientDetailPage from './pages/ClientDetailPage'
 import PartnerAccessPage from './pages/PartnerAccessPage'
 
 function ProtectedRoute({ children, adminOnly = false }) {
@@ -37,6 +38,7 @@ export default function App() {
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/clients" element={<ClientsPage />} />
+          <Route path="/clients/:id" element={<ClientDetailPage />} />
           <Route path="/consultants" element={<ConsultantsPage />} />
           <Route path="/consultants/new" element={<NewConsultantPage />} />
           <Route path="/aos" element={<AOSPage />} />
