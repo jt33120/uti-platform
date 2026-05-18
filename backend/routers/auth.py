@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from services.supabase_client import supabase
 from config import settings
 import traceback
+import httpx
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
@@ -153,12 +154,32 @@ async def register(body: RegisterRequest):
         raise HTTPException(status_code=422, detail="Le nom doit contenir au moins 2 caractères.")
 
     # ── Step 1: Create Supabase Auth user ─────────────────────────
+    # Using direct HTTP instead of supabase.auth.admin to ensure the
+    # service_role key is sent in BOTH the apikey and Authorization headers,
+    # which some versions of gotrue-py fail to do correctly.
     try:
-        auth_response = supabase.auth.admin.create_user({
-            "email": body.email,
-            "password": body.password,
-            "email_confirm": True,  # auto-confirm — remove if you want email verification
-        })
+        with httpx.Client(timeout=15) as client:
+            resp = client.post(
+                f"{settings.supabase_url}/auth/v1/admin/users",
+                headers={
+                    "apikey": settings.supabase_service_key,
+                    "Authorization": f"Bearer {settings.supabase_service_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "email": body.email,
+                    "password": body.password,
+                    "email_confirm": True,
+                },
+            )
+        if resp.status_code >= 400:
+            raw_error = resp.text
+            print(f"[AUTH] create_user HTTP {resp.status_code}: {raw_error}")
+            status, detail = _parse_supabase_error(raw_error)
+            raise HTTPException(status_code=status, detail=detail)
+        user_data = resp.json()
+    except HTTPException:
+        raise
     except Exception as e:
         tb = traceback.format_exc()
         raw_error = str(e)
@@ -167,18 +188,13 @@ async def register(body: RegisterRequest):
         raise HTTPException(status_code=status, detail=detail)
 
     # ── Validate response ─────────────────────────────────────────
-    if hasattr(auth_response, 'error') and auth_response.error:
-        status, detail = _parse_supabase_error(auth_response.error.message)
-        raise HTTPException(status_code=status, detail=detail)
-
-    if not getattr(auth_response, 'user', None):
-        print(f"[AUTH] Unexpected Supabase response: {auth_response}")
+    user_id = user_data.get("id")
+    if not user_id:
+        print(f"[AUTH] Unexpected Supabase response (no id): {user_data}")
         raise HTTPException(
             status_code=500,
             detail="Supabase n'a pas retourné d'utilisateur. Vérifiez vos logs serveur."
         )
-
-    user_id = auth_response.user.id
 
     # ── Step 2: Insert profile row ────────────────────────────────
     try:
@@ -193,7 +209,14 @@ async def register(body: RegisterRequest):
         print(f"[AUTH] profiles insert failed for user {user_id}:\n{tb}")
         # Auth user was created — attempt cleanup to avoid orphan
         try:
-            supabase.auth.admin.delete_user(user_id)
+            with httpx.Client(timeout=10) as client:
+                client.delete(
+                    f"{settings.supabase_url}/auth/v1/admin/users/{user_id}",
+                    headers={
+                        "apikey": settings.supabase_service_key,
+                        "Authorization": f"Bearer {settings.supabase_service_key}",
+                    },
+                )
             print(f"[AUTH] Cleaned up orphan auth user {user_id}")
         except Exception as cleanup_err:
             print(f"[AUTH] Cleanup failed: {cleanup_err}")
@@ -306,10 +329,19 @@ async def forgot_password(body: ForgotPasswordRequest):
     leaking whether the email exists in the system.
     """
     try:
-        supabase.auth.reset_password_for_email(
-            body.email,
-            options={"redirect_to": f"{settings.frontend_url}/reset-password"},
-        )
+        with httpx.Client(timeout=10) as client:
+            client.post(
+                f"{settings.supabase_url}/auth/v1/recover",
+                headers={
+                    "apikey": settings.supabase_service_key,
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "email": body.email,
+                    "gotrue_meta_security": {},
+                },
+                params={"redirect_to": f"{settings.frontend_url}/reset-password"},
+            )
     except Exception as e:
         print(f"[AUTH] forgot-password error (non-fatal): {e}")
     return {"message": "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé."}
@@ -324,12 +356,33 @@ async def reset_password(body: ResetPasswordRequest):
     if len(body.new_password) < 6:
         raise HTTPException(status_code=422, detail="Le mot de passe doit contenir au moins 6 caractères.")
     try:
-        # Verify the recovery token and get the user
-        user_resp = supabase.auth.get_user(body.access_token)
-        if not user_resp or not user_resp.user:
+        # Verify the recovery token by calling Supabase /auth/v1/user with it
+        with httpx.Client(timeout=10) as client:
+            user_resp = client.get(
+                f"{settings.supabase_url}/auth/v1/user",
+                headers={
+                    "apikey": settings.supabase_service_key,
+                    "Authorization": f"Bearer {body.access_token}",
+                },
+            )
+        if user_resp.status_code != 200:
             raise HTTPException(status_code=400, detail="Lien de réinitialisation invalide ou expiré.")
-        user_id = user_resp.user.id
-        supabase.auth.admin.update_user_by_id(user_id, {"password": body.new_password})
+        user_id = user_resp.json().get("id")
+        if not user_id:
+            raise HTTPException(status_code=400, detail="Lien de réinitialisation invalide ou expiré.")
+        # Update the password via admin API
+        with httpx.Client(timeout=10) as client:
+            upd = client.put(
+                f"{settings.supabase_url}/auth/v1/admin/users/{user_id}",
+                headers={
+                    "apikey": settings.supabase_service_key,
+                    "Authorization": f"Bearer {settings.supabase_service_key}",
+                    "Content-Type": "application/json",
+                },
+                json={"password": body.new_password},
+            )
+        if upd.status_code >= 400:
+            raise HTTPException(status_code=400, detail="Impossible de mettre à jour le mot de passe.")
         return {"message": "Mot de passe mis à jour avec succès."}
     except HTTPException:
         raise
