@@ -41,6 +41,39 @@ async def list_all_access(user: dict = Depends(require_admin)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.get("/{partner_id}/clients")
+async def list_clients_for_partner(partner_id: str, user: dict = Depends(require_admin)):
+    """
+    Returns all clients with this partner's tier for each.
+    Clients without any row in partner_clients get tier=None.
+    Mirror of GET /clients/{client_id}/partners.
+    """
+    try:
+        # Verify partner exists
+        partner = supabase.table("profiles").select("id, email, name, created_at").eq(
+            "id", partner_id
+        ).eq("role", "ao").single().execute()
+        if not partner.data:
+            raise HTTPException(status_code=404, detail="Partenaire introuvable")
+
+        clients = supabase.table("clients").select(
+            "id, name, sector, logo_url, created_at"
+        ).order("name").execute().data
+
+        access_rows = supabase.table("partner_clients").select("client_id, tier").eq(
+            "partner_id", partner_id
+        ).execute().data
+
+        tiers = {row["client_id"]: row["tier"] for row in access_rows}
+        for c in clients:
+            c["tier"] = tiers.get(c["id"])
+        return {"partner": partner.data, "clients": clients}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.put("/access")
 async def upsert_access(body: AccessUpsert, user: dict = Depends(require_admin)):
     """
@@ -67,6 +100,70 @@ async def upsert_access(body: AccessUpsert, user: dict = Depends(require_admin))
             }).execute()
 
         return response.data[0] if response.data else {"status": "ok"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.post("/{partner_id}/apply-pac/{pac_id}")
+async def apply_pac_to_partner(partner_id: str, pac_id: str, user: dict = Depends(require_admin)):
+    """
+    Apply a PAC to a partner: batch upsert partner_clients rows.
+    If a partner already has a tier for a client in the PAC, it is overwritten.
+    Clients not in the PAC are left untouched.
+    """
+    try:
+        # Verify partner exists and is an AO
+        partner = supabase.table("profiles").select("id").eq(
+            "id", partner_id
+        ).eq("role", "ao").execute()
+        if not partner.data:
+            raise HTTPException(status_code=404, detail="Partenaire introuvable")
+
+        # Verify PAC exists
+        pac = supabase.table("pacs").select("id, name").eq("id", pac_id).execute()
+        if not pac.data:
+            raise HTTPException(status_code=404, detail="PAC introuvable")
+
+        # Get PAC client rows
+        pac_clients = supabase.table("pac_clients").select("client_id, tier").eq(
+            "pac_id", pac_id
+        ).execute().data
+
+        if not pac_clients:
+            return {"message": "PAC vide, aucune affectation appliquée", "count": 0}
+
+        # Get existing partner_clients rows for the clients in the PAC
+        client_ids = [r["client_id"] for r in pac_clients]
+        existing = supabase.table("partner_clients").select("client_id").eq(
+            "partner_id", partner_id
+        ).in_("client_id", client_ids).execute().data
+        existing_set = {r["client_id"] for r in existing}
+
+        # Split into updates and inserts
+        to_insert = []
+        for row in pac_clients:
+            if row["client_id"] in existing_set:
+                supabase.table("partner_clients").update({
+                    "tier": row["tier"],
+                    "assigned_by": user["sub"],
+                }).eq("partner_id", partner_id).eq("client_id", row["client_id"]).execute()
+            else:
+                to_insert.append({
+                    "partner_id": partner_id,
+                    "client_id": row["client_id"],
+                    "tier": row["tier"],
+                    "assigned_by": user["sub"],
+                })
+
+        if to_insert:
+            supabase.table("partner_clients").insert(to_insert).execute()
+
+        return {
+            "message": f"PAC « {pac.data[0]['name']} » appliqué",
+            "count": len(pac_clients),
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

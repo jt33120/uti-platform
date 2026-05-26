@@ -16,6 +16,8 @@ import ClientsPage from './pages/ClientsPage'
 import ClientDetailPage from './pages/ClientDetailPage'
 import PartnerAccessPage from './pages/PartnerAccessPage'
 import PartnersPage from './pages/PartnersPage'
+import PartnerDetailPage from './pages/PartnerDetailPage'
+import PacsPage from './pages/PacsPage'
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user } = useAuth()
@@ -51,7 +53,9 @@ export default function App() {
           <Route path="/clients/new" element={<ProtectedRoute adminOnly><NewClientPage /></ProtectedRoute>} />
           <Route path="/aos/:id" element={<AODetailPage />} />
           <Route path="/partners" element={<ProtectedRoute adminOnly><PartnersPage /></ProtectedRoute>} />
+          <Route path="/partners/:id" element={<ProtectedRoute adminOnly><PartnerDetailPage /></ProtectedRoute>} />
           <Route path="/partners-access" element={<ProtectedRoute adminOnly><PartnerAccessPage /></ProtectedRoute>} />
+          <Route path="/pacs" element={<ProtectedRoute adminOnly><PacsPage /></ProtectedRoute>} />
         </Route>
       </Routes>
     </AuthProvider>
