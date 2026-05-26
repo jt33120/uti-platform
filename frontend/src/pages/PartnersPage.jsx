@@ -1,8 +1,10 @@
 import { useEffect, useState, useMemo } from 'react'
+import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import {
   Users, Search, Pencil, Trash2, X, Loader2, AlertCircle,
   ShieldOff, Star, ListChecks, UserPlus, Ban, CalendarDays,
+  Settings2,
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from '../components/InviteModal'
@@ -106,6 +108,7 @@ function AccessSummary({ summary }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PartnersPage() {
+  const navigate = useNavigate()
   const [partners, setPartners] = useState([])
   const [access, setAccess] = useState([])
   const [loading, setLoading] = useState(true)
@@ -286,8 +289,9 @@ export default function PartnersPage() {
             return (
               <div
                 key={partner.id}
+                onClick={() => navigate(`/partners/${partner.id}`)}
                 className={clsx(
-                  'card p-4 flex items-center gap-4 hover:border-white/10 transition-all duration-150',
+                  'card p-4 flex items-center gap-4 hover:border-white/10 transition-all duration-150 cursor-pointer',
                   isSuspendedEverywhere && 'border-red-500/20 opacity-80'
                 )}
               >
@@ -319,7 +323,16 @@ export default function PartnersPage() {
                 </div>
 
                 {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0">
+                <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
+                  {/* Manage clients */}
+                  <button
+                    onClick={() => navigate(`/partners/${partner.id}`)}
+                    className="btn-ghost p-2 text-slate-400 hover:text-brand-300 transition-colors"
+                    title="Gérer les clients de ce partenaire"
+                  >
+                    <Settings2 size={13} />
+                  </button>
+
                   {/* Suspend globally — only if has active access */}
                   {summary.total > 0 && !isSuspendedEverywhere && (
                     <button
