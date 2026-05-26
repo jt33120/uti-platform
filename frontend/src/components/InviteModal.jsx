@@ -1,11 +1,15 @@
 import { useState, useEffect } from 'react'
-import { X, Copy, Check } from 'lucide-react'
+import { X, Copy, Check, Mail, AlertTriangle, Send, Loader2 } from 'lucide-react'
 import api from '../lib/api'
 
 export default function InviteModal({ onClose }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
   const [inviteUrl, setInviteUrl] = useState(null)
+  const [inviteToken, setInviteToken] = useState(null)
+  const [emailSent, setEmailSent] = useState(false)
+  const [emailError, setEmailError] = useState(null)
+  const [resending, setResending] = useState(false)
   const [copied, setCopied] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -23,6 +27,13 @@ export default function InviteModal({ onClose }) {
     try {
       const res = await api.post('/invitations', { name, email })
       setInviteUrl(res.data.url)
+      // Extract token from the returned URL so we can re-send if needed
+      try {
+        const u = new URL(res.data.url)
+        setInviteToken(u.searchParams.get('invite'))
+      } catch { /* ignore */ }
+      setEmailSent(!!res.data.email_sent)
+      setEmailError(res.data.email_sent ? null : res.data.email_error)
     } catch (err) {
       setError(err.response?.data?.detail || "Erreur lors de la création de l'invitation")
     } finally {
@@ -35,6 +46,26 @@ export default function InviteModal({ onClose }) {
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
   }
+
+  const handleResend = async () => {
+    if (!inviteToken) return
+    setResending(true)
+    setEmailError(null)
+    try {
+      await api.post('/invitations/resend', { token: inviteToken })
+      setEmailSent(true)
+    } catch (err) {
+      setEmailError(err.response?.data?.detail || "Échec d'envoi de l'email")
+    } finally {
+      setResending(false)
+    }
+  }
+
+  const mailtoHref = inviteUrl
+    ? `mailto:${email}?subject=${encodeURIComponent('Invitation — UTI Group Plateforme Partenaires')}&body=${encodeURIComponent(
+        `Bonjour ${name},\n\nVous êtes invité(e) à rejoindre la plateforme partenaires UTI Group.\n\nCliquez ici pour créer votre compte (lien valable 7 jours) :\n${inviteUrl}\n\nÀ bientôt.`
+      )}`
+    : '#'
 
   return (
     <div
@@ -122,6 +153,28 @@ export default function InviteModal({ onClose }) {
               Invitation créée pour <span className="font-medium">{name}</span> ({email})
             </div>
 
+            {/* Email status */}
+            {emailSent ? (
+              <div
+                className="text-[12px] rounded-md px-3 py-2 flex items-center gap-2"
+                style={{ background: 'var(--success-soft)', color: 'var(--success)' }}
+              >
+                <Check size={13} strokeWidth={2} />
+                Email envoyé automatiquement à <span className="font-medium">{email}</span>
+              </div>
+            ) : (
+              <div
+                className="text-[12px] rounded-md px-3 py-2 flex items-start gap-2"
+                style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}
+              >
+                <AlertTriangle size={13} strokeWidth={2} className="shrink-0 mt-0.5" />
+                <div className="min-w-0">
+                  L'email n'a pas pu être envoyé automatiquement.
+                  {emailError && <div className="opacity-80 mt-0.5 break-words text-[11px]">{emailError}</div>}
+                </div>
+              </div>
+            )}
+
             <div>
               <label className="label">Lien d'invitation</label>
               <div className="flex gap-2">
@@ -142,9 +195,31 @@ export default function InviteModal({ onClose }) {
                   )}
                 </button>
               </div>
-              <p className="text-[11px] text-[var(--text-faint)] mt-1.5">
-                Envoyez ce lien par email ou message au partenaire.
-              </p>
+            </div>
+
+            {/* Send actions */}
+            <div className="flex gap-2">
+              <button
+                onClick={handleResend}
+                disabled={resending || !inviteToken}
+                className="btn-ghost flex-1 justify-center"
+                title="Renvoyer l'email via Resend"
+              >
+                {resending ? (
+                  <><Loader2 size={13} className="animate-spin" /> Envoi...</>
+                ) : emailSent ? (
+                  <><Send size={13} strokeWidth={1.75} /> Renvoyer l'email</>
+                ) : (
+                  <><Send size={13} strokeWidth={1.75} /> Envoyer l'email</>
+                )}
+              </button>
+              <a
+                href={mailtoHref}
+                className="btn-ghost flex-1 justify-center"
+                title="Ouvrir votre client mail avec le lien pré-rempli"
+              >
+                <Mail size={13} strokeWidth={1.75} /> Via mon mail
+              </a>
             </div>
 
             <button onClick={onClose} className="btn-primary w-full justify-center">
