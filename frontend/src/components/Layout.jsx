@@ -1,12 +1,13 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
-  Building2, Network, Sun, Moon, UserPlus, UserCheck, Package
+  Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
+import SettingsModal from './SettingsModal'
 
 const NavItem = ({ to, icon: Icon, label, end = false }) => (
   <NavLink
@@ -48,13 +49,25 @@ export default function Layout() {
 
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
   const [inviteOpen, setInviteOpen] = useState(false)
+  const [profileMenuOpen, setProfileMenuOpen] = useState(false)
+  const [settingsOpen, setSettingsOpen] = useState(false)
+  const profileMenuRef = useRef(null)
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
-    // Keep legacy `light` class out of the way
     document.documentElement.classList.remove('light')
     localStorage.setItem('theme', dark ? 'dark' : 'light')
   }, [dark])
+
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (profileMenuRef.current && !profileMenuRef.current.contains(e.target)) {
+        setProfileMenuOpen(false)
+      }
+    }
+    if (profileMenuOpen) document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [profileMenuOpen])
 
   const handleLogout = () => {
     logout()
@@ -105,30 +118,58 @@ export default function Layout() {
         </nav>
 
         {/* User */}
-        <div className="p-2" style={{ borderTop: '1px solid var(--border)' }}>
-          <div className="flex items-center gap-2.5 px-2 h-11">
-            <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
-                 style={{ background: 'var(--surface-2)', color: 'var(--text)' }}>
-              {user?.name?.charAt(0).toUpperCase()}
+        <div className="p-2 relative" style={{ borderTop: '1px solid var(--border)' }} ref={profileMenuRef}>
+          {/* Profile popover menu */}
+          {profileMenuOpen && (
+            <div
+              className="absolute left-2 right-2 card py-1"
+              style={{ bottom: 'calc(100% + 4px)', zIndex: 50 }}
+            >
+              <button
+                onClick={() => { setProfileMenuOpen(false); setSettingsOpen(true) }}
+                className="flex items-center gap-2.5 w-full px-3 h-8 text-[13px] text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors rounded"
+              >
+                <Settings size={14} strokeWidth={1.75} />
+                Paramètres du profil
+              </button>
+              <button
+                onClick={handleLogout}
+                className="flex items-center gap-2.5 w-full px-3 h-8 text-[13px] text-[var(--text-muted)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors rounded"
+              >
+                <LogOut size={14} strokeWidth={1.75} />
+                Déconnexion
+              </button>
             </div>
-            <div className="flex-1 min-w-0">
+          )}
+
+          <button
+            onClick={() => setProfileMenuOpen(o => !o)}
+            className="flex items-center gap-2.5 px-2 h-11 w-full rounded-md transition-colors hover:bg-[var(--surface-2)]"
+          >
+            {user?.avatar_url ? (
+              <img
+                src={user.avatar_url}
+                alt="Avatar"
+                className="w-7 h-7 rounded-full object-cover shrink-0"
+              />
+            ) : (
+              <div className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-semibold shrink-0"
+                   style={{ background: 'var(--surface-2)', color: 'var(--text)' }}>
+                {user?.name?.charAt(0).toUpperCase()}
+              </div>
+            )}
+            <div className="flex-1 min-w-0 text-left">
               <div className="text-[12px] font-medium truncate text-[var(--text)]">{user?.name}</div>
               <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">
                 {user?.role === 'admin' ? 'Administrateur' : 'Partenaire'}
               </div>
             </div>
-            <button
-              onClick={handleLogout}
-              className="p-1.5 rounded text-[var(--text-faint)] hover:text-[var(--danger)] hover:bg-[var(--surface-2)] transition-colors"
-              title="Déconnexion"
-            >
-              <LogOut size={14} strokeWidth={1.75} />
-            </button>
-          </div>
+          </button>
         </div>
       </aside>
 
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
+      {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
 
       {/* Main */}
       <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
