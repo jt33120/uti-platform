@@ -9,8 +9,12 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   email       TEXT NOT NULL UNIQUE,
   name        TEXT NOT NULL,
   role        TEXT NOT NULL CHECK (role IN ('admin', 'ao')),
+  avatar_url  TEXT,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
+
+-- Add avatar_url to existing deployments
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
 
 -- 2. Clients
 --    Dimension de cloisonnement : chaque AO et chaque partenaire
@@ -185,12 +189,20 @@ CREATE POLICY "matchings_select_all" ON public.matchings
 -- Path convention: {ao_id}/{submission_uuid}.pdf
 
 -- ============================================================
+-- Storage bucket for avatars
+-- ============================================================
+-- Run in Supabase Storage: create a bucket named "avatars"
+-- Set it to PUBLIC so avatar URLs are directly accessible
+-- Path convention: {user_id}/avatar.{ext}
+
+-- ============================================================
 -- Indexes
 -- ============================================================
 
 -- Migration: add ao_type to existing databases
 ALTER TABLE public.appels_offres ADD COLUMN IF NOT EXISTS ao_type TEXT;
 
+CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_name_unique_lower ON public.clients (LOWER(name));
 CREATE INDEX IF NOT EXISTS idx_clients_created_at       ON public.clients(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_consultants_created_by   ON public.consultants(created_by);
 CREATE INDEX IF NOT EXISTS idx_consultants_created_at   ON public.consultants(created_at DESC);

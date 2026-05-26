@@ -4,17 +4,20 @@ from typing import Optional
 from openai import AsyncOpenAI
 from config import settings
 
-client = AsyncOpenAI(api_key=settings.openai_api_key)
+client = AsyncOpenAI(
+    api_key=settings.openrouter_key,
+    base_url="https://openrouter.ai/api/v1"
+)
 
-# GPT-4o pricing (as of 2024)
-GPT4O_INPUT_COST_PER_MILLION = 2.50  # $2.50 per 1M input tokens
-GPT4O_OUTPUT_COST_PER_MILLION = 10.00  # $10.00 per 1M output tokens
+# Claude 3.5 Haiku pricing via OpenRouter
+HAIKU_INPUT_COST_PER_MILLION = 0.80  # $0.80 per 1M input tokens
+HAIKU_OUTPUT_COST_PER_MILLION = 4.00  # $4.00 per 1M output tokens
 
 
 def calculate_cost(input_tokens: int, output_tokens: int) -> float:
-    """Calculate cost in USD for GPT-4o API usage."""
-    input_cost = (input_tokens / 1_000_000) * GPT4O_INPUT_COST_PER_MILLION
-    output_cost = (output_tokens / 1_000_000) * GPT4O_OUTPUT_COST_PER_MILLION
+    """Calculate cost in USD for Claude 3.5 Haiku API usage."""
+    input_cost = (input_tokens / 1_000_000) * HAIKU_INPUT_COST_PER_MILLION
+    output_cost = (output_tokens / 1_000_000) * HAIKU_OUTPUT_COST_PER_MILLION
     return input_cost + output_cost
 
 
@@ -95,12 +98,12 @@ Score les {len(consultants)} consultant(s) fourni(s).
 async def score_consultants(ao: dict, consultants: list[dict]) -> tuple[list[dict], float]:
     """
     Core AI matching function.
-    Uses GPT-4o with structured JSON output for reliable, explainable scoring.
+    Uses Claude 3.5 Haiku with structured JSON output for reliable, explainable scoring.
     Returns (scored_results, cost_usd).
 
     Strategy:
     1. Send AO + all CVs texts in a single prompt
-    2. GPT-4o scores each consultant with breakdown + explanation
+    2. Claude 3.5 Haiku scores each consultant with breakdown + explanation
     3. Sort by total score, return top results
     """
     if not consultants:
@@ -110,7 +113,7 @@ async def score_consultants(ao: dict, consultants: list[dict]) -> tuple[list[dic
 
     try:
         response = await client.chat.completions.create(
-            model="gpt-4o",
+            model="anthropic/claude-3.5-haiku",
             messages=[
                 {"role": "system", "content": SCORING_SYSTEM_PROMPT},
                 {"role": "user", "content": prompt},
@@ -152,7 +155,7 @@ async def score_consultants(ao: dict, consultants: list[dict]) -> tuple[list[dic
 async def score_consultants_batch(ao: dict, consultants: list[dict], batch_size: int = 5) -> tuple[list[dict], float]:
     """
     Handle large number of consultants by batching.
-    GPT-4o context window allows ~10 CVs at once safely.
+    Haiku context window allows ~10 CVs at once safely.
     For more, we batch and merge results.
     Returns (scored_results, total_cost_usd).
     """

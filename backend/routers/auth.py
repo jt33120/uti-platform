@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -300,6 +300,7 @@ async def login(body: LoginRequest):
             "email": body.email,
             "name": profile["name"],
             "role": profile["role"],
+            "avatar_url": profile.get("avatar_url"),
         }
     }
 
@@ -389,3 +390,125 @@ async def reset_password(body: ResetPasswordRequest):
     except Exception as e:
         print(f"[AUTH] reset-password error: {e}")
         raise HTTPException(status_code=400, detail="Lien de réinitialisation invalide ou expiré.")
+
+
+class UpdateProfileRequest(BaseModel):
+    name: Optional[str] = None
+    email: Optional[EmailStr] = None
+    current_password: Optional[str] = None
+    new_password: Optional[str] = None
+
+
+@router.patch("/me")
+async def update_profile(body: UpdateProfileRequest, user: dict = Depends(get_current_user)):
+    user_id = user["sub"]
+    current_email = user["email"]
+
+    # Email or password change requires current password verification
+    if body.email or body.new_password:
+        if not body.current_password:
+            raise HTTPException(status_code=422, detail="Mot de passe actuel requis pour changer l'email ou le mot de passe.")
+        try:
+            auth_resp = supabase.auth.sign_in_with_password({
+                "email": current_email,
+                "password": body.current_password,
+            })
+            if not getattr(auth_resp, 'user', None):
+                raise HTTPException(status_code=401, detail="Mot de passe actuel incorrect.")
+        except HTTPException:
+            raise
+        except Exception as e:
+            msg = str(e).lower()
+            if "invalid" in msg or "credentials" in msg:
+                raise HTTPException(status_code=401, detail="Mot de passe actuel incorrect.")
+            raise HTTPException(status_code=500, detail="Erreur de vérification du mot de passe.")
+
+        if body.new_password and len(body.new_password) < 6:
+            raise HTTPException(status_code=422, detail="Le nouveau mot de passe doit contenir au moins 6 caractères.")
+
+        auth_update: dict = {}
+        if body.email:
+            auth_update["email"] = body.email
+        if body.new_password:
+            auth_update["password"] = body.new_password
+
+        with httpx.Client(timeout=10) as client:
+            resp = client.put(
+                f"{settings.supabase_url}/auth/v1/admin/users/{user_id}",
+                headers={
+                    "apikey": settings.supabase_service_key,
+                    "Authorization": f"Bearer {settings.supabase_service_key}",
+                    "Content-Type": "application/json",
+                },
+                json=auth_update,
+            )
+        if resp.status_code >= 400:
+            raise HTTPException(status_code=400, detail="Impossible de mettre à jour les identifiants.")
+
+    profile_update: dict = {}
+    if body.name and body.name.strip():
+        if len(body.name.strip()) < 2:
+            raise HTTPException(status_code=422, detail="Le nom doit contenir au moins 2 caractères.")
+        profile_update["name"] = body.name.strip()
+    if body.email:
+        profile_update["email"] = body.email
+
+    if profile_update:
+        supabase.table("profiles").update(profile_update).eq("id", user_id).execute()
+
+    profile = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
+    return profile.data
+
+
+_AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}
+_AVATAR_EXT = {"image/jpeg": "jpg", "image/png": "png", "image/webp": "webp"}
+_AVATAR_MAX_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
+@router.post("/me/avatar")
+async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    user_id = user["sub"]
+
+    if file.content_type not in _AVATAR_ALLOWED_TYPES:
+        raise HTTPException(status_code=422, detail="Format non supporté. Utilisez JPEG, PNG ou WebP.")
+
+    file_bytes = await file.read()
+    if len(file_bytes) > _AVATAR_MAX_BYTES:
+        raise HTTPException(status_code=422, detail="Image trop lourde (max 2 Mo).")
+
+    ext = _AVATAR_EXT[file.content_type]
+    storage_path = f"{user_id}/avatar.{ext}"
+
+    # Remove any existing avatar files for this user
+    try:
+        existing = supabase.storage.from_("avatars").list(user_id)
+        if existing:
+            supabase.storage.from_("avatars").remove([f"{user_id}/{f['name']}" for f in existing])
+    except Exception:
+        pass
+
+    try:
+        supabase.storage.from_("avatars").upload(
+            storage_path,
+            file_bytes,
+            {"content-type": file.content_type},
+        )
+        avatar_url = supabase.storage.from_("avatars").get_public_url(storage_path)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur upload avatar: {str(e)}")
+
+    supabase.table("profiles").update({"avatar_url": avatar_url}).eq("id", user_id).execute()
+    return {"avatar_url": avatar_url}
+
+
+@router.delete("/me/avatar")
+async def delete_avatar(user: dict = Depends(get_current_user)):
+    user_id = user["sub"]
+    try:
+        existing = supabase.storage.from_("avatars").list(user_id)
+        if existing:
+            supabase.storage.from_("avatars").remove([f"{user_id}/{f['name']}" for f in existing])
+    except Exception:
+        pass
+    supabase.table("profiles").update({"avatar_url": None}).eq("id", user_id).execute()
+    return {"avatar_url": None}

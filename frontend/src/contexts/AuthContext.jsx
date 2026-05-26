@@ -46,11 +46,38 @@ export function AuthProvider({ children }) {
     setUser(null)
   }, [])
 
+  const updateProfile = async (data) => {
+    const { data: updated } = await api.patch('/auth/me', data)
+    const newUser = { ...user, ...updated }
+    localStorage.setItem('user', JSON.stringify(newUser))
+    setUser(newUser)
+    return newUser
+  }
+
+  const uploadAvatar = async (file) => {
+    const form = new FormData()
+    form.append('file', file)
+    const { data } = await api.post('/auth/me/avatar', form, {
+      headers: { 'Content-Type': 'multipart/form-data' },
+    })
+    const newUser = { ...user, avatar_url: data.avatar_url }
+    localStorage.setItem('user', JSON.stringify(newUser))
+    setUser(newUser)
+    return data.avatar_url
+  }
+
+  const deleteAvatar = async () => {
+    await api.delete('/auth/me/avatar')
+    const newUser = { ...user, avatar_url: null }
+    localStorage.setItem('user', JSON.stringify(newUser))
+    setUser(newUser)
+  }
+
   const isAdmin = user?.role === 'admin'
   const isAO = user?.role === 'ao'
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isAO }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isAO, updateProfile, uploadAvatar, deleteAvatar }}>
       {children}
     </AuthContext.Provider>
   )
