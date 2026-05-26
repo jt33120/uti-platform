@@ -3,11 +3,13 @@ import { Outlet, NavLink, useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
-  Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings
+  Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
+  HelpCircle, Mail
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
 import SettingsModal from './SettingsModal'
+import ContactModal from './ContactModal'
 
 const NavItem = ({ to, icon: Icon, label, end = false }) => (
   <NavLink
@@ -51,7 +53,14 @@ export default function Layout() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
+  const [contactOpen, setContactOpen] = useState(false)
+  const [contactDefaultType, setContactDefaultType] = useState('question')
   const profileMenuRef = useRef(null)
+
+  const openContact = (type = 'question') => {
+    setContactDefaultType(type)
+    setContactOpen(true)
+  }
 
   useEffect(() => {
     document.documentElement.classList.toggle('dark', dark)
@@ -113,6 +122,7 @@ export default function Layout() {
             <>
               <SectionLabel>Raccourcis</SectionLabel>
               <NavItem to="/consultants/new" icon={Plus} label="Ajouter consultant" />
+              <NavButton onClick={() => openContact('question')} icon={Mail} label="Contacter l'équipe" />
             </>
           )}
         </nav>
@@ -170,14 +180,22 @@ export default function Layout() {
 
       {inviteOpen && <InviteModal onClose={() => setInviteOpen(false)} />}
       {settingsOpen && <SettingsModal onClose={() => setSettingsOpen(false)} />}
+      {contactOpen && <ContactModal defaultType={contactDefaultType} onClose={() => setContactOpen(false)} />}
 
       {/* Main */}
       <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
         {/* Top bar */}
         <div
-          className="h-14 flex items-center justify-end px-6"
+          className="h-14 flex items-center justify-end gap-1 px-6"
           style={{ borderBottom: '1px solid var(--border)' }}
         >
+          <button
+            onClick={() => openContact('bug')}
+            className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+            title="Aide / Signaler un problème"
+          >
+            <HelpCircle size={15} strokeWidth={1.75} />
+          </button>
           <button
             onClick={() => setDark(d => !d)}
             className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
