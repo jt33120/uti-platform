@@ -38,11 +38,13 @@ export default function LoginPage() {
           Accédez à votre espace partenaire
         </p>
 
-        <form onSubmit={handleSubmit} className="space-y-3.5">
+        <form onSubmit={handleSubmit} className="space-y-3.5" autoComplete="on">
           <div>
             <label className="label">Email</label>
             <input
               type="email"
+              name="email"
+              autoComplete="email"
               className="input"
               placeholder="vous@example.com"
               value={form.email}
@@ -65,6 +67,8 @@ export default function LoginPage() {
             <div className="relative">
               <input
                 type={showPassword ? 'text' : 'password'}
+                name="password"
+                autoComplete="current-password"
                 className="input pr-9"
                 placeholder="••••••••"
                 value={form.password}

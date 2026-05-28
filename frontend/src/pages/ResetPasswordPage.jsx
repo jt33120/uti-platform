@@ -1,13 +1,18 @@
 import { useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
 import { Eye, EyeOff, CheckCircle, ArrowLeft } from 'lucide-react'
 
 export default function ResetPasswordPage() {
   const navigate = useNavigate()
+  const { logout } = useAuth()
   const [accessToken, setAccessToken] = useState('')
+  const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
+  const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+  const [showConfirm, setShowConfirm] = useState(false)
   const [loading, setLoading] = useState(false)
   const [done, setDone] = useState(false)
   const [error, setError] = useState('')
@@ -15,12 +20,18 @@ export default function ResetPasswordPage() {
   // Supabase sends the recovery token in the URL hash:
   // /reset-password#access_token=XXX&refresh_token=YYY&type=recovery
   useEffect(() => {
+    logout() // clear any stale session so we don't land as the wrong user
     const hash = window.location.hash.substring(1)
     const params = new URLSearchParams(hash)
     const token = params.get('access_token')
     const type = params.get('type')
     if (token && type === 'recovery') {
       setAccessToken(token)
+      // Fetch the email associated with this recovery token so Keychain
+      // can associate the new password with the correct account.
+      api.get('/auth/me', { headers: { Authorization: `Bearer ${token}` } })
+        .then(r => setEmail(r.data?.email || ''))
+        .catch(() => {})
     } else {
       setError("Lien de réinitialisation invalide. Veuillez refaire une demande.")
     }
@@ -28,12 +39,16 @@ export default function ResetPasswordPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
+    if (password !== confirmPassword) {
+      setError('Les mots de passe ne correspondent pas.')
+      return
+    }
     setError('')
     setLoading(true)
     try {
       await api.post('/auth/reset-password', { access_token: accessToken, new_password: password })
       setDone(true)
-      setTimeout(() => navigate('/login'), 3000)
+      setTimeout(() => { logout(); navigate('/login') }, 3000)
     } catch (err) {
       setError(err.response?.data?.detail || 'Une erreur est survenue.')
     } finally {
@@ -73,12 +88,17 @@ export default function ResetPasswordPage() {
             </Link>
           </div>
         ) : (
-          <form onSubmit={handleSubmit} className="space-y-3.5">
+          <form onSubmit={handleSubmit} className="space-y-3.5" autoComplete="on">
+            {/* Hidden username field lets macOS Keychain associate the new password with this account */}
+            <input type="hidden" name="username" autoComplete="username" value={email} readOnly />
+
             <div>
               <label className="label">Nouveau mot de passe</label>
               <div className="relative">
                 <input
                   type={showPassword ? 'text' : 'password'}
+                  name="new-password"
+                  autoComplete="new-password"
                   className="input pr-9"
                   placeholder="Min. 6 caractères"
                   value={password}
@@ -94,6 +114,31 @@ export default function ResetPasswordPage() {
                   onClick={() => setShowPassword(p => !p)}
                 >
                   {showPassword ? <EyeOff size={14} /> : <Eye size={14} />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Confirmer le mot de passe</label>
+              <div className="relative">
+                <input
+                  type={showConfirm ? 'text' : 'password'}
+                  name="confirm-password"
+                  autoComplete="new-password"
+                  className="input pr-9"
+                  placeholder="Répétez le mot de passe"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                  minLength={6}
+                  disabled={!accessToken}
+                />
+                <button
+                  type="button"
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] hover:text-[var(--text)]"
+                  onClick={() => setShowConfirm(p => !p)}
+                >
+                  {showConfirm ? <EyeOff size={14} /> : <Eye size={14} />}
                 </button>
               </div>
             </div>

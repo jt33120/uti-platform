@@ -196,6 +196,26 @@ CREATE POLICY "matchings_select_all" ON public.matchings
 -- Path convention: {user_id}/avatar.{ext}
 
 -- ============================================================
+-- Support messages (contact / bug reports)
+-- ============================================================
+CREATE TABLE IF NOT EXISTS public.support_messages (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id     UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  from_name   TEXT NOT NULL,
+  from_email  TEXT NOT NULL,
+  type        TEXT NOT NULL DEFAULT 'question' CHECK (type IN ('bug', 'question', 'suggestion', 'other')),
+  subject     TEXT NOT NULL,
+  message     TEXT NOT NULL,
+  created_at  TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE public.support_messages ENABLE ROW LEVEL SECURITY;
+
+-- Only admins (via service role backend) can read all messages
+CREATE POLICY "support_insert_own" ON public.support_messages
+  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+
+-- ============================================================
 -- Indexes
 -- ============================================================
 
