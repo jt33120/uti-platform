@@ -12,7 +12,9 @@ class Settings(BaseSettings):
     resend_from: str = "UTI Group <onboarding@resend.dev>"
     admin_email: Optional[str] = None  # recipient for support/contact notifications
 
-    class Config:
-        env_file = ".env"
+    model_config = {
+        "env_file": ".env",
+        "extra": "ignore",
+    }
 
 settings = Settings()
