@@ -10,6 +10,7 @@ class Settings(BaseSettings):
     frontend_url: str = "https://git-alpha-hazel.vercel.app"
     resend_key: Optional[str] = None
     resend_from: str = "UTI Group <onboarding@resend.dev>"
+    admin_email: Optional[str] = None  # recipient for support/contact notifications
 
     model_config = {
         "env_file": ".env",

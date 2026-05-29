@@ -1,8 +1,10 @@
+import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
-from typing import Literal
+from typing import Literal, Optional
 from routers.auth import get_current_user
 from services.supabase_client import supabase
+from config import settings
 
 router = APIRouter(prefix="/support", tags=["support"])
 
@@ -19,6 +21,82 @@ class ContactRequest(BaseModel):
     type: _TYPES
     subject: str
     message: str
+
+
+def _send_support_email(
+    from_name: str,
+    from_email: str,
+    type_label: str,
+    subject: str,
+    message: str,
+) -> tuple[bool, Optional[str]]:
+    """Forward contact message to the admin via Resend. Never raises."""
+    if not settings.resend_key:
+        return False, "RESEND_KEY non configurée"
+    if not settings.admin_email:
+        return False, "ADMIN_EMAIL non configurée"
+
+    html = f"""\
+<!DOCTYPE html>
+<html lang="fr">
+  <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">UTI Group — Support</div>
+                <h1 style="font-size:20px;margin:8px 0 0;font-weight:600;">Nouveau message : {type_label}</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 8px;">
+                <table cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;color:#1d1d1f;">
+                  <tr><td style="padding:4px 0;color:#6e6e73;width:90px;">De</td><td>{from_name} &lt;{from_email}&gt;</td></tr>
+                  <tr><td style="padding:4px 0;color:#6e6e73;">Sujet</td><td>{subject}</td></tr>
+                  <tr><td style="padding:4px 0;color:#6e6e73;">Type</td><td>{type_label}</td></tr>
+                </table>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 32px;">
+                <div style="background:#f5f5f7;border-radius:8px;padding:16px;font-size:14px;line-height:1.6;color:#1d1d1f;white-space:pre-wrap;">{message}</div>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px;border-top:1px solid #e5e5e7;font-size:12px;color:#86868b;">
+                Vous pouvez répondre directement à {from_email}
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>"""
+
+    try:
+        resp = httpx.post(
+            "https://api.resend.com/emails",
+            headers={
+                "Authorization": f"Bearer {settings.resend_key}",
+                "Content-Type": "application/json",
+            },
+            json={
+                "from": settings.resend_from,
+                "to": [settings.admin_email],
+                "reply_to": from_email,
+                "subject": f"[Support] {type_label} — {subject}",
+                "html": html,
+            },
+            timeout=10,
+        )
+        if resp.status_code >= 400:
+            return False, f"Resend {resp.status_code}: {resp.text}"
+        return True, None
+    except Exception as e:
+        return False, str(e)
 
 
 @router.post("/contact")
@@ -54,13 +132,12 @@ async def contact(body: ContactRequest, user: dict = Depends(get_current_user)):
         print(f"[SUPPORT] DB insert failed: {e}")
         raise HTTPException(status_code=500, detail="Erreur lors de l'enregistrement du message.")
 
-    # Mock email — log until SMTP / DNS is configured
+    # Send email notification to admin
     type_label = _TYPE_LABELS.get(body.type, body.type)
-    print(
-        f"\n[SUPPORT] ✉️  Nouveau message — {type_label}\n"
-        f"  De      : {from_name} <{user_email}>\n"
-        f"  Sujet   : {body.subject.strip()}\n"
-        f"  Message : {body.message.strip()}\n"
-    )
+    ok, err = _send_support_email(from_name, user_email, type_label, body.subject.strip(), body.message.strip())
+    if not ok:
+        print(f"[SUPPORT] Email non envoyé : {err}")
+    else:
+        print(f"[SUPPORT] Email transmis à {settings.admin_email}")
 
     return {"message": "Message envoyé avec succès."}
