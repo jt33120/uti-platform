@@ -20,6 +20,15 @@ class Settings(BaseSettings):
     smtp_from: Optional[str] = None  # defaults to smtp_user when unset
     smtp_from_name: str = "UTI Group"
 
+    # File storage backend: "supabase" (default) or "s3" (OVH Object Storage)
+    storage_backend: str = "supabase"
+    s3_endpoint_url: Optional[str] = None  # e.g. https://s3.gra.io.cloud.ovh.net
+    s3_region: str = "gra"
+    s3_access_key: Optional[str] = None
+    s3_secret_key: Optional[str] = None
+    s3_bucket: Optional[str] = None  # single OVH bucket; "cvs"/"avatars" become key prefixes
+    s3_public_base_url: Optional[str] = None  # public base URL for stored objects
+
     model_config = {
         "env_file": ".env",
         "extra": "ignore",

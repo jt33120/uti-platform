@@ -1,6 +1,7 @@
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from typing import Optional
 from services.supabase_client import supabase
+from services import storage
 from services.cv_parser import extract_text_from_pdf
 from routers.auth import get_current_user
 import uuid
@@ -106,12 +107,12 @@ async def create_submission(
     submission_uuid = str(uuid.uuid4())
     storage_path = f"{ao_id}/{submission_uuid}.pdf"
     try:
-        supabase.storage.from_("cvs").upload(
+        cv_url = storage.upload(
+            "cvs",
             storage_path,
             file_bytes,
-            {"content-type": "application/pdf"},
+            "application/pdf",
         )
-        cv_url = supabase.storage.from_("cvs").get_public_url(storage_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur upload CV: {str(e)}")
 
@@ -128,7 +129,7 @@ async def create_submission(
         }).execute().data[0]
     except Exception as e:
         try:
-            supabase.storage.from_("cvs").remove([storage_path])
+            storage.remove("cvs", [storage_path])
         except Exception:
             pass
         raise HTTPException(status_code=500, detail=f"Erreur création soumission: {str(e)}")
@@ -191,7 +192,7 @@ async def delete_submission(submission_id: str, user: dict = Depends(get_current
     # Attempt to delete the file from storage (best-effort)
     try:
         path = f"{sub['ao_id']}/{submission_id}.pdf"
-        supabase.storage.from_("cvs").remove([path])
+        storage.remove("cvs", [path])
     except Exception:
         pass
 

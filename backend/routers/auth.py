@@ -5,6 +5,7 @@ from typing import Optional
 from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from services.supabase_client import supabase
+from services import storage
 from config import settings
 import traceback
 import httpx
@@ -481,19 +482,19 @@ async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(get_c
 
     # Remove any existing avatar files for this user
     try:
-        existing = supabase.storage.from_("avatars").list(user_id)
+        existing = storage.list("avatars", user_id)
         if existing:
-            supabase.storage.from_("avatars").remove([f"{user_id}/{f['name']}" for f in existing])
+            storage.remove("avatars", [f"{user_id}/{f['name']}" for f in existing])
     except Exception:
         pass
 
     try:
-        supabase.storage.from_("avatars").upload(
+        avatar_url = storage.upload(
+            "avatars",
             storage_path,
             file_bytes,
-            {"content-type": file.content_type},
+            file.content_type,
         )
-        avatar_url = supabase.storage.from_("avatars").get_public_url(storage_path)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur upload avatar: {str(e)}")
 
@@ -505,9 +506,9 @@ async def upload_avatar(file: UploadFile = File(...), user: dict = Depends(get_c
 async def delete_avatar(user: dict = Depends(get_current_user)):
     user_id = user["sub"]
     try:
-        existing = supabase.storage.from_("avatars").list(user_id)
+        existing = storage.list("avatars", user_id)
         if existing:
-            supabase.storage.from_("avatars").remove([f"{user_id}/{f['name']}" for f in existing])
+            storage.remove("avatars", [f"{user_id}/{f['name']}" for f in existing])
     except Exception:
         pass
     supabase.table("profiles").update({"avatar_url": None}).eq("id", user_id).execute()

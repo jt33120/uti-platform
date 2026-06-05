@@ -15,6 +15,7 @@ def is_allowed_origin(origin: str) -> bool:
     if not origin:
         return False
     allowed = [
+        settings.frontend_url,
         "https://git-alpha-hazel.vercel.app",
         "http://localhost:5173",
         "http://localhost:3000",
