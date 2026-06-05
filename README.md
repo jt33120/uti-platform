@@ -144,6 +144,17 @@ Pour de gros volumes (>50 CVs), le système batchifie automatiquement les appels
 | `OPENAI_API_KEY` | Clé API OpenAI (GPT-4o) | ✅ |
 | `JWT_SECRET` | Secret pour signer les tokens | ✅ |
 | `FRONTEND_URL` | URL du frontend (CORS) | optionnel |
+| `SMTP_HOST` | Serveur SMTP (défaut `mail.infomaniak.com`) | optionnel |
+| `SMTP_PORT` | Port SMTP STARTTLS (défaut `587`) | optionnel |
+| `SMTP_USER` | Compte SMTP (envoi des emails) | ✅ (emails) |
+| `SMTP_PASSWORD` | Mot de passe SMTP | ✅ (emails) |
+| `SMTP_FROM` | Adresse expéditeur (défaut = `SMTP_USER`) | optionnel |
+| `SMTP_FROM_NAME` | Nom affiché de l'expéditeur (défaut `UTI Group`) | optionnel |
+| `ADMIN_EMAIL` | Destinataire des notifications support/contact | ✅ (support) |
+
+> Les emails transactionnels (invitations partenaires, formulaire de support)
+> sont envoyés via SMTP Infomaniak. Pour tester la connexion :
+> `cd backend && python scripts/test_smtp.py` (renseignez `SMTP_TEST_TO`).
 
 ---
 

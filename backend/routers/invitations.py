@@ -1,10 +1,10 @@
 import secrets
-import httpx
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Optional
 from services.supabase_client import supabase
+from services.email import send_email
 from routers.auth import require_admin
 from config import settings
 
@@ -23,12 +23,9 @@ def _is_expired(expires_at: str) -> bool:
 
 def _send_invite_email(to_email: str, partner_name: str, invite_url: str) -> tuple[bool, Optional[str]]:
     """
-    Send the invitation email via Resend.
+    Send the invitation email via SMTP.
     Returns (success, error_message). Never raises — caller decides what to do.
     """
-    if not settings.resend_key:
-        return False, "RESEND_KEY non configurée"
-
     subject = "Invitation — UTI Group Plateforme Partenaires"
     html = f"""\
 <!DOCTYPE html>
@@ -75,26 +72,14 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str) -> tup
   </body>
 </html>"""
 
-    try:
-        resp = httpx.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {settings.resend_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": settings.resend_from,
-                "to": [to_email],
-                "subject": subject,
-                "html": html,
-            },
-            timeout=10,
-        )
-        if resp.status_code >= 400:
-            return False, f"Resend {resp.status_code}: {resp.text}"
-        return True, None
-    except Exception as e:
-        return False, str(e)
+    text = (
+        f"Bonjour {partner_name},\n\n"
+        "Vous êtes invité(e) à rejoindre la plateforme partenaires UTI Group.\n"
+        "Créez votre compte en ouvrant le lien ci-dessous (usage unique, expire dans 7 jours) :\n\n"
+        f"{invite_url}\n\n"
+        "Si vous n'attendiez pas cette invitation, ignorez simplement cet email."
+    )
+    return send_email(to_email, subject, html, text=text)
 
 
 @router.post("")
