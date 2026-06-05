@@ -1,9 +1,9 @@
-import httpx
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Literal, Optional
 from routers.auth import get_current_user
 from services.supabase_client import supabase
+from services.email import send_email
 from config import settings
 
 router = APIRouter(prefix="/support", tags=["support"])
@@ -30,9 +30,7 @@ def _send_support_email(
     subject: str,
     message: str,
 ) -> tuple[bool, Optional[str]]:
-    """Forward contact message to the admin via Resend. Never raises."""
-    if not settings.resend_key:
-        return False, "RESEND_KEY non configurée"
+    """Forward contact message to the admin via SMTP. Never raises."""
     if not settings.admin_email:
         return False, "ADMIN_EMAIL non configurée"
 
@@ -76,27 +74,21 @@ def _send_support_email(
   </body>
 </html>"""
 
-    try:
-        resp = httpx.post(
-            "https://api.resend.com/emails",
-            headers={
-                "Authorization": f"Bearer {settings.resend_key}",
-                "Content-Type": "application/json",
-            },
-            json={
-                "from": settings.resend_from,
-                "to": [settings.admin_email],
-                "reply_to": from_email,
-                "subject": f"[Support] {type_label} — {subject}",
-                "html": html,
-            },
-            timeout=10,
-        )
-        if resp.status_code >= 400:
-            return False, f"Resend {resp.status_code}: {resp.text}"
-        return True, None
-    except Exception as e:
-        return False, str(e)
+    text = (
+        f"Nouveau message de support : {type_label}\n\n"
+        f"De : {from_name} <{from_email}>\n"
+        f"Sujet : {subject}\n"
+        f"Type : {type_label}\n\n"
+        f"{message}\n\n"
+        f"Vous pouvez répondre directement à {from_email}"
+    )
+    return send_email(
+        settings.admin_email,
+        f"[Support] {type_label} — {subject}",
+        html,
+        text=text,
+        reply_to=from_email,
+    )
 
 
 @router.post("/contact")
