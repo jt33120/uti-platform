@@ -7,7 +7,7 @@ Guide pas-à-pas pour faire tourner le backend **FastAPI** sur le VPS OVH, en
 | | Avant | Après |
 |---|---|---|
 | Frontend | Vercel | **Vercel** (inchangé) |
-| Backend | Railway | **VPS OVH** (`plateforme.groupement-it.com`) |
+| Backend | Railway | **VPS OVH** (`vps-cc93f2a8.vps.ovh.net`) |
 | Base de données | Supabase | **Supabase** (inchangé) |
 | Stockage fichiers | Supabase Storage | **OVH Object Storage** (Phase 2) |
 
@@ -21,15 +21,12 @@ Guide pas-à-pas pour faire tourner le backend **FastAPI** sur le VPS OVH, en
 
 ## ✅ Pré-requis (à vérifier avant de commencer)
 
-1. **DNS** : un enregistrement **A** `plateforme.groupement-it.com → 164.132.44.212`
-   doit exister chez IONOS. Vérifie depuis ta machine :
-   ```bash
-   nslookup plateforme.groupement-it.com
-   # doit renvoyer 164.132.44.212
-   ```
-   Sans ça, le certificat HTTPS (étape 1.6) échouera.
-2. **Accès SSH** au VPS : `ssh julian.talou@164.132.44.212`
-3. Les **secrets** à portée de main : clés Supabase, OpenAI, `JWT_SECRET`,
+> Le backend est exposé sur l'adresse technique du VPS, **`vps-cc93f2a8.vps.ovh.net`**,
+> qui pointe déjà vers `164.132.44.212`. **Aucune manipulation DNS n'est nécessaire.**
+> (`plateforme.groupement-it.com` reste le domaine du frontend, sur Vercel.)
+
+1. **Accès SSH** au VPS : `ssh julian.talou@164.132.44.212`
+2. Les **secrets** à portée de main : clés Supabase, OpenAI, `JWT_SECRET`,
    mot de passe SMTP Infomaniak (les mêmes que sur Railway).
 
 ---
@@ -103,13 +100,13 @@ sudo nginx -t && sudo systemctl reload nginx
 
 # Certificat HTTPS (Let's Encrypt) — réécrit nginx pour ajouter le 443 + redirection
 sudo apt install -y certbot python3-certbot-nginx
-sudo certbot --nginx -d plateforme.groupement-it.com
+sudo certbot --nginx -d vps-cc93f2a8.vps.ovh.net
 ```
 
 ### 1.7 — Vérifier le backend OVH en HTTPS
 Depuis **n'importe quelle machine** :
 ```bash
-curl https://plateforme.groupement-it.com/health   # → {"status":"ok"}
+curl https://vps-cc93f2a8.vps.ovh.net/health   # → {"status":"ok"}
 ```
 ✅ Si tu obtiens `{"status":"ok"}` en **https**, le backend OVH est opérationnel.
 
@@ -120,7 +117,7 @@ curl https://plateforme.groupement-it.com/health   # → {"status":"ok"}
 Édite **`vercel.json`** à la racine du repo et remplace la destination de l'API :
 ```diff
 -      "destination": "https://git-production-af3c.up.railway.app/:path*"
-+      "destination": "https://plateforme.groupement-it.com/:path*"
++      "destination": "https://vps-cc93f2a8.vps.ovh.net/:path*"
 ```
 Commit + push sur `master`. Vercel redéploie le frontend, qui appelle désormais
 le backend OVH. **Teste l'appli** (login, upload de CV, etc.).
