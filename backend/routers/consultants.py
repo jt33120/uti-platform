@@ -32,7 +32,7 @@ class ConsultantUpdate(BaseModel):
 @router.post("")
 async def create_consultant(body: ConsultantCreate, user: dict = Depends(get_current_user)):
     """
-    Create a consultant in the partner's roster.
+    Create a consultant in the partner's vivier (talent pool).
     CV upload is no longer here — CVs are attached to specific AO submissions.
     """
     try:
@@ -56,7 +56,7 @@ async def create_consultant(body: ConsultantCreate, user: dict = Depends(get_cur
 async def list_consultants(user: dict = Depends(get_current_user)):
     """
     Admin: all consultants.
-    Partner: only their own roster.
+    Partner: only their own vivier.
     """
     try:
         query = supabase.table("consultants").select("*").order("created_at", desc=True)

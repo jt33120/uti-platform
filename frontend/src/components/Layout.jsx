@@ -10,6 +10,7 @@ import clsx from 'clsx'
 import InviteModal from './InviteModal'
 import SettingsModal from './SettingsModal'
 import ContactModal from './ContactModal'
+import AssistantWidget from './AssistantWidget'
 
 const NavItem = ({ to, icon: Icon, label, end = false }) => (
   <NavLink
@@ -208,6 +209,9 @@ export default function Layout() {
           <Outlet />
         </div>
       </main>
+
+      {/* Floating AI assistant — routes & pre-fills, never submits */}
+      <AssistantWidget />
     </div>
   )
 }

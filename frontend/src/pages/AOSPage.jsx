@@ -4,13 +4,16 @@ import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import {
   FileText, Plus, Euro, MapPin, Clock, ArrowRight, Search,
-  Building2, Users, Star, ListChecks, Calendar,
+  Building2, Users, Star, ListChecks, Calendar, CalendarClock,
   Pencil, Trash2, X, Loader2, ChevronDown,
 } from 'lucide-react'
 
 const formatDate = (iso) => {
   if (!iso) return null
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(new Date(iso))
+  // Parse date-only strings as local to avoid the UTC off-by-one.
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso)
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
 }
 import clsx from 'clsx'
 
@@ -44,6 +47,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
     duration: ao.duration || '',
     context: ao.context || '',
     ao_type: ao.ao_type || '',
+    deadline: ao.deadline || '',
     status: ao.status || 'open',
   })
   const [loading, setLoading] = useState(false)
@@ -62,6 +66,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
       const payload = { ...form }
       if (!payload.budget_max) delete payload.budget_max
       else payload.budget_max = parseInt(payload.budget_max)
+      if (!payload.deadline) delete payload.deadline
       await api.patch(`/aos/${ao.id}`, payload)
       onSaved()
     } catch (err) {
@@ -114,6 +119,11 @@ function AOEditModal({ ao, onClose, onSaved }) {
           <div>
             <label className="label">Contexte / Notes IA</label>
             <textarea className="input min-h-[60px] resize-y" value={form.context} onChange={set('context')} />
+          </div>
+
+          <div>
+            <label className="label" style={{ color: 'var(--danger)' }}>Date limite de réponse</label>
+            <input className="input" type="date" value={form.deadline} onChange={set('deadline')} />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -204,6 +214,11 @@ function AOCard({ ao, isAdmin, onEdit, onDelete, navigate }) {
           {ao.ao_type && (
             <span className="badge bg-violet-500/10 text-violet-300 border border-violet-500/20 text-[10px]">
               {ao.ao_type}
+            </span>
+          )}
+          {ao.deadline && (
+            <span className="badge text-[10px]" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
+              <CalendarClock size={9} /> {formatDate(ao.deadline)}
             </span>
           )}
           <TierBadge tier={ao.tier} />

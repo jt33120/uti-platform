@@ -1,17 +1,34 @@
 import { useState, useEffect, useRef } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowLeft, Zap, Euro, MapPin, Clock, Users, CheckCircle,
   AlertCircle, TrendingUp, Award, ChevronDown, ChevronUp,
   Loader2, FileText, Trash2, RotateCcw, Building2, Plus,
-  Upload, X, UserCircle2, Briefcase, Calendar, Pencil
+  Upload, X, UserCircle2, Briefcase, Calendar, Pencil,
+  CalendarClock, AlertTriangle, BarChart3
 } from 'lucide-react'
+
+// Parse date-only strings ("YYYY-MM-DD") as *local* dates to avoid the UTC
+// off-by-one; full timestamps fall back to native parsing.
+const parseDateLocal = (iso) => {
+  if (!iso) return null
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso)
+}
 
 const formatDate = (iso) => {
   if (!iso) return null
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(iso))
+  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(parseDateLocal(iso))
+}
+
+// Days between today (midnight) and the deadline date. Negative = past.
+const daysUntil = (iso) => {
+  if (!iso) return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const d = parseDateLocal(iso); d.setHours(0, 0, 0, 0)
+  return Math.round((d - today) / 86400000)
 }
 import clsx from 'clsx'
 
@@ -162,13 +179,14 @@ function MatchCard({ result, rank }) {
 }
 
 // ─── Submission modal (partner submits a CV to this AO) ─────────
-function SubmitModal({ aoId, roster, onClose, onSubmitted }) {
+function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
   const fileRef = useRef(null)
-  const [mode, setMode] = useState(roster.length > 0 ? 'existing' : 'new')
-  const [consultantId, setConsultantId] = useState(roster[0]?.id || '')
+  const [mode, setMode] = useState(prefill ? 'new' : (vivier.length > 0 ? 'existing' : 'new'))
+  const [consultantId, setConsultantId] = useState(vivier[0]?.id || '')
   const [form, setForm] = useState({
     name: '', skills: '', tjm: '', experience_years: '',
     employment_type: 'independant', availability: '',
+    ...(prefill || {}),
   })
   const [cvFile, setCvFile] = useState(null)
   const [dragOver, setDragOver] = useState(false)
@@ -221,12 +239,12 @@ function SubmitModal({ aoId, roster, onClose, onSubmitted }) {
           <button onClick={onClose} className="text-slate-500 hover:text-white"><X size={18} /></button>
         </div>
 
-        {roster.length > 0 && (
+        {vivier.length > 0 && (
           <div className="flex gap-1 bg-white/5 rounded-lg p-1 mb-4">
             <button type="button" onClick={() => setMode('existing')}
               className={clsx('flex-1 px-3 py-1.5 text-xs rounded-md font-medium transition-all',
                 mode === 'existing' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200')}>
-              Depuis le roster
+              Depuis le vivier
             </button>
             <button type="button" onClick={() => setMode('new')}
               className={clsx('flex-1 px-3 py-1.5 text-xs rounded-md font-medium transition-all',
@@ -243,7 +261,7 @@ function SubmitModal({ aoId, roster, onClose, onSubmitted }) {
               <div className="relative">
                 <select className="input appearance-none pr-9" value={consultantId}
                         onChange={e => setConsultantId(e.target.value)}>
-                  {roster.map(c => (
+                  {vivier.map(c => (
                     <option key={c.id} value={c.id} className="bg-navy-900">
                       {c.name}{c.tjm ? ` · ${c.tjm}€/j` : ''}{c.employment_type ? ` · ${c.employment_type === 'salarie' ? 'Salarié' : 'Indépendant'}` : ''}
                     </option>
@@ -443,6 +461,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
     duration: ao.duration || '',
     context: ao.context || '',
     ao_type: ao.ao_type || '',
+    deadline: ao.deadline || '',
     status: ao.status || 'open',
   })
   const [loading, setLoading] = useState(false)
@@ -461,6 +480,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
       const payload = { ...form }
       if (!payload.budget_max) delete payload.budget_max
       else payload.budget_max = parseInt(payload.budget_max)
+      if (!payload.deadline) delete payload.deadline
       await api.patch(`/aos/${ao.id}`, payload)
       onSaved()
     } catch (err) {
@@ -513,6 +533,11 @@ function AOEditModal({ ao, onClose, onSaved }) {
           <div>
             <label className="label">Contexte / Notes IA</label>
             <textarea className="input min-h-[60px] resize-y" value={form.context} onChange={set('context')} />
+          </div>
+
+          <div>
+            <label className="label" style={{ color: 'var(--danger)' }}>Date limite de réponse</label>
+            <input className="input" type="date" value={form.deadline} onChange={set('deadline')} />
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -572,21 +597,170 @@ function AOEditModal({ ao, onClose, onSaved }) {
   )
 }
 
+// ─── Deadline banner (big & red) ────────────────────────────────
+function DeadlineBanner({ deadline }) {
+  if (!deadline) return null
+  const days = daysUntil(deadline)
+  const overdue = days < 0
+  const urgent = days >= 0 && days <= 7
+
+  return (
+    <div
+      className="mb-5 rounded-lg border px-5 py-4 flex items-center gap-4"
+      style={{ background: 'var(--danger-soft)', borderColor: 'var(--danger)' }}
+    >
+      <div
+        className="shrink-0 w-11 h-11 rounded-lg flex items-center justify-center"
+        style={{ background: 'var(--danger)', color: '#fff' }}
+      >
+        {overdue ? <AlertTriangle size={22} /> : <CalendarClock size={22} />}
+      </div>
+      <div className="flex-1 min-w-0">
+        <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--danger)' }}>
+          Date limite de réponse
+        </div>
+        <div className="text-2xl font-bold leading-tight" style={{ color: 'var(--danger)' }}>
+          {formatDate(deadline)}
+        </div>
+      </div>
+      <div className="text-right shrink-0">
+        <div className="text-2xl font-extrabold tabular" style={{ color: 'var(--danger)' }}>
+          {overdue ? 'Dépassée' : days === 0 ? "Aujourd'hui" : `J-${days}`}
+        </div>
+        <div className="text-[11px]" style={{ color: 'var(--danger)' }}>
+          {overdue
+            ? `depuis ${Math.abs(days)} j`
+            : days === 0 ? 'dernier jour' : urgent ? 'échéance proche' : 'restants'}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── AO insights chart (admin) ──────────────────────────────────
+function StatBar({ label, value, max, color, sublabel }) {
+  const pct = max > 0 ? (value / max) * 100 : 0
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <span className="text-xs text-[var(--text-muted)] flex items-center gap-1.5">
+          <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ background: color }} />
+          {label}
+        </span>
+        <span className="text-xs font-semibold text-[var(--text)] tabular">
+          {value}
+          {sublabel ? <span className="text-[var(--text-faint)] font-normal">{sublabel}</span> : null}
+        </span>
+      </div>
+      <div className="h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+        <div
+          className="h-full rounded-full transition-all duration-700"
+          style={{ width: `${value > 0 ? Math.max(pct, 4) : 0}%`, background: color }}
+        />
+      </div>
+    </div>
+  )
+}
+
+function AOInsightsChart({ aoId }) {
+  const [stats, setStats] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let alive = true
+    api.get(`/aos/${aoId}/stats`)
+      .then(r => { if (alive) setStats(r.data) })
+      .catch(e => { if (alive) setError(e.response?.data?.detail || 'Erreur') })
+      .finally(() => { if (alive) setLoading(false) })
+    return () => { alive = false }
+  }, [aoId])
+
+  if (loading) {
+    return (
+      <div className="card p-4 flex items-center justify-center h-40">
+        <Loader2 size={18} className="animate-spin text-[var(--text-faint)]" />
+      </div>
+    )
+  }
+  if (error || !stats) return null
+
+  // Distinct, accessible colors per series
+  const C = {
+    eligible: '#6366f1',   // indigo  — could answer / matching pool
+    responded: '#10b981',  // emerald — answered
+    proposed: '#8b5cf6',   // violet  — proposed
+    gap: '#f59e0b',        // amber   — matching but not proposed
+  }
+  const partnersMax = Math.max(stats.partners_eligible, stats.partners_responded, 1)
+  const consultantsMax = Math.max(
+    stats.consultants_pool_eligible, stats.consultants_proposed, stats.consultants_eligible_not_proposed, 1
+  )
+  const partnerCoverage = stats.partners_eligible > 0
+    ? Math.round((stats.partners_responded / stats.partners_eligible) * 100) : 0
+  const consultantCoverage = stats.consultants_pool_eligible > 0
+    ? Math.round((stats.consultants_proposed / stats.consultants_pool_eligible) * 100) : 0
+
+  return (
+    <div className="card p-4">
+      <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wide flex items-center gap-1.5 mb-4">
+        <BarChart3 size={13} className="text-[var(--accent-text)]" /> Couverture de l'AO
+      </p>
+
+      {/* Partners */}
+      <div className="mb-4">
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Partenaires</span>
+          <span className="text-[11px] text-[var(--text-faint)]">{partnerCoverage}% ont répondu</span>
+        </div>
+        <div className="space-y-2.5">
+          <StatBar
+            label="Peuvent répondre" value={stats.partners_eligible} max={partnersMax} color={C.eligible}
+            sublabel={(stats.partners_list_1 + stats.partners_list_2) > 0 ? ` · L1 ${stats.partners_list_1} / L2 ${stats.partners_list_2}` : ''}
+          />
+          <StatBar label="Ont répondu" value={stats.partners_responded} max={partnersMax} color={C.responded} />
+        </div>
+      </div>
+
+      {/* Consultants */}
+      <div>
+        <div className="flex items-center justify-between mb-2">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-faint)]">Consultants</span>
+          <span className="text-[11px] text-[var(--text-faint)]">{consultantCoverage}% du vivier éligible proposé</span>
+        </div>
+        <div className="space-y-2.5">
+          <StatBar label="Éligibles (vivier qui matche)" value={stats.consultants_pool_eligible} max={consultantsMax} color={C.eligible} />
+          <StatBar label="Proposés" value={stats.consultants_proposed} max={consultantsMax} color={C.proposed} />
+          <StatBar label="Éligibles non proposés" value={stats.consultants_eligible_not_proposed} max={consultantsMax} color={C.gap} />
+        </div>
+      </div>
+
+      <p className="text-[10px] text-[var(--text-faint)] mt-4 leading-relaxed">
+        « Éligibles » = consultants dont les compétences recoupent celles de l'AO, chez des partenaires ayant accès au client.
+      </p>
+    </div>
+  )
+}
+
 // ─── Main page ──────────────────────────────────────────────────
 export default function AODetailPage() {
   const { id } = useParams()
   const { isAdmin, user } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [ao, setAo] = useState(null)
   const [submissions, setSubmissions] = useState([])
-  const [roster, setRoster] = useState([])
+  const [vivier, setVivier] = useState([])
   const [matchResults, setMatchResults] = useState(null)
   const [loading, setLoading] = useState(true)
   const [matching, setMatching] = useState(false)
   const [matchError, setMatchError] = useState('')
   const [showSubmitModal, setShowSubmitModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
+  // Assistant can deep-link here to open the "propose consultant" flow,
+  // optionally pre-filling the new-consultant fields. It never submits.
+  const [submitPrefill, setSubmitPrefill] = useState(location.state?.assistantPrefill || null)
 
   const fetchAo = async () => {
     const r = await api.get(`/aos/${id}`)
@@ -618,8 +792,8 @@ export default function AODetailPage() {
         const [aoData, subs] = await Promise.all([fetchAo(), fetchSubmissions()])
 
         if (!isAdmin) {
-          const rosterRes = await api.get('/consultants')
-          setRoster(rosterRes.data)
+          const vivierRes = await api.get('/consultants')
+          setVivier(vivierRes.data)
 
           if (subs.length > 0) {
             try {
@@ -659,6 +833,15 @@ export default function AODetailPage() {
     }
     init()
   }, [id, isAdmin])
+
+  // Assistant deep-link: open the "propose consultant" modal for partners.
+  useEffect(() => {
+    if (!isAdmin && location.state?.openSubmit) {
+      setShowSubmitModal(true)
+      navigate(location.pathname, { replace: true, state: {} })
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isAdmin])
 
   const handleRerunMatch = () => runMatching()
 
@@ -729,6 +912,9 @@ export default function AODetailPage() {
         )}
       </div>
 
+      {/* Deadline — big & red */}
+      <DeadlineBanner deadline={ao.deadline} />
+
       {/* Key info cards */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
         {ao.budget_max && (
@@ -773,6 +959,7 @@ export default function AODetailPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         {/* Left: AO meta */}
         <div className="lg:col-span-1 space-y-4">
+          {isAdmin && <AOInsightsChart aoId={id} />}
           <div className="card p-4">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Compétences requises</p>
             <div className="flex flex-wrap gap-1.5">
@@ -920,8 +1107,8 @@ export default function AODetailPage() {
       </div>
 
       {showSubmitModal && (
-        <SubmitModal aoId={id} roster={roster}
-          onClose={() => setShowSubmitModal(false)}
+        <SubmitModal aoId={id} vivier={vivier} prefill={submitPrefill}
+          onClose={() => { setShowSubmitModal(false); setSubmitPrefill(null) }}
           onSubmitted={handleSubmissionSuccess} />
       )}
       {showEditModal && (

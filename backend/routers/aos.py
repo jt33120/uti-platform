@@ -29,6 +29,7 @@ class AOCreate(BaseModel):
     duration: Optional[str] = None
     context: Optional[str] = None
     ao_type: Optional[str] = None
+    deadline: Optional[str] = None  # date limite de réponse (YYYY-MM-DD)
 
 
 class AOUpdate(BaseModel):
@@ -41,6 +42,7 @@ class AOUpdate(BaseModel):
     duration: Optional[str] = None
     context: Optional[str] = None
     ao_type: Optional[str] = None
+    deadline: Optional[str] = None  # date limite de réponse (YYYY-MM-DD)
     status: Optional[str] = None
 
 
@@ -75,6 +77,7 @@ async def create_ao(body: AOCreate, user: dict = Depends(require_admin)):
             "duration": body.duration,
             "context": body.context,
             "ao_type": body.ao_type,
+            "deadline": body.deadline,
             "status": "open",
             "created_by": user["sub"],
         }).execute()
@@ -156,6 +159,73 @@ async def get_ao(ao_id: str, user: dict = Depends(get_current_user)):
         raise
     except Exception:
         raise HTTPException(status_code=404, detail="AO introuvable")
+
+
+@router.get("/{ao_id}/stats")
+async def get_ao_stats(ao_id: str, user: dict = Depends(require_admin)):
+    """
+    Funnel analytics for an AO (admin only).
+
+    Returns, for this AO:
+    - partners who *could* answer it (list_1/list_2 access to the AO's client)
+    - partners who *actually* answered it (submitted at least one CV)
+    - consultants that have been proposed (distinct consultants submitted)
+    - consultants that *match the criteria* but haven't been proposed yet
+      (skill overlap with the AO, owned by an eligible partner, not yet submitted)
+    """
+    try:
+        ao = supabase.table("appels_offres").select("*").eq("id", ao_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="AO introuvable")
+
+    client_id = ao.get("client_id")
+
+    # ── Partners who could answer (eligible access on this client) ──
+    eligible_rows = []
+    if client_id:
+        eligible_rows = supabase.table("partner_clients").select("partner_id, tier").eq(
+            "client_id", client_id
+        ).in_("tier", ["list_1", "list_2"]).execute().data or []
+    eligible_partner_ids = {r["partner_id"] for r in eligible_rows}
+    partners_list_1 = sum(1 for r in eligible_rows if r["tier"] == "list_1")
+    partners_list_2 = sum(1 for r in eligible_rows if r["tier"] == "list_2")
+
+    # ── Submissions for this AO ────────────────────────────────────
+    subs = supabase.table("submissions").select(
+        "id, submitted_by, consultant_id"
+    ).eq("ao_id", ao_id).execute().data or []
+    responded_partner_ids = {s["submitted_by"] for s in subs if s.get("submitted_by")}
+    proposed_consultant_ids = {s["consultant_id"] for s in subs if s.get("consultant_id")}
+
+    # ── Consultants matching the AO criteria, owned by eligible partners ──
+    ao_skills = [s.strip().lower() for s in (ao.get("skills_required") or "").split(",") if s.strip()]
+    pool_eligible = 0
+    eligible_not_proposed = 0
+    if eligible_partner_ids:
+        consultants = supabase.table("consultants").select(
+            "id, skills, created_by"
+        ).in_("created_by", list(eligible_partner_ids)).execute().data or []
+        for c in consultants:
+            c_skills = [s.strip().lower() for s in (c.get("skills") or "").split(",") if s.strip()]
+            matches = (
+                any(any(a in cs or cs in a for cs in c_skills) for a in ao_skills)
+                if ao_skills else True
+            )
+            if matches:
+                pool_eligible += 1
+                if c["id"] not in proposed_consultant_ids:
+                    eligible_not_proposed += 1
+
+    return {
+        "partners_eligible": len(eligible_partner_ids),
+        "partners_list_1": partners_list_1,
+        "partners_list_2": partners_list_2,
+        "partners_responded": len(responded_partner_ids),
+        "consultants_proposed": len(proposed_consultant_ids),
+        "consultants_pool_eligible": pool_eligible,
+        "consultants_eligible_not_proposed": eligible_not_proposed,
+        "submissions_total": len(subs),
+    }
 
 
 @router.patch("/{ao_id}")
