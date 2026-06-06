@@ -184,7 +184,7 @@ export default function Layout() {
       {contactOpen && <ContactModal defaultType={contactDefaultType} onClose={() => setContactOpen(false)} />}
 
       {/* Main */}
-      <main className="flex-1 overflow-y-auto" style={{ background: 'var(--bg)' }}>
+      <main className="flex-1 overflow-y-auto app-bg">
         {/* Top bar */}
         <div
           className="h-14 flex items-center justify-end gap-1 px-6"

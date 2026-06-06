@@ -119,8 +119,13 @@ export default function AssistantWidget() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Ouvrir l'assistant"
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 h-12 px-4 rounded-full shadow-lg transition-transform hover:scale-[1.03]"
-          style={{ background: 'var(--action-bg)', color: 'var(--action-text)' }}
+          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 h-12 px-4 rounded-full transition-transform hover:scale-[1.03]"
+          style={{
+            backgroundColor: 'var(--action-bg)',
+            backgroundImage: 'var(--btn-sheen)',
+            color: 'var(--action-text)',
+            boxShadow: 'var(--btn-inset), 0 4px 14px rgba(10,10,10,0.25)',
+          }}
         >
           <Sparkles size={18} strokeWidth={2} />
           <span className="text-[13px] font-semibold">Assistant</span>
