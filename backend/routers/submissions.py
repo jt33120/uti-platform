@@ -53,7 +53,7 @@ async def create_submission(
     Submit a CV to an AO.
 
     Two modes:
-    - Pass `consultant_id` to reuse an existing roster consultant
+    - Pass `consultant_id` to reuse an existing vivier consultant
     - Pass consultant fields (name, skills, ...) to create + submit in one shot
     """
     _check_ao_access(ao_id, user)

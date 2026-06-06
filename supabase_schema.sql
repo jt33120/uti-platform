@@ -44,13 +44,14 @@ CREATE TABLE IF NOT EXISTS public.appels_offres (
   duration         TEXT,
   context          TEXT,                -- Additional context passed to AI
   ao_type          TEXT,                -- Type d'AO (ex: Assurance, Banque/Finance, IT/Dev)
+  deadline         DATE,                -- Date limite de réponse à l'AO
   status           TEXT DEFAULT 'open' CHECK (status IN ('open', 'closed')),
   created_by       UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 4. Consultants
---    Roster géré par les partenaires (role='ao').
+--    Vivier (talent pool) géré par les partenaires (role='ao').
 --    Un consultant est soumis à un AO via la table submissions.
 CREATE TABLE IF NOT EXISTS public.consultants (
   id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -221,6 +222,9 @@ CREATE POLICY "support_insert_own" ON public.support_messages
 
 -- Migration: add ao_type to existing databases
 ALTER TABLE public.appels_offres ADD COLUMN IF NOT EXISTS ao_type TEXT;
+
+-- Migration: add deadline (date limite de réponse) to existing databases
+ALTER TABLE public.appels_offres ADD COLUMN IF NOT EXISTS deadline DATE;
 
 CREATE UNIQUE INDEX IF NOT EXISTS idx_clients_name_unique_lower ON public.clients (LOWER(name));
 CREATE INDEX IF NOT EXISTS idx_clients_created_at       ON public.clients(created_at DESC);

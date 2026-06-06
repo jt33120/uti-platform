@@ -1,19 +1,21 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../lib/api'
 import {
   ArrowLeft, FileText, Loader2, ChevronDown, Building2,
-  Euro, MapPin, Clock, Zap, CheckCircle
+  Euro, MapPin, Clock, Zap, CheckCircle, CalendarClock
 } from 'lucide-react'
 
 export default function NewAOPage() {
   const navigate = useNavigate()
+  const { state } = useLocation()
   const [clients, setClients] = useState([])
   const AO_TYPES = ['Assurance', 'Banque / Finance', 'IT / Dev', 'Énergie', 'Retail', 'Public', 'Santé', 'Autre']
 
   const [form, setForm] = useState({
     client_id: '', title: '', description: '', skills_required: '',
-    budget_max: '', location: '', duration: '', context: '', ao_type: '',
+    budget_max: '', location: '', duration: '', context: '', ao_type: '', deadline: '',
+    ...(state?.assistantPrefill || {}),  // assistant may pre-fill (never submits)
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -36,6 +38,7 @@ export default function NewAOPage() {
       const payload = { ...form }
       if (!payload.budget_max) delete payload.budget_max
       else payload.budget_max = parseInt(payload.budget_max)
+      if (!payload.deadline) delete payload.deadline
       const { data } = await api.post('/aos', payload)
       navigate(`/aos/${data.id}`)
     } catch (err) {
@@ -181,6 +184,14 @@ export default function NewAOPage() {
 
               <div>
                 <label className="label flex items-center gap-1.5">
+                  <CalendarClock size={12} style={{ color: 'var(--danger)' }} /> Date limite de réponse
+                </label>
+                <input type="date" className="input"
+                  value={form.deadline} onChange={set('deadline')} />
+              </div>
+
+              <div>
+                <label className="label flex items-center gap-1.5">
                   <Euro size={12} className="text-emerald-400" /> Budget max (€/jour)
                 </label>
                 <input type="number" className="input" placeholder="700"
@@ -221,6 +232,11 @@ export default function NewAOPage() {
               )}
 
               <div className="space-y-2 text-xs">
+                {form.deadline && (
+                  <div className="flex items-center gap-2 font-medium" style={{ color: 'var(--danger)' }}>
+                    <CalendarClock size={11} /> Échéance : {form.deadline}
+                  </div>
+                )}
                 {form.ao_type && (
                   <div className="flex items-center gap-2 text-slate-400">
                     <FileText size={11} className="text-violet-400" /> {form.ao_type}

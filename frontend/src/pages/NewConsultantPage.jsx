@@ -1,15 +1,17 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../lib/api'
 import { ArrowLeft, UserPlus, Loader2 } from 'lucide-react'
 import clsx from 'clsx'
 
 export default function NewConsultantPage() {
   const navigate = useNavigate()
+  const { state } = useLocation()
   const [form, setForm] = useState({
     name: '', tjm: '', skills: '', experience_years: '',
     availability: '', employment_type: 'independant',
     email: '', phone: '',
+    ...(state?.assistantPrefill || {}),  // assistant may pre-fill (never submits)
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -44,7 +46,7 @@ export default function NewConsultantPage() {
         <div>
           <h1 className="section-title">Nouveau Consultant</h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Ajoutez un profil à votre roster. Le CV sera attaché lors de la soumission à un AO.
+            Ajoutez un profil à votre vivier. Le CV sera attaché lors de la soumission à un AO.
           </p>
         </div>
       </div>
@@ -138,7 +140,7 @@ export default function NewConsultantPage() {
           <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center py-2.5">
             {loading
               ? <><Loader2 size={15} className="animate-spin" />Enregistrement...</>
-              : <><UserPlus size={15} />Ajouter au roster</>}
+              : <><UserPlus size={15} />Ajouter au vivier</>}
           </button>
         </div>
       </form>

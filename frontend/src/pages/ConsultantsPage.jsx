@@ -117,7 +117,7 @@ export default function ConsultantsPage() {
         <div>
           <h1 className="section-title flex items-center gap-2">
             <Users size={20} className="text-emerald-400" />
-            Roster Consultants
+            Vivier de consultants
             <span className="text-sm font-normal text-slate-500">({consultants.length})</span>
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
@@ -151,7 +151,7 @@ export default function ConsultantsPage() {
         <div className="text-center py-16">
           <Users size={32} className="mx-auto text-slate-700 mb-3" />
           <p className="text-slate-500 text-sm">
-            {search ? 'Aucun résultat' : 'Aucun consultant dans votre roster'}
+            {search ? 'Aucun résultat' : 'Aucun consultant dans votre vivier'}
           </p>
           {!isAdmin && (
             <Link to="/consultants/new" className="btn-primary mt-4 mx-auto">
