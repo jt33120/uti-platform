@@ -41,6 +41,17 @@
 
   /* Focus ring */
   --ring:        rgba(99, 102, 241, 0.35);
+
+  /* ── Texture & depth (kept extremely subtle on purpose) ── */
+  /* Dot-grid background — like faint engineering paper */
+  --dot:         rgba(10, 10, 10, 0.028);
+  /* Primary button sheen / gloss */
+  --btn-sheen:   linear-gradient(180deg, rgba(255,255,255,0.16), rgba(255,255,255,0) 55%);
+  --btn-inset:   inset 0 1px 0 rgba(255,255,255,0.18);
+  --btn-shadow:  0 1px 2px rgba(10,10,10,0.22);
+  /* Card depth */
+  --card-shadow: 0 1px 2px rgba(10,10,10,0.05);
+  --card-sheen:  linear-gradient(180deg, rgba(255,255,255,0.5), rgba(255,255,255,0) 96px);
 }
 
 html.dark {
@@ -67,6 +78,14 @@ html.dark {
   --success-soft:rgba(34, 197, 94, 0.12);
   --warning-soft:rgba(217, 119, 6, 0.15);
   --danger-soft: rgba(220, 38, 38, 0.15);
+
+  /* ── Texture & depth (dark) ── */
+  --dot:         rgba(255, 255, 255, 0.030);
+  --btn-sheen:   linear-gradient(180deg, rgba(255,255,255,0.10), rgba(0,0,0,0.06) 90%);
+  --btn-inset:   inset 0 1px 0 rgba(255,255,255,0.42);
+  --btn-shadow:  0 1px 2px rgba(0,0,0,0.45);
+  --card-shadow: 0 1px 2px rgba(0,0,0,0.30);
+  --card-sheen:  linear-gradient(180deg, rgba(255,255,255,0.022), rgba(255,255,255,0) 96px);
 }
 
 /* ════════════════════════════════════════════════════════════════
@@ -84,6 +103,10 @@ html.dark {
     font-family: 'Inter var', 'Inter', system-ui, sans-serif;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    /* Faint dot-grid texture — almost imperceptible, gives a finished feel */
+    background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+    background-size: 22px 22px;
+    background-position: -1px -1px;
   }
 
   ::selection { background: var(--accent-soft); color: var(--accent-text); }
@@ -101,25 +124,41 @@ html.dark {
    Components
    ════════════════════════════════════════════════════════════════ */
 @layer components {
-  /* Surface card — flat, hairline border, no glow */
+  /* Surface card — hairline border, faint top sheen + soft shadow for depth */
   .card {
     background-color: var(--surface);
+    background-image: var(--card-sheen);
     border: 1px solid var(--border);
     border-radius: 8px;
+    box-shadow: var(--card-shadow);
+  }
+
+  /* Scrolling content area — carries the dot-grid texture */
+  .app-bg {
+    background-color: var(--bg);
+    background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+    background-size: 22px 22px;
+    background-position: -1px -1px;
   }
 
   .surface-2 {
     background-color: var(--surface-2);
   }
 
-  /* Primary action — near-black on light, near-white on dark */
+  /* Primary action — near-black on light, near-white on dark, with a subtle gloss */
   .btn-primary {
     @apply inline-flex items-center gap-2 px-3.5 h-9 text-sm font-medium rounded-md
-           transition-colors disabled:opacity-40 disabled:cursor-not-allowed;
+           transition-all disabled:opacity-40 disabled:cursor-not-allowed;
     background-color: var(--action-bg);
+    background-image: var(--btn-sheen);
     color: var(--action-text);
+    box-shadow: var(--btn-inset), var(--btn-shadow);
   }
-  .btn-primary:hover:not(:disabled) { background-color: var(--action-bg-hover); }
+  .btn-primary:hover:not(:disabled) {
+    background-color: var(--action-bg-hover);
+    box-shadow: var(--btn-inset), 0 2px 6px rgba(10,10,10,0.22);
+  }
+  .btn-primary:active:not(:disabled) { box-shadow: var(--btn-inset); transform: translateY(0.5px); }
 
   /* Ghost / secondary */
   .btn-ghost {
