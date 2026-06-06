@@ -15,3 +15,6 @@ package-lock.json
 # Misc
 .DS_Store
 *.log
+
+# OpenClaw agent context — must never be committed (autonomous-updater guardrail)
+ProjectMemory/
