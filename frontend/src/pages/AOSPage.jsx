@@ -405,7 +405,7 @@ export default function AOSPage() {
               onClick={() => setFilter(f)}
               className={clsx(
                 'px-3 py-1 text-xs rounded-md font-medium transition-all',
-                filter === f ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                filter === f ? 'seg-active' : 'text-slate-400 hover:text-slate-200'
               )}
             >
               {f === 'all' ? 'Tous' : f === 'open' ? 'Ouverts' : 'Fermés'}
@@ -422,7 +422,7 @@ export default function AOSPage() {
               onClick={() => setGroupBy(o.k)}
               className={clsx(
                 'px-3 py-1 text-xs rounded-md font-medium transition-all',
-                groupBy === o.k ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200'
+                groupBy === o.k ? 'seg-active' : 'text-slate-400 hover:text-slate-200'
               )}
             >
               {o.l}
