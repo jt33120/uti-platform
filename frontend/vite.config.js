@@ -1,7 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
-const DEPLOYED_BACKEND_URL = 'https://git-production-af3c.up.railway.app';
+const DEPLOYED_BACKEND_URL = 'https://vps-cc93f2a8.vps.ovh.net';
 
 export default defineConfig({
   plugins: [react()],

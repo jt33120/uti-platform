@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/:path*",
-      "destination": "https://git-production-af3c.up.railway.app/:path*"
+      "destination": "https://vps-cc93f2a8.vps.ovh.net/:path*"
     },
     {
       "source": "/(.*)",
