@@ -119,6 +119,7 @@ export default function AssistantWidget() {
         <button
           onClick={() => setOpen(true)}
           aria-label="Ouvrir l'assistant"
+          data-tour="assistant"
           className="fixed bottom-6 right-6 z-40 flex items-center gap-2 h-12 px-4 rounded-full transition-transform hover:scale-[1.03]"
           style={{
             backgroundColor: 'var(--action-bg)',

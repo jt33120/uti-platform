@@ -243,12 +243,12 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
           <div className="flex gap-1 bg-white/5 rounded-lg p-1 mb-4">
             <button type="button" onClick={() => setMode('existing')}
               className={clsx('flex-1 px-3 py-1.5 text-xs rounded-md font-medium transition-all',
-                mode === 'existing' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200')}>
+                mode === 'existing' ? 'seg-active' : 'text-slate-400 hover:text-slate-200')}>
               Depuis le vivier
             </button>
             <button type="button" onClick={() => setMode('new')}
               className={clsx('flex-1 px-3 py-1.5 text-xs rounded-md font-medium transition-all',
-                mode === 'new' ? 'bg-brand-600 text-white' : 'text-slate-400 hover:text-slate-200')}>
+                mode === 'new' ? 'seg-active' : 'text-slate-400 hover:text-slate-200')}>
               Nouveau consultant
             </button>
           </div>

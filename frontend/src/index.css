@@ -262,6 +262,14 @@ html.dark {
   background-color: var(--accent-text) !important;
 }
 
+/* Segmented control — active "pill" (replaces the hard-to-read saturated purple).
+   High-contrast, monochrome, consistent with the primary action buttons. */
+.seg-active {
+  background-color: var(--action-bg) !important;
+  color: var(--action-text) !important;
+  box-shadow: var(--btn-inset), var(--btn-shadow);
+}
+
 /* Score ring animation — kept but no auto-playing slide-ups elsewhere */
 @keyframes score-fill {
   from { stroke-dashoffset: 283; }
