@@ -18,3 +18,7 @@ package-lock.json
 
 # OpenClaw agent context — must never be committed (autonomous-updater guardrail)
 ProjectMemory/
+
+# Build/backup junk — must never be tracked (autonomous-updater hygiene)
+bfg-1.14.0.jar
+backup-git.git/
