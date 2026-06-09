@@ -2,65 +2,80 @@ import { useEffect, useMemo, useState } from 'react'
 import api from '../lib/api'
 import {
   Building2, Users, Loader2, AlertCircle, ChevronDown,
-  Star, ListChecks, Ban, UserCircle2, ShieldOff, CheckCircle2
+  Star, ListChecks, Ban, UserCircle2, ShieldOff, GripVertical,
 } from 'lucide-react'
-import clsx from 'clsx'
 
 const COLUMNS = [
-  { key: 'none', label: 'Aucun accès', icon: Ban, color: 'text-slate-400', accent: 'border-slate-700/40' },
-  { key: 'list_1', label: 'Liste 1 (prioritaire)', icon: Star, color: 'text-emerald-400', accent: 'border-emerald-500/30' },
-  { key: 'list_2', label: 'Liste 2', icon: ListChecks, color: 'text-brand-300', accent: 'border-brand-500/30' },
-  { key: 'suspended', label: 'Suspendu', icon: AlertCircle, color: 'text-red-400', accent: 'border-red-500/30' },
+  { key: 'none', label: 'Aucun accès', icon: Ban, color: '#737373', tint: 'rgba(115,115,115,0.05)' },
+  { key: 'list_1', label: 'Liste 1 · Prioritaire', icon: Star, color: '#16a34a', tint: 'rgba(22,163,74,0.06)' },
+  { key: 'list_2', label: 'Liste 2', icon: ListChecks, color: '#4f46e5', tint: 'rgba(79,70,229,0.06)' },
+  { key: 'suspended', label: 'Suspendu', icon: AlertCircle, color: '#dc2626', tint: 'rgba(220,38,38,0.05)' },
 ]
 
-function PartnerCard({ partner, draggable, onDragStart }) {
+const AV = [['#6366f1', '#8b5cf6'], ['#10b981', '#0ea5e9'], ['#f59e0b', '#f43f5e'], ['#0ea5e9', '#6366f1'], ['#a855f7', '#ec4899'], ['#14b8a6', '#10b981']]
+const gradOf = (name) => AV[(name || '?').toUpperCase().charCodeAt(0) % AV.length]
+
+function Avatar({ name, size = 28 }) {
+  const g = gradOf(name)
   return (
     <div
-      draggable={draggable}
-      onDragStart={onDragStart}
-      className={clsx(
-        'flex items-center gap-2 p-2.5 rounded-lg bg-white/3 border border-white/5',
-        'hover:border-white/15 transition-all duration-150',
-        draggable && 'cursor-grab active:cursor-grabbing'
-      )}
+      className="rounded-full flex items-center justify-center font-bold shrink-0"
+      style={{ width: size, height: size, fontSize: size * 0.4, background: `linear-gradient(135deg, ${g[0]}, ${g[1]})`, color: '#fff' }}
     >
-      <div className="w-7 h-7 rounded-full bg-gradient-to-br from-brand-500/40 to-emerald-500/40 border border-white/10 flex items-center justify-center text-[11px] font-bold text-white shrink-0">
-        {partner.name?.charAt(0).toUpperCase() || '?'}
-      </div>
-      <div className="flex-1 min-w-0">
-        <div className="text-xs font-semibold text-white truncate">{partner.name}</div>
-        <div className="text-[10px] text-slate-500 truncate">{partner.email}</div>
-      </div>
+      {name?.charAt(0).toUpperCase() || '?'}
     </div>
   )
 }
 
-function Column({ col, partners, onDrop, onDragOver, isTarget }) {
+function PartnerCard({ partner, onDragStart }) {
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-150 group"
+      style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
+    >
+      <Avatar name={partner.name} />
+      <div className="flex-1 min-w-0">
+        <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{partner.name}</div>
+        <div className="text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>{partner.email}</div>
+      </div>
+      <GripVertical size={13} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--text-faint)' }} />
+    </div>
+  )
+}
+
+function Column({ col, partners, onDrop, onDragOver, onDragLeave, isTarget }) {
   const Icon = col.icon
   return (
     <div
       onDragOver={onDragOver}
+      onDragLeave={onDragLeave}
       onDrop={onDrop}
-      className={clsx(
-        'card p-3 min-h-[300px] transition-all duration-150 border-2',
-        isTarget ? 'border-brand-400 bg-brand-500/5' : col.accent
-      )}
+      className="rounded-xl p-3 min-h-[320px] transition-all duration-150"
+      style={{
+        background: isTarget ? 'var(--accent-soft)' : col.tint,
+        border: `1.5px ${isTarget ? 'dashed' : 'solid'} ${isTarget ? 'var(--accent)' : 'var(--border)'}`,
+      }}
     >
-      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/5">
-        <Icon size={14} className={col.color} />
-        <span className={clsx('text-xs font-semibold uppercase tracking-wide', col.color)}>
-          {col.label}
+      <div className="flex items-center gap-2 mb-3 pb-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: `${col.color}1a`, color: col.color }}>
+          <Icon size={13} strokeWidth={2.25} />
+        </div>
+        <span className="text-[11px] font-bold uppercase tracking-wide" style={{ color: col.color }}>{col.label}</span>
+        <span className="ml-auto text-[11px] font-semibold tabular px-1.5 rounded" style={{ background: `${col.color}14`, color: col.color }}>
+          {partners.length}
         </span>
-        <span className="ml-auto text-[10px] text-slate-500">{partners.length}</span>
       </div>
       <div className="space-y-1.5">
         {partners.length === 0 ? (
-          <div className="text-[11px] text-slate-600 text-center py-6 italic">
+          <div className="text-[11px] text-center py-8 italic" style={{ color: 'var(--text-faint)' }}>
             Glissez un partenaire ici
           </div>
         ) : (
-          partners.map(p => <PartnerCard key={p.id} partner={p} draggable
-            onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)} />)
+          partners.map(p => (
+            <PartnerCard key={p.id} partner={p} onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)} />
+          ))
         )}
       </div>
     </div>
@@ -70,12 +85,12 @@ function Column({ col, partners, onDrop, onDragOver, isTarget }) {
 export default function PartnerAccessPage() {
   const [clients, setClients] = useState([])
   const [partners, setPartners] = useState([])
-  const [access, setAccess] = useState([]) // partner_clients rows
+  const [access, setAccess] = useState([])
   const [selectedClient, setSelectedClient] = useState(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [dragTarget, setDragTarget] = useState(null)
-  const [suspending, setSuspending] = useState(null) // partner id being suspended
+  const [suspending, setSuspending] = useState(null)
   const [fetchError, setFetchError] = useState(null)
 
   const fetchAll = async () => {
@@ -100,7 +115,6 @@ export default function PartnerAccessPage() {
 
   useEffect(() => { fetchAll() }, [])
 
-  // Group partners by tier for the currently selected client
   const grouped = useMemo(() => {
     const result = { none: [], list_1: [], list_2: [], suspended: [] }
     if (!selectedClient) return result
@@ -120,7 +134,6 @@ export default function PartnerAccessPage() {
     setSaving(true)
     setDragTarget(null)
 
-    // Optimistic update
     const prev = access
     setAccess(prevAccess => {
       const others = prevAccess.filter(r => !(r.partner_id === partnerId && r.client_id === selectedClient))
@@ -130,18 +143,12 @@ export default function PartnerAccessPage() {
 
     try {
       if (tierKey === 'none') {
-        await api.delete('/partners/access', {
-          params: { partner_id: partnerId, client_id: selectedClient },
-        })
+        await api.delete('/partners/access', { params: { partner_id: partnerId, client_id: selectedClient } })
       } else {
-        await api.put('/partners/access', {
-          partner_id: partnerId,
-          client_id: selectedClient,
-          tier: tierKey,
-        })
+        await api.put('/partners/access', { partner_id: partnerId, client_id: selectedClient, tier: tierKey })
       }
     } catch (e) {
-      setAccess(prev) // rollback
+      setAccess(prev)
       alert(e.response?.data?.detail || 'Erreur lors de la mise à jour')
     } finally {
       setSaving(false)
@@ -166,52 +173,52 @@ export default function PartnerAccessPage() {
   if (loading) {
     return (
       <div className="flex items-center justify-center h-64">
-        <Loader2 size={24} className="animate-spin text-brand-400" />
+        <Loader2 size={24} className="animate-spin" style={{ color: 'var(--accent)' }} />
       </div>
     )
   }
 
   if (fetchError) {
     return (
-      <div className="card p-6 flex items-start gap-3 border border-red-500/30 bg-red-500/5">
-        <AlertCircle size={18} className="text-red-400 mt-0.5 shrink-0" />
+      <div className="card p-6 flex items-start gap-3" style={{ borderColor: 'var(--danger)', background: 'var(--danger-soft)' }}>
+        <AlertCircle size={18} className="mt-0.5 shrink-0" style={{ color: 'var(--danger)' }} />
         <div>
-          <p className="text-sm font-semibold text-red-300">Erreur de chargement</p>
-          <p className="text-xs text-red-400 mt-1">{fetchError}</p>
-          <button onClick={fetchAll} className="mt-3 text-xs text-brand-300 hover:underline">Réessayer</button>
+          <p className="text-sm font-semibold" style={{ color: 'var(--danger)' }}>Erreur de chargement</p>
+          <p className="text-xs mt-1" style={{ color: 'var(--text-muted)' }}>{fetchError}</p>
+          <button onClick={fetchAll} className="mt-3 text-xs font-medium" style={{ color: 'var(--accent-text)' }}>Réessayer</button>
         </div>
       </div>
     )
   }
 
   return (
-    <div className="animate-slide-up">
+    <div>
       <div className="page-header">
         <div>
           <h1 className="section-title flex items-center gap-2">
-            <Users size={20} className="text-brand-400" />
+            <Users size={19} strokeWidth={2} style={{ color: 'var(--accent-text)' }} />
             Accès partenaires
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Sélectionnez un client, puis glissez-déposez les partenaires entre les listes
+          <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+            Sélectionnez un client, puis glissez-déposez les partenaires entre les listes.
           </p>
         </div>
         {saving && (
-          <div className="text-xs text-brand-300 flex items-center gap-1.5">
-            <Loader2 size={12} className="animate-spin" /> Enregistrement...
+          <div className="text-xs flex items-center gap-1.5" style={{ color: 'var(--accent-text)' }}>
+            <Loader2 size={12} className="animate-spin" /> Enregistrement…
           </div>
         )}
       </div>
 
       {clients.length === 0 ? (
         <div className="card p-8 text-center">
-          <Building2 size={28} className="mx-auto text-slate-700 mb-3" />
-          <p className="text-slate-400 text-sm">Aucun client. Créez-en un d'abord depuis « Clients ».</p>
+          <Building2 size={28} className="mx-auto mb-3" style={{ color: 'var(--text-faint)' }} />
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Aucun client. Créez-en un d'abord depuis « Clients ».</p>
         </div>
       ) : partners.length === 0 ? (
         <div className="card p-8 text-center">
-          <UserCircle2 size={28} className="mx-auto text-slate-700 mb-3" />
-          <p className="text-slate-400 text-sm">Aucun partenaire (rôle « ao ») n'est inscrit pour le moment.</p>
+          <UserCircle2 size={28} className="mx-auto mb-3" style={{ color: 'var(--text-faint)' }} />
+          <p className="text-sm" style={{ color: 'var(--text-muted)' }}>Aucun partenaire (rôle « ao ») n'est inscrit pour le moment.</p>
         </div>
       ) : (
         <>
@@ -219,23 +226,17 @@ export default function PartnerAccessPage() {
           <div className="card p-4 mb-5">
             <label className="label">Client</label>
             <div className="relative">
-              <select
-                value={selectedClient || ''}
-                onChange={e => setSelectedClient(e.target.value)}
-                className="input appearance-none pr-9"
-              >
-                {clients.map(c => (
-                  <option key={c.id} value={c.id} className="bg-navy-900">{c.name}</option>
-                ))}
+              <select value={selectedClient || ''} onChange={e => setSelectedClient(e.target.value)} className="input appearance-none pr-9">
+                {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
-              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none" style={{ color: 'var(--text-faint)' }} />
             </div>
             {currentClient?.sector && (
-              <p className="text-[11px] text-slate-500 mt-2">Secteur : {currentClient.sector}</p>
+              <p className="text-[11px] mt-2" style={{ color: 'var(--text-faint)' }}>Secteur : {currentClient.sector}</p>
             )}
           </div>
 
-          {/* Kanban columns */}
+          {/* Kanban */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
             {COLUMNS.map(col => (
               <Column
@@ -244,56 +245,46 @@ export default function PartnerAccessPage() {
                 partners={grouped[col.key]}
                 isTarget={dragTarget === col.key}
                 onDragOver={(e) => { e.preventDefault(); setDragTarget(col.key) }}
-                onDrop={(e) => {
-                  e.preventDefault()
-                  const partnerId = e.dataTransfer.getData('partnerId')
-                  handleDrop(col.key, partnerId)
-                }}
+                onDragLeave={() => setDragTarget(t => (t === col.key ? null : t))}
+                onDrop={(e) => { e.preventDefault(); handleDrop(col.key, e.dataTransfer.getData('partnerId')) }}
               />
             ))}
           </div>
 
-          <p className="text-[11px] text-slate-600 mt-4 text-center">
-            <Star size={11} className="inline text-emerald-500 mr-1" />
-            Les partenaires de la <span className="text-emerald-400">Liste 1</span> sont prioritaires sur les AOs de ce client.
+          <p className="text-[11px] mt-4 text-center" style={{ color: 'var(--text-faint)' }}>
+            <Star size={11} className="inline mr-1" style={{ color: '#16a34a' }} />
+            Les partenaires de la <span style={{ color: '#16a34a', fontWeight: 600 }}>Liste 1</span> sont prioritaires sur les AOs de ce client.
           </p>
 
-          {/* Global partner management */}
+          {/* Global suspension */}
           <div className="mt-8">
-            <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest mb-3 flex items-center gap-2">
-              <ShieldOff size={13} className="text-red-400" /> Suspension globale
+            <h2 className="text-xs font-semibold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
+              <ShieldOff size={13} style={{ color: 'var(--danger)' }} /> Suspension globale
             </h2>
             <div className="space-y-2">
               {partners.map(p => {
-                const partnerAccess = access.filter(r => r.partner_id === p.id)
-                const isSuspendedEverywhere = partnerAccess.length > 0 &&
-                  partnerAccess.every(r => r.tier === 'suspended')
-                const hasAnyAccess = partnerAccess.some(r => r.tier !== 'suspended')
+                const pa = access.filter(r => r.partner_id === p.id)
+                const suspendedEverywhere = pa.length > 0 && pa.every(r => r.tier === 'suspended')
+                const hasAnyAccess = pa.some(r => r.tier !== 'suspended')
                 return (
                   <div key={p.id} className="card p-3 flex items-center gap-3">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-brand-500/40 to-emerald-500/40 border border-white/10 flex items-center justify-center text-xs font-bold text-white shrink-0">
-                      {p.name?.charAt(0).toUpperCase() || '?'}
-                    </div>
+                    <Avatar name={p.name} size={32} />
                     <div className="flex-1 min-w-0">
-                      <div className="text-xs font-semibold text-white truncate">{p.name}</div>
-                      <div className="text-[10px] text-slate-500 truncate">{p.email}</div>
+                      <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{p.name}</div>
+                      <div className="text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>{p.email}</div>
                     </div>
-                    {isSuspendedEverywhere ? (
-                      <span className="badge bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] flex items-center gap-1">
+                    {suspendedEverywhere ? (
+                      <span className="badge" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
                         <AlertCircle size={10} /> Suspendu partout
                       </span>
                     ) : hasAnyAccess ? (
-                      <button
-                        onClick={() => handleSuspendGlobally(p.id)}
-                        disabled={suspending === p.id}
-                        className="btn-danger text-xs px-3 py-1.5 flex items-center gap-1.5"
-                      >
+                      <button onClick={() => handleSuspendGlobally(p.id)} disabled={suspending === p.id} className="btn-danger text-xs px-3 h-8">
                         {suspending === p.id
-                          ? <><Loader2 size={12} className="animate-spin" />Suspension...</>
+                          ? <><Loader2 size={12} className="animate-spin" />Suspension…</>
                           : <><ShieldOff size={12} />Suspendre partout</>}
                       </button>
                     ) : (
-                      <span className="text-[10px] text-slate-600">Aucun accès actif</span>
+                      <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Aucun accès actif</span>
                     )}
                   </div>
                 )
