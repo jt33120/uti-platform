@@ -3,15 +3,28 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid,
 } from 'recharts'
 
-// Premium, light-friendly palette (also reads well on dark)
-export const PALETTE = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9', '#a855f7', '#14b8a6', '#eab308']
+/* ──────────────────────────────────────────────────────────────
+   ONE palette for the whole project: a monochromatic indigo ramp.
+   No rainbow. Colour here encodes *magnitude / rank*, not category —
+   so it carries information instead of just decorating.
+   Ordered dark → light; pair charts feed values sorted desc so the
+   darkest tone is always the largest slice/bar.
+   ────────────────────────────────────────────────────────────── */
+export const BRAND = '#4f46e5'                          // single brand fill for series
+export const NEUTRAL = '#d4d4d4'                         // "rest / closed / other"
+export const PALETTE = [
+  '#312e81', '#3730a3', '#4338ca', '#4f46e5',
+  '#6366f1', '#818cf8', '#a5b4fc', '#c7d2fe',
+]
 
+/* Frameless block: a quiet label + the viz, on the page surface.
+   No border, no shadow — separation comes from whitespace. */
 export function ChartCard({ title, icon: Icon, right, children, className = '' }) {
   return (
-    <div className={`card p-5 ${className}`}>
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 text-[13px] font-semibold" style={{ color: 'var(--text)' }}>
-          {Icon && <Icon size={14} strokeWidth={2} style={{ color: 'var(--accent-text)' }} />}
+    <div className={className}>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.07em]" style={{ color: 'var(--text-faint)' }}>
+          {Icon && <Icon size={13} strokeWidth={2} />}
           {title}
         </div>
         {right}
@@ -94,7 +107,7 @@ export function VBars({ data, height = 188 }) {
         <YAxis tick={{ fontSize: 11, fill: 'var(--text-faint)' }} axisLine={false} tickLine={false} allowDecimals={false} width={30} />
         <Tooltip content={<TooltipBox />} cursor={{ fill: 'var(--surface-2)' }} />
         <Bar dataKey="value" radius={[5, 5, 0, 0]} maxBarSize={46}>
-          {data.map((d, i) => <Cell key={i} fill={d.color || PALETTE[i % PALETTE.length]} />)}
+          {data.map((d, i) => <Cell key={i} fill={d.color || BRAND} />)}
         </Bar>
       </BarChart>
     </ResponsiveContainer>
@@ -109,7 +122,7 @@ export function HBars({ data, height = 200 }) {
         <YAxis type="category" dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} width={104} />
         <Tooltip content={<TooltipBox />} cursor={{ fill: 'var(--surface-2)' }} />
         <Bar dataKey="value" radius={[0, 5, 5, 0]} maxBarSize={16}>
-          {data.map((d, i) => <Cell key={i} fill={d.color || PALETTE[i % PALETTE.length]} />)}
+          {data.map((d, i) => <Cell key={i} fill={d.color || BRAND} />)}
         </Bar>
       </BarChart>
     </ResponsiveContainer>

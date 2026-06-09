@@ -3,11 +3,13 @@ import ForceGraph2D from 'react-force-graph-2d'
 import api from '../lib/api'
 import { Loader2, Compass, Maximize2, AlertCircle } from 'lucide-react'
 
-const COLORS = { partner: '#4f46e5', consultant: '#10b981', client: '#f59e0b' }
+// One hue, three tones — node type reads by depth of indigo, not by a
+// different colour each. Cohesive with the rest of the project.
+const COLORS = { partner: '#312e81', consultant: '#6366f1', client: '#a5b4fc' }
 const TIER = {
-  list_1: { color: '#16a34a', label: 'Liste 1' },
-  list_2: { color: '#6366f1', label: 'Liste 2' },
-  suspended: { color: '#dc2626', label: 'Suspendu' },
+  list_1: { color: '#4338ca', label: 'Liste 1' },
+  list_2: { color: '#a5b4fc', label: 'Liste 2' },
+  suspended: { color: '#dc2626', label: 'Suspendu' }, // red kept: it's a real warning state
 }
 const NODE_LEGEND = [
   { key: 'partner', label: 'Partenaires' },
