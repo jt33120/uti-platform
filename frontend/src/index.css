@@ -283,14 +283,21 @@ html.dark {
 .animate-slide-up,
 .animate-fade-in { animation: none; }
 
-/* Neutralise gradient avatar styles from older pages */
+/* Collapse every multi-colour gradient avatar/tile to ONE brand hue —
+   project-wide cohesion from a single rule (initials read in accent text). */
 .bg-gradient-to-br {
   background-image: none !important;
-  background-color: var(--surface-2) !important;
+  background-color: var(--accent-soft) !important;
 }
 .bg-gradient-to-br.text-white,
 .bg-gradient-to-br .text-white {
-  color: var(--text) !important;
+  color: var(--accent-text) !important;
+}
+
+/* Pull stray violet/emerald decorative borders back onto the brand hairline */
+.border-violet-500\/20, .border-violet-400\/20,
+.border-emerald-500\/20, .border-emerald-400\/20 {
+  border-color: var(--border) !important;
 }
 
 /* Tighten any leftover rounded-2xl to feel more corporate */

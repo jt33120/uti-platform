@@ -7,51 +7,51 @@ import {
   Briefcase, Layers, Zap, Award, BarChart3,
 } from 'lucide-react'
 import InviteModal from '../components/InviteModal'
-import { ChartCard, EmptyHint, Donut, Legend, VBars, HBars, PALETTE } from '../components/charts'
+import { ChartCard, EmptyHint, Donut, Legend, VBars, HBars, BRAND, NEUTRAL } from '../components/charts'
 
 const parseSkills = (s) => (s || '').split(/[,;/]+/).map(x => x.trim()).filter(Boolean)
 
-function Kpi({ icon: Icon, label, value, sub, to, tint }) {
+// KPI — frameless. A number, a quiet label, a monochrome glyph. Separation
+// comes from a hairline divider on wide screens, not a box around each one.
+function Kpi({ icon: Icon, label, value, sub, to }) {
   const inner = (
-    <div className="card p-4 h-full transition-colors hover:border-[var(--border-strong)]">
-      <div className="flex items-center justify-between mb-3">
-        <div className="w-9 h-9 rounded-lg flex items-center justify-center" style={{ background: tint.bg, color: tint.fg }}>
-          <Icon size={17} strokeWidth={2} />
-        </div>
-        {to && <ArrowRight size={14} strokeWidth={1.75} style={{ color: 'var(--text-faint)' }} />}
+    <div className="flex flex-col gap-1.5 lg:px-5 lg:border-l lg:first:border-l-0 lg:first:pl-0 border-[color:var(--border)] group">
+      <div className="flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }}>
+        <Icon size={14} strokeWidth={2} />
+        <span className="text-[11px] uppercase tracking-[0.07em] font-semibold">{label}</span>
+        {to && <ArrowRight size={12} strokeWidth={2} className="opacity-0 group-hover:opacity-100 transition-opacity -ml-0.5" />}
       </div>
-      <div className="text-[26px] font-semibold tabular leading-none" style={{ color: 'var(--text)' }}>{value ?? '—'}</div>
-      <div className="text-xs mt-1.5" style={{ color: 'var(--text-faint)' }}>
-        {label}{sub ? <span> · {sub}</span> : null}
-      </div>
+      <div className="text-[30px] font-semibold tabular leading-none" style={{ color: 'var(--text)' }}>{value ?? '—'}</div>
+      {sub && <div className="text-[11px]" style={{ color: 'var(--text-faint)' }}>{sub}</div>}
     </div>
   )
   return to ? <Link to={to} className="block">{inner}</Link> : inner
 }
 
-function QuickAction({ to, onClick, icon: Icon, title, desc, tint }) {
+// Quick action — single hairline row, monochrome glyph. The accent appears
+// only on hover, so the resting state stays calm.
+function QuickAction({ to, onClick, icon: Icon, title, desc }) {
   const inner = (
-    <div className="card p-3.5 flex items-center gap-3 transition-colors hover:bg-[var(--surface-2)] group cursor-pointer">
-      <div className="w-8 h-8 rounded-md flex items-center justify-center shrink-0" style={{ background: tint.bg, color: tint.fg }}>
+    <div className="flex items-center gap-3 py-2.5 transition-colors group cursor-pointer">
+      <div
+        className="w-8 h-8 rounded-md flex items-center justify-center shrink-0 transition-colors"
+        style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
+      >
         <Icon size={15} strokeWidth={2} />
       </div>
       <div className="flex-1 min-w-0">
         <div className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>{title}</div>
         <div className="text-[11px] truncate" style={{ color: 'var(--text-faint)' }}>{desc}</div>
       </div>
-      <ArrowRight size={14} strokeWidth={1.75} className="transition-colors" style={{ color: 'var(--text-faint)' }} />
+      <ArrowRight
+        size={14} strokeWidth={1.75}
+        className="opacity-40 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all"
+        style={{ color: 'var(--accent-text)' }}
+      />
     </div>
   )
   if (to) return <Link to={to}>{inner}</Link>
   return <button onClick={onClick} className="text-left w-full">{inner}</button>
-}
-
-const TINT = {
-  indigo: { bg: 'rgba(99,102,241,0.12)', fg: '#4f46e5' },
-  emerald: { bg: 'rgba(16,185,129,0.13)', fg: '#059669' },
-  amber: { bg: 'rgba(245,158,11,0.15)', fg: '#d97706' },
-  violet: { bg: 'rgba(168,85,247,0.13)', fg: '#9333ea' },
-  sky: { bg: 'rgba(14,165,233,0.13)', fg: '#0284c7' },
 }
 
 export default function DashboardPage() {
@@ -86,9 +86,10 @@ export default function DashboardPage() {
 
   const d = useMemo(() => {
     const open = aos.filter(a => a.status === 'open').length
+    // Status reads as a duotone: brand = active, neutral = the rest.
     const aoStatus = [
-      { name: 'Ouverts', value: open, color: '#10b981' },
-      { name: 'Fermés', value: aos.length - open, color: '#cbd5e1' },
+      { name: 'Ouverts', value: open, color: BRAND },
+      { name: 'Fermés', value: aos.length - open, color: NEUTRAL },
     ].filter(x => x.value > 0)
 
     const typeMap = {}
@@ -119,95 +120,81 @@ export default function DashboardPage() {
   }, [aos, consultants, clients])
 
   const recentAOs = aos.slice(0, 5)
+  const hairline = { borderTop: '1px solid var(--border)' }
 
   return (
     <div>
-      {/* Hero */}
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-7">
-        <div>
-          <h1 className="text-[22px] font-semibold tracking-tightest" style={{ color: 'var(--text)' }}>
-            Bonjour, {user?.name?.split(' ')[0]}
-          </h1>
-          <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            {isAdmin ? "Pilotez vos appels d'offres et le scoring IA en un coup d'œil." : 'Soumettez des consultants et suivez les appels d\'offres.'}
-          </p>
-        </div>
-        {isAdmin && ai.matchings != null && (
-          <div
-            className="rounded-xl px-4 py-2.5 flex items-center gap-3"
-            style={{ background: 'linear-gradient(135deg, rgba(99,102,241,0.12), rgba(16,185,129,0.10))', border: '1px solid var(--border)' }}
-          >
-            <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: 'rgba(99,102,241,0.18)', color: '#4f46e5' }}>
-              <Sparkles size={16} strokeWidth={2} />
-            </div>
-            <div className="leading-tight">
-              <div className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Moteur IA · {d.matchings}</div>
-              <div className="text-[13px] font-semibold tabular" style={{ color: 'var(--text)' }}>
-                {ai.matchings} matching{ai.matchings > 1 ? 's' : ''}
-                {ai.cost != null && <span style={{ color: 'var(--text-muted)' }}> · ${ai.cost}</span>}
-              </div>
-            </div>
-          </div>
-        )}
+      {/* Hero — greeting only. The IA figure lives in its own KPI below,
+          so no duplicate badge here. */}
+      <div className="mb-8">
+        <h1 className="text-[22px] font-semibold tracking-tightest" style={{ color: 'var(--text)' }}>
+          Bonjour, {user?.name?.split(' ')[0]}
+        </h1>
+        <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+          {isAdmin ? "Pilotez vos appels d'offres et le scoring IA en un coup d'œil." : 'Soumettez des consultants et suivez les appels d\'offres.'}
+        </p>
       </div>
 
-      {/* KPIs */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-7">
+      {/* Stat band — no boxes. Numbers carry the weight; hairlines do the splitting. */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-6 pt-7 pb-8" style={hairline}>
         <Kpi icon={Users} label="Consultants" value={consultants.length} to="/consultants"
-          sub={d.avgTjm ? `TJM moy. ${d.avgTjm}€` : null} tint={TINT.indigo} />
+          sub={d.avgTjm ? `TJM moy. ${d.avgTjm} €` : null} />
         <Kpi icon={Briefcase} label={isAdmin ? "Appels d'offres" : 'Mes AOs'} value={aos.length} to="/aos"
-          sub={`${d.open} ouvert${d.open > 1 ? 's' : ''}`} tint={TINT.emerald} />
+          sub={`${d.open} ouvert${d.open > 1 ? 's' : ''}`} />
         <Kpi icon={Building2} label="Clients" value={clients.length} to="/clients"
-          sub={d.sectors.length ? `${d.sectors.length} secteurs` : null} tint={TINT.amber} />
+          sub={d.sectors.length ? `${d.sectors.length} secteurs` : null} />
         {isAdmin
-          ? <Kpi icon={Sparkles} label="Matchings IA" value={ai.matchings} sub={ai.model} tint={TINT.violet} />
-          : <Kpi icon={FileText} label="CVs soumis" value={submissions} tint={TINT.violet} />}
+          ? <Kpi icon={Sparkles} label="Matchings IA" value={ai.matchings}
+              sub={ai.cost != null ? `${ai.model || '—'} · $${ai.cost}` : ai.model} />
+          : <Kpi icon={FileText} label="CVs soumis" value={submissions} />}
       </div>
 
-      {/* Charts — row 1 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-3">
-        <ChartCard title="Appels d'offres par type" icon={Layers} className="lg:col-span-2">
-          {d.aoTypes.length ? <VBars data={d.aoTypes} /> : <EmptyHint />}
-        </ChartCard>
-        <ChartCard title="Statut des AO" icon={BarChart3}>
-          {d.aoStatus.length ? <><Donut data={d.aoStatus} centerLabel="AO" /><Legend data={d.aoStatus} /></> : <EmptyHint />}
-        </ChartCard>
+      {/* Analyse — frameless charts on the page surface, split by whitespace.
+          The brand tone encodes magnitude, so colour informs, never decorates. */}
+      <div className="pt-7" style={hairline}>
+        <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold mb-5" style={{ color: 'var(--text-faint)' }}>Analyse</h2>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-9 mb-9">
+          <ChartCard title="Appels d'offres par type" icon={Layers} className="lg:col-span-2">
+            {d.aoTypes.length ? <VBars data={d.aoTypes} /> : <EmptyHint />}
+          </ChartCard>
+          <ChartCard title="Statut des AO" icon={BarChart3}>
+            {d.aoStatus.length ? <><Donut data={d.aoStatus} centerLabel="AO" /><Legend data={d.aoStatus} /></> : <EmptyHint />}
+          </ChartCard>
+
+          <ChartCard title="Top compétences demandées" icon={Zap}>
+            {d.topSkills.length ? <HBars data={d.topSkills} /> : <EmptyHint />}
+          </ChartCard>
+          <ChartCard title="Séniorité du vivier" icon={Award}>
+            {consultants.length ? <VBars data={d.seniority} /> : <EmptyHint />}
+          </ChartCard>
+          <ChartCard title="Clients par secteur" icon={Building2}>
+            {d.sectors.length ? <><Donut data={d.sectors} centerLabel="clients" /><Legend data={d.sectors} /></> : <EmptyHint />}
+          </ChartCard>
+        </div>
       </div>
 
-      {/* Charts — row 2 */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 mb-8">
-        <ChartCard title="Top compétences demandées" icon={Zap}>
-          {d.topSkills.length ? <HBars data={d.topSkills.map((s, i) => ({ ...s, color: PALETTE[i % PALETTE.length] }))} /> : <EmptyHint />}
-        </ChartCard>
-        <ChartCard title="Séniorité du vivier" icon={Award}>
-          {consultants.length ? <VBars data={d.seniority} /> : <EmptyHint />}
-        </ChartCard>
-        <ChartCard title="Clients par secteur" icon={Building2}>
-          {d.sectors.length ? <><Donut data={d.sectors} centerLabel="clients" /><Legend data={d.sectors} /></> : <EmptyHint />}
-        </ChartCard>
-      </div>
-
-      {/* Recent + quick actions */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
-        {/* Recent AOs */}
-        <div className="card overflow-hidden lg:col-span-2">
-          <div className="flex items-center justify-between px-4 h-11" style={{ borderBottom: '1px solid var(--border)' }}>
-            <div className="flex items-center gap-2 text-[13px] font-medium" style={{ color: 'var(--text)' }}>
-              <FileText size={14} strokeWidth={1.75} /> Derniers appels d'offres
-            </div>
-            <Link to="/aos" className="text-[12px] font-medium flex items-center gap-1" style={{ color: 'var(--text-muted)' }}>
+      {/* Recent + quick actions — a list earns its container (it groups rows
+          that belong together); the shortcut column stays open. */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-7 pt-7" style={hairline}>
+        <div className="lg:col-span-2">
+          <div className="flex items-center justify-between mb-1">
+            <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }}>
+              <FileText size={13} strokeWidth={2} /> Derniers appels d'offres
+            </h2>
+            <Link to="/aos" className="text-[12px] font-medium flex items-center gap-1 hover:underline" style={{ color: 'var(--accent-text)' }}>
               Voir tout <ArrowRight size={11} strokeWidth={2} />
             </Link>
           </div>
           {loading ? (
-            <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--text-faint)' }}>Chargement…</div>
+            <div className="py-10 text-center text-[13px]" style={{ color: 'var(--text-faint)' }}>Chargement…</div>
           ) : recentAOs.length === 0 ? (
-            <div className="px-4 py-10 text-center text-[13px]" style={{ color: 'var(--text-faint)' }}>Aucun appel d'offres pour le moment.</div>
+            <div className="py-10 text-center text-[13px]" style={{ color: 'var(--text-faint)' }}>Aucun appel d'offres pour le moment.</div>
           ) : (
             <ul>
-              {recentAOs.map((ao, i) => (
-                <li key={ao.id} style={{ borderTop: i === 0 ? 'none' : '1px solid var(--border)' }}>
-                  <Link to={`/aos/${ao.id}`} className="flex items-center gap-3 px-4 h-12 hover:bg-[var(--surface-2)] transition-colors group">
+              {recentAOs.map((ao) => (
+                <li key={ao.id} style={hairline}>
+                  <Link to={`/aos/${ao.id}`} className="flex items-center gap-3 h-12 px-1 -mx-1 rounded-md hover:bg-[var(--surface-2)] transition-colors group">
                     <div className="flex-1 min-w-0">
                       <div className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>{ao.title}</div>
                       <div className="text-[11px] truncate" style={{ color: 'var(--text-faint)' }}>{ao.skills_required}</div>
@@ -221,7 +208,7 @@ export default function DashboardPage() {
                         <span className="w-1 h-1 rounded-full" style={{ background: 'currentColor' }} />
                         {ao.status === 'open' ? 'Ouvert' : 'Fermé'}
                       </span>
-                      <ArrowRight size={12} strokeWidth={2} style={{ color: 'var(--text-faint)' }} />
+                      <ArrowRight size={12} strokeWidth={2} className="group-hover:translate-x-0.5 transition-transform" style={{ color: 'var(--text-faint)' }} />
                     </div>
                   </Link>
                 </li>
@@ -232,12 +219,12 @@ export default function DashboardPage() {
 
         {/* Quick actions */}
         <div>
-          <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold mb-2.5" style={{ color: 'var(--text-faint)' }}>Raccourcis</h2>
-          <div className="space-y-2.5">
-            {isAdmin && <QuickAction to="/aos/new" icon={Plus} title="Nouvel appel d'offres" desc="IA : générer depuis un email" tint={TINT.emerald} />}
-            {isAdmin && <QuickAction to="/clients/new" icon={Building2} title="Nouveau client" desc="Créer un dossier client" tint={TINT.amber} />}
-            <QuickAction to="/consultants/new" icon={Users} title="Ajouter un consultant" desc="Profil + CV PDF" tint={TINT.indigo} />
-            {isAdmin && <QuickAction onClick={() => setInviteOpen(true)} icon={UserPlus} title="Inviter un partenaire" desc="Lien sécurisé à 7 jours" tint={TINT.violet} />}
+          <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold mb-1.5" style={{ color: 'var(--text-faint)' }}>Raccourcis</h2>
+          <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
+            {isAdmin && <QuickAction to="/aos/new" icon={Plus} title="Nouvel appel d'offres" desc="IA : générer depuis un email" />}
+            {isAdmin && <QuickAction to="/clients/new" icon={Building2} title="Nouveau client" desc="Créer un dossier client" />}
+            <QuickAction to="/consultants/new" icon={Users} title="Ajouter un consultant" desc="Profil + CV PDF" />
+            {isAdmin && <QuickAction onClick={() => setInviteOpen(true)} icon={UserPlus} title="Inviter un partenaire" desc="Lien sécurisé à 7 jours" />}
           </div>
         </div>
       </div>

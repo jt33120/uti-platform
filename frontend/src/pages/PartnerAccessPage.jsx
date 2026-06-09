@@ -5,22 +5,20 @@ import {
   Star, ListChecks, Ban, UserCircle2, ShieldOff, GripVertical,
 } from 'lucide-react'
 
+// Tiers read as one hue by depth (priority = deeper indigo); suspended stays
+// red because it's a genuine warning state, and "none" stays neutral grey.
 const COLUMNS = [
   { key: 'none', label: 'Aucun accès', icon: Ban, color: '#737373', tint: 'rgba(115,115,115,0.05)' },
-  { key: 'list_1', label: 'Liste 1 · Prioritaire', icon: Star, color: '#16a34a', tint: 'rgba(22,163,74,0.06)' },
-  { key: 'list_2', label: 'Liste 2', icon: ListChecks, color: '#4f46e5', tint: 'rgba(79,70,229,0.06)' },
+  { key: 'list_1', label: 'Liste 1 · Prioritaire', icon: Star, color: '#4338ca', tint: 'rgba(67,56,202,0.07)' },
+  { key: 'list_2', label: 'Liste 2', icon: ListChecks, color: '#818cf8', tint: 'rgba(129,140,248,0.08)' },
   { key: 'suspended', label: 'Suspendu', icon: AlertCircle, color: '#dc2626', tint: 'rgba(220,38,38,0.05)' },
 ]
 
-const AV = [['#6366f1', '#8b5cf6'], ['#10b981', '#0ea5e9'], ['#f59e0b', '#f43f5e'], ['#0ea5e9', '#6366f1'], ['#a855f7', '#ec4899'], ['#14b8a6', '#10b981']]
-const gradOf = (name) => AV[(name || '?').toUpperCase().charCodeAt(0) % AV.length]
-
 function Avatar({ name, size = 28 }) {
-  const g = gradOf(name)
   return (
     <div
       className="rounded-full flex items-center justify-center font-bold shrink-0"
-      style={{ width: size, height: size, fontSize: size * 0.4, background: `linear-gradient(135deg, ${g[0]}, ${g[1]})`, color: '#fff' }}
+      style={{ width: size, height: size, fontSize: size * 0.4, background: 'var(--accent-soft)', color: 'var(--accent-text)' }}
     >
       {name?.charAt(0).toUpperCase() || '?'}
     </div>
@@ -252,8 +250,8 @@ export default function PartnerAccessPage() {
           </div>
 
           <p className="text-[11px] mt-4 text-center" style={{ color: 'var(--text-faint)' }}>
-            <Star size={11} className="inline mr-1" style={{ color: '#16a34a' }} />
-            Les partenaires de la <span style={{ color: '#16a34a', fontWeight: 600 }}>Liste 1</span> sont prioritaires sur les AOs de ce client.
+            <Star size={11} className="inline mr-1" style={{ color: 'var(--accent-text)' }} />
+            Les partenaires de la <span style={{ color: 'var(--accent-text)', fontWeight: 600 }}>Liste 1</span> sont prioritaires sur les AOs de ce client.
           </p>
 
           {/* Global suspension */}

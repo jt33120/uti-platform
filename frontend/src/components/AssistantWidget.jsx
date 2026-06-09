@@ -18,8 +18,6 @@ const SUGGESTIONS = {
   ],
 }
 
-const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9', '#a855f7', '#14b8a6', '#eab308']
-
 function MiniChart({ title, data }) {
   const max = Math.max(...data.map(d => d.value), 1)
   return (
@@ -30,7 +28,8 @@ function MiniChart({ title, data }) {
           <div key={i} className="flex items-center gap-2">
             <div className="w-20 text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{d.name}</div>
             <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface)' }}>
-              <div className="h-full rounded-full" style={{ width: `${Math.max((d.value / max) * 100, 4)}%`, background: CHART_COLORS[i % CHART_COLORS.length] }} />
+              {/* one brand hue; opacity tracks magnitude, so colour carries info */}
+              <div className="h-full rounded-full" style={{ width: `${Math.max((d.value / max) * 100, 4)}%`, background: 'var(--accent)', opacity: 0.45 + 0.55 * (d.value / max) }} />
             </div>
             <div className="w-7 text-right text-[10px] tabular" style={{ color: 'var(--text)' }}>
               {Number.isInteger(d.value) ? d.value : d.value.toFixed(1)}
