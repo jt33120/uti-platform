@@ -29,6 +29,11 @@ class Settings(BaseSettings):
     s3_bucket: Optional[str] = None  # single OVH bucket; "cvs"/"avatars" become key prefixes
     s3_public_base_url: Optional[str] = None  # public base URL for stored objects
 
+    # In-app AI assistant — optional dedicated OpenRouter key + model
+    # (falls back to openrouter_key when unset)
+    assistant_openrouter_key: Optional[str] = None
+    assistant_model: str = "anthropic/claude-3.5-sonnet"
+
     model_config = {
         "env_file": ".env",
         "extra": "ignore",

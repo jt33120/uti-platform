@@ -2,48 +2,81 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
-import { Sparkles, X, Minus, Send, Loader2, ArrowRight } from 'lucide-react'
+import { Sparkles, X, Minus, Send, Loader2, ArrowRight, Eye } from 'lucide-react'
 
-// Role-aware starter suggestions. The assistant only ever *prepares* actions
-// (navigate + pre-fill) — it never submits anything on the user's behalf.
+// Role-aware starter suggestions — showcase the 3 capabilities: Q&A, chart, highlight.
 const SUGGESTIONS = {
   admin: [
-    "Créer un appel d'offres",
-    'Ajouter un consultant',
-    'Voir les partenaires',
+    "Combien d'AOs ouverts ?",
+    'Montre les AOs par type',
+    'Où créer un appel d\'offres ?',
   ],
   ao: [
-    'Ajouter un consultant à mon vivier',
+    'Combien de consultants dans mon vivier ?',
     "Voir les appels d'offres",
-    'Voir mes clients',
+    'Où ajouter un consultant ?',
   ],
 }
 
-function Bubble({ m, onAction }) {
+const CHART_COLORS = ['#6366f1', '#10b981', '#f59e0b', '#f43f5e', '#0ea5e9', '#a855f7', '#14b8a6', '#eab308']
+
+function MiniChart({ title, data }) {
+  const max = Math.max(...data.map(d => d.value), 1)
+  return (
+    <div className="mt-1.5 p-3 rounded-lg" style={{ background: 'var(--surface-2)', border: '1px solid var(--border)' }}>
+      {title && <div className="text-[11px] font-semibold mb-2" style={{ color: 'var(--text)' }}>{title}</div>}
+      <div className="space-y-1.5">
+        {data.map((d, i) => (
+          <div key={i} className="flex items-center gap-2">
+            <div className="w-20 text-[10px] truncate" style={{ color: 'var(--text-muted)' }}>{d.name}</div>
+            <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface)' }}>
+              <div className="h-full rounded-full" style={{ width: `${Math.max((d.value / max) * 100, 4)}%`, background: CHART_COLORS[i % CHART_COLORS.length] }} />
+            </div>
+            <div className="w-7 text-right text-[10px] tabular" style={{ color: 'var(--text)' }}>
+              {Number.isInteger(d.value) ? d.value : d.value.toFixed(1)}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+function Bubble({ m, onNavigate, onHighlight }) {
   const isUser = m.role === 'user'
   return (
     <div className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className="max-w-[85%]">
         <div
           className="px-3 py-2 rounded-lg text-[13px] leading-relaxed whitespace-pre-wrap"
-          style={
-            isUser
-              ? { background: 'var(--accent)', color: '#fff' }
-              : { background: 'var(--surface-2)', color: 'var(--text)' }
-          }
+          style={isUser ? { background: 'var(--accent)', color: '#fff' } : { background: 'var(--surface-2)', color: 'var(--text)' }}
         >
           {m.content}
         </div>
-        {m.action?.path && (
-          <button
-            onClick={() => onAction(m.action)}
-            className="mt-1.5 w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
-            style={{ background: 'var(--accent-soft)', color: 'var(--accent-text)', border: '1px solid var(--accent)' }}
-          >
-            <span className="truncate">{m.action.cta || 'Ouvrir la page'}</span>
-            <ArrowRight size={13} className="shrink-0" />
-          </button>
-        )}
+        {(m.actions || []).map((a, i) => {
+          if (a.type === 'navigate') return (
+            <button
+              key={i} onClick={() => onNavigate(a)}
+              className="mt-1.5 w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
+              style={{ background: 'var(--accent-soft)', color: 'var(--accent-text)', border: '1px solid var(--accent)' }}
+            >
+              <span className="truncate">{a.cta || 'Ouvrir la page'}</span>
+              <ArrowRight size={13} className="shrink-0" />
+            </button>
+          )
+          if (a.type === 'highlight') return (
+            <button
+              key={i} onClick={() => onHighlight(a)}
+              className="mt-1.5 w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-[12px] font-medium transition-colors"
+              style={{ background: 'var(--surface-2)', color: 'var(--text)', border: '1px solid var(--border)' }}
+            >
+              <span className="truncate">{a.cta || 'Me montrer'}</span>
+              <Eye size={13} className="shrink-0" />
+            </button>
+          )
+          if (a.type === 'chart' && a.data?.length) return <MiniChart key={i} title={a.title} data={a.data} />
+          return null
+        })}
       </div>
     </div>
   )
@@ -85,24 +118,41 @@ export default function AssistantWidget() {
         messages: next.map(m => ({ role: m.role, content: m.content })),
         page: location.pathname,
       })
-      setMessages(m => [...m, { role: 'assistant', content: data.reply, action: data.action }])
+      setMessages(m => [...m, { role: 'assistant', content: data.reply, actions: data.actions || [] }])
     } catch {
       setMessages(m => [...m, {
         role: 'assistant',
         content: "Désolé, je n'ai pas pu traiter votre demande. Veuillez réessayer.",
-        action: null,
+        actions: [],
       }])
     } finally {
       setLoading(false)
     }
   }
 
-  // Navigate + pre-fill. Crucially, this never submits the target form —
-  // the user always reviews and confirms the final action themselves.
-  const runAction = (action) => {
-    if (!action?.path) return
-    navigate(action.path, { state: { assistantPrefill: action.prefill || undefined } })
+  // Navigate + pre-fill. Never submits the target form — the user always confirms.
+  const runNavigate = (a) => {
+    if (!a?.path) return
+    navigate(a.path, { state: { assistantPrefill: a.prefill || undefined } })
     setOpen(false)
+  }
+
+  // Pulse the matching sidebar menu entry to show *where* a feature lives.
+  const runHighlight = (a) => {
+    if (!a?.path) return
+    const el = document.querySelector(`a[href="${a.path}"]`)
+    if (!el) { navigate(a.path); setOpen(false); return }
+    el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+    try {
+      el.animate(
+        [
+          { boxShadow: '0 0 0 0 rgba(99,102,241,0)' },
+          { boxShadow: '0 0 0 4px rgba(99,102,241,0.55)' },
+          { boxShadow: '0 0 0 0 rgba(99,102,241,0)' },
+        ],
+        { duration: 850, iterations: 3, easing: 'ease-out' },
+      )
+    } catch { /* Web Animations API unavailable */ }
   }
 
   const onKeyDown = (e) => {
@@ -184,8 +234,8 @@ export default function AssistantWidget() {
                   style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
                 >
                   Bonjour {user.name?.split(' ')[0]} 👋<br />
-                  Je peux vous emmener sur la bonne page et pré-remplir des formulaires.
-                  Je ne soumets jamais rien — vous gardez toujours la main.
+                  Posez-moi une question sur vos données, demandez un graphique, ou dites-moi où aller —
+                  je vous guide et pré-remplis, mais je ne valide jamais à votre place.
                 </div>
                 <div className="flex flex-wrap gap-1.5">
                   {(SUGGESTIONS[role] || []).map((s) => (
@@ -202,7 +252,7 @@ export default function AssistantWidget() {
               </div>
             )}
 
-            {messages.map((m, i) => <Bubble key={i} m={m} onAction={runAction} />)}
+            {messages.map((m, i) => <Bubble key={i} m={m} onNavigate={runNavigate} onHighlight={runHighlight} />)}
 
             {loading && (
               <div className="flex justify-start">
