@@ -158,6 +158,7 @@ export default function Layout() {
               <NavItem to="/clients/new" icon={Plus} label="Nouveau client" />
               <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter partenaire" />
               <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
+              <NavItem to="/graph" icon={Compass} label="Cartographie" />
               <NavItem to="/pacs" icon={Package} label="PACs" />
             </>
           )}
