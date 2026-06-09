@@ -3,7 +3,8 @@ import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../lib/api'
 import {
   ArrowLeft, FileText, Loader2, ChevronDown, Building2,
-  Euro, MapPin, Clock, Zap, CheckCircle, CalendarClock
+  Euro, MapPin, Clock, Zap, CheckCircle, CalendarClock,
+  Sparkles, UploadCloud, X
 } from 'lucide-react'
 
 export default function NewAOPage() {
@@ -19,6 +20,44 @@ export default function NewAOPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // AI draft step
+  const [aiText, setAiText] = useState('')
+  const [aiFiles, setAiFiles] = useState([])
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [aiDone, setAiDone] = useState(false)
+
+  const generateFromSource = async () => {
+    setAiError(''); setAiDone(false)
+    if (!aiText.trim() && aiFiles.length === 0) {
+      setAiError("Collez le texte d'un email ou ajoutez un fichier (PDF, DOCX)."); return
+    }
+    setAiLoading(true)
+    try {
+      const fd = new FormData()
+      fd.append('pasted_text', aiText)
+      aiFiles.forEach(f => fd.append('files', f))
+      const { data } = await api.post('/aos/draft', fd)
+      setForm(p => ({
+        ...p,
+        title: data.title || p.title,
+        description: data.description || p.description,
+        skills_required: data.skills_required || p.skills_required,
+        ao_type: data.ao_type || p.ao_type,
+        budget_max: data.budget_max != null ? String(data.budget_max) : p.budget_max,
+        location: data.location || p.location,
+        duration: data.duration || p.duration,
+        deadline: data.deadline || p.deadline,
+        context: data.context || p.context,
+      }))
+      setAiDone(true)
+    } catch (err) {
+      setAiError(err.response?.data?.detail || 'Échec de la génération. Réessayez.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
 
   useEffect(() => {
     api.get('/clients').then(r => {
@@ -65,6 +104,65 @@ export default function NewAOPage() {
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">Les compétences renseignées alimentent directement le scoring IA</p>
         </div>
+      </div>
+
+      {/* AI generation step — paste an email / drop attachments → pre-fill the form */}
+      <div className="card p-6 mb-6 border border-violet-500/20 bg-gradient-to-br from-violet-500/[0.08] to-brand-500/[0.04]">
+        <div className="flex items-start gap-3 mb-4">
+          <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/30 to-brand-500/30 border border-violet-400/20 flex items-center justify-center shrink-0">
+            <Sparkles size={17} className="text-violet-300" />
+          </div>
+          <div>
+            <h2 className="text-sm font-semibold text-white">Générer l'AO avec l'IA</h2>
+            <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
+              Collez l'email reçu et/ou ajoutez la pièce jointe (PDF, DOCX). L'IA pré-remplit le formulaire ci-dessous —
+              vous vérifiez et ajustez avant d'enregistrer.
+            </p>
+          </div>
+        </div>
+
+        <textarea
+          className="input h-28 resize-none text-sm"
+          placeholder="Collez ici le texte de l'email de l'appel d'offres…"
+          value={aiText} onChange={e => setAiText(e.target.value)}
+        />
+
+        <div className="flex flex-wrap items-center gap-2 mt-3">
+          <label className="btn-ghost cursor-pointer text-sm">
+            <UploadCloud size={15} /> Ajouter un fichier
+            <input
+              type="file" multiple accept=".pdf,.docx,.txt" className="hidden"
+              onChange={e => { setAiFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = '' }}
+            />
+          </label>
+          {aiFiles.map((f, i) => (
+            <span key={i} className="badge bg-white/5 border border-white/10 text-slate-300 text-xs">
+              <FileText size={11} className="inline mr-1" />{f.name}
+              <button
+                type="button"
+                onClick={() => setAiFiles(prev => prev.filter((_, j) => j !== i))}
+                className="ml-1.5 text-slate-500 hover:text-red-400"
+              >
+                <X size={11} />
+              </button>
+            </span>
+          ))}
+          <button
+            type="button" onClick={generateFromSource} disabled={aiLoading}
+            className="btn-primary text-sm ml-auto"
+          >
+            {aiLoading
+              ? <><Loader2 size={14} className="animate-spin" />Génération…</>
+              : <><Sparkles size={14} />Générer l'AO</>}
+          </button>
+        </div>
+
+        {aiError && <p className="text-xs text-red-400 mt-3">{aiError}</p>}
+        {aiDone && !aiError && (
+          <p className="text-xs text-emerald-400 mt-3 flex items-center gap-1.5">
+            <CheckCircle size={12} /> Champs pré-remplis — vérifiez et ajustez ci-dessous avant d'enregistrer.
+          </p>
+        )}
       </div>
 
       <form onSubmit={handleSubmit}>

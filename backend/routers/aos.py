@@ -1,7 +1,9 @@
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional
 from services.supabase_client import supabase
+from services.cv_parser import extract_text_from_pdf, extract_text_from_docx
+from services import ao_drafter
 from routers.auth import get_current_user, require_admin
 
 router = APIRouter(prefix="/aos", tags=["appels_offres"])
@@ -62,6 +64,58 @@ def _accessible_client_ids(user: dict) -> Optional[list[str]]:
 @router.get("/types")
 async def get_ao_types():
     return AO_TYPES
+
+
+@router.post("/draft")
+async def draft_ao(
+    pasted_text: str = Form(""),
+    files: list[UploadFile] = File(default=[]),
+    user: dict = Depends(require_admin),
+):
+    """
+    Generate editable AO fields from raw source material: pasted email text and/or
+    attachments (PDF, DOCX, TXT). The admin reviews and edits the result before
+    saving — nothing is persisted here.
+    """
+    if not ao_drafter.is_available():
+        raise HTTPException(status_code=503, detail="Génération IA indisponible (clé OpenRouter non configurée).")
+
+    parts: list[str] = []
+    if pasted_text and pasted_text.strip():
+        parts.append(pasted_text.strip())
+
+    for f in files:
+        data = await f.read()
+        if not data:
+            continue
+        name = (f.filename or "").lower()
+        try:
+            if name.endswith(".pdf"):
+                parts.append(extract_text_from_pdf(data))
+            elif name.endswith(".docx"):
+                parts.append(extract_text_from_docx(data))
+            elif name.endswith(".txt"):
+                parts.append(data.decode("utf-8", errors="ignore"))
+            # other formats are silently skipped
+        except Exception:
+            # unreadable file → skip rather than fail the whole request
+            continue
+
+    source = "\n\n".join(p for p in parts if p and p.strip())
+    if not source.strip():
+        raise HTTPException(
+            status_code=422,
+            detail="Aucun contenu exploitable. Collez le texte de l'email ou ajoutez un PDF/DOCX.",
+        )
+
+    try:
+        fields = await ao_drafter.draft_ao_fields(source, AO_TYPES)
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Erreur de génération IA : {e}")
+
+    if fields is None:
+        raise HTTPException(status_code=502, detail="L'IA n'a pas renvoyé de résultat exploitable. Réessayez.")
+    return fields
 
 
 @router.post("")

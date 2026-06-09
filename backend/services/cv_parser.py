@@ -40,6 +40,20 @@ def extract_text_from_pdf(file_bytes: bytes) -> str:
     return clean_text(raw_text)
 
 
+def extract_text_from_docx(file_bytes: bytes) -> str:
+    """Extract text from a .docx file (paragraphs + table cells)."""
+    from docx import Document  # imported lazily so the dep is only needed when used
+
+    doc = Document(io.BytesIO(file_bytes))
+    parts = [p.text for p in doc.paragraphs if p.text and p.text.strip()]
+    for table in doc.tables:
+        for row in table.rows:
+            cells = [c.text.strip() for c in row.cells if c.text and c.text.strip()]
+            if cells:
+                parts.append(" | ".join(cells))
+    return clean_text("\n".join(parts))
+
+
 def clean_text(text: str) -> str:
     """Clean and normalize extracted text."""
     # Remove excessive whitespace while preserving structure
