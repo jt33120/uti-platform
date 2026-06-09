@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { lazy, Suspense } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
@@ -18,6 +19,9 @@ import PartnerAccessPage from './pages/PartnerAccessPage'
 import PartnersPage from './pages/PartnersPage'
 import PartnerDetailPage from './pages/PartnerDetailPage'
 import PacsPage from './pages/PacsPage'
+
+// Lazy — keeps the graph library out of the main bundle
+const GraphPage = lazy(() => import('./pages/GraphPage'))
 
 function ProtectedRoute({ children, adminOnly = false }) {
   const { user } = useAuth()
@@ -55,6 +59,13 @@ export default function App() {
           <Route path="/partners" element={<ProtectedRoute adminOnly><PartnersPage /></ProtectedRoute>} />
           <Route path="/partners/:id" element={<ProtectedRoute adminOnly><PartnerDetailPage /></ProtectedRoute>} />
           <Route path="/partners-access" element={<ProtectedRoute adminOnly><PartnerAccessPage /></ProtectedRoute>} />
+          <Route path="/graph" element={
+            <ProtectedRoute adminOnly>
+              <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement de la cartographie…</div>}>
+                <GraphPage />
+              </Suspense>
+            </ProtectedRoute>
+          } />
           <Route path="/pacs" element={<ProtectedRoute adminOnly><PacsPage /></ProtectedRoute>} />
         </Route>
       </Routes>
