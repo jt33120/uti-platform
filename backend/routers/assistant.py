@@ -123,6 +123,21 @@ def _strip_json(text: str) -> str:
     return text
 
 
+def _parse_json(text: str) -> Optional[dict]:
+    """Robustly parse a JSON object from the model output (handles fences/prose)."""
+    raw = _strip_json(text or "")
+    try:
+        return json.loads(raw)
+    except json.JSONDecodeError:
+        m = re.search(r"\{.*\}", raw, re.DOTALL)
+        if m:
+            try:
+                return json.loads(m.group(0))
+            except json.JSONDecodeError:
+                return None
+    return None
+
+
 def _sanitize_action(action: Optional[dict], role: str) -> Optional[AssistantAction]:
     """Validate a proposed action against the role's allowlist."""
     if not action or not isinstance(action, dict):
@@ -212,11 +227,13 @@ async def chat(body: ChatRequest, user: dict = Depends(get_current_user)):
         resp = await _client.chat.completions.create(
             model=MODEL,
             messages=convo,
-            response_format={"type": "json_object"},
             temperature=0.3,
             max_tokens=600,
         )
-        data = json.loads(_strip_json(resp.choices[0].message.content))
+        data = _parse_json(resp.choices[0].message.content or "")
+        if data is None:
+            print("[ASSISTANT] model output was not valid JSON — falling back")
+            return _fallback(body.messages, role)
         reply = (data.get("reply") or "").strip() or "Comment puis-je vous aider ?"
         action = _sanitize_action(data.get("action"), role)
         return ChatResponse(reply=reply, action=action)
