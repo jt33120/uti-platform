@@ -2,6 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useParams, useNavigate, useLocation } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import {
   ArrowLeft, Zap, Euro, MapPin, Clock, Users, CheckCircle,
   AlertCircle, TrendingUp, Award, ChevronDown, ChevronUp,
@@ -747,6 +748,7 @@ export default function AODetailPage() {
   const { id } = useParams()
   const { isAdmin: isAdminRole, isStaff, user } = useAuth()
   const isAdmin = isStaff // staff view (admin + commerce) — naming kept to avoid touching every usage below
+  const confirm = useConfirm()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -847,13 +849,21 @@ export default function AODetailPage() {
   const handleRerunMatch = () => runMatching()
 
   const handleDelete = async () => {
-    if (!confirm('Supprimer cet AO ?')) return
+    if (!(await confirm({
+      title: "Supprimer cet appel d'offres ?",
+      message: 'L\'AO et ses données associées seront supprimés définitivement.',
+      confirmLabel: 'Supprimer',
+    }))) return
     await api.delete(`/aos/${id}`)
     navigate('/aos')
   }
 
   const handleDeleteSubmission = async (sid) => {
-    if (!confirm('Retirer cette soumission ?')) return
+    if (!(await confirm({
+      title: 'Retirer cette soumission ?',
+      message: 'Le CV soumis sera retiré de cet AO.',
+      confirmLabel: 'Retirer',
+    }))) return
     await api.delete(`/submissions/${sid}`)
     setSubmissions(p => p.filter(s => s.id !== sid))
   }

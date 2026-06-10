@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import {
   Building2, Users, Loader2, AlertCircle, ChevronDown,
   Star, ListChecks, Ban, UserCircle2, ShieldOff, GripVertical,
@@ -84,6 +85,7 @@ function Column({ col, partners, onDrop, onDragOver, onDragLeave, isTarget, read
 
 export default function PartnerAccessPage() {
   const { isAdmin } = useAuth() // commerce : même vue, lecture seule
+  const confirm = useConfirm()
   const readOnly = !isAdmin
   const [clients, setClients] = useState([])
   const [partners, setPartners] = useState([])
@@ -158,7 +160,11 @@ export default function PartnerAccessPage() {
   }
 
   const handleSuspendGlobally = async (partnerId) => {
-    if (!confirm('Suspendre ce partenaire sur TOUS les clients ?')) return
+    if (!(await confirm({
+      title: 'Suspendre ce partenaire ?',
+      message: 'Le partenaire sera suspendu sur TOUS les clients.',
+      confirmLabel: 'Suspendre',
+    }))) return
     setSuspending(partnerId)
     try {
       await api.post(`/partners/${partnerId}/suspend`)

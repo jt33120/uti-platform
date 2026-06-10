@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import {
   FileText, Plus, Euro, MapPin, Clock, ArrowRight, Search,
   Building2, Users, Star, ListChecks, Calendar, CalendarClock,
@@ -316,6 +317,7 @@ function AOCard({ ao, isStaff, onEdit, onDelete, navigate, selected, onToggleSel
 
 export default function AOSPage() {
   const { isStaff } = useAuth()
+  const confirm = useConfirm()
   const navigate = useNavigate()
   const [aos, setAos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -334,7 +336,11 @@ export default function AOSPage() {
       .catch(e => setError(e.response?.data?.detail || e.message || 'Erreur de chargement'))
 
   const handleDeleteAo = async (ao) => {
-    if (!confirm(`Supprimer l'AO « ${ao.title} » ? Cette action est irréversible.`)) return
+    if (!(await confirm({
+      title: "Supprimer l'appel d'offres ?",
+      message: `« ${ao.title} » sera supprimé définitivement. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+    }))) return
     setDeleting(ao.id)
     try {
       await api.delete(`/aos/${ao.id}`)
@@ -358,7 +364,11 @@ export default function AOSPage() {
   const handleBulkDelete = async () => {
     const n = selected.size
     if (!n) return
-    if (!confirm(`Supprimer ${n} AO${n > 1 ? 's' : ''} ? Cette action est irréversible.`)) return
+    if (!(await confirm({
+      title: `Supprimer ${n} appel${n > 1 ? 's' : ''} d'offres ?`,
+      message: `${n} AO${n > 1 ? 's' : ''} ${n > 1 ? 'seront supprimés' : 'sera supprimé'} définitivement. Cette action est irréversible.`,
+      confirmLabel: `Supprimer (${n})`,
+    }))) return
     setBulkDeleting(true)
     try {
       const ids = Array.from(selected)

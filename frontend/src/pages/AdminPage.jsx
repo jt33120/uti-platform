@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import {
   Gauge, Users, FileText, Sparkles, Ticket, UserPlus, X, Loader2,
   Shield, Briefcase, BadgePercent, Check, RotateCcw, Inbox,
@@ -48,6 +49,7 @@ function RoleBadge({ role }) {
 
 export default function AdminPage() {
   const { user } = useAuth()
+  const confirm = useConfirm()
   const [overview, setOverview] = useState(null)
   const [accounts, setAccounts] = useState([])
   const [pending, setPending] = useState([])
@@ -74,11 +76,21 @@ export default function AdminPage() {
   useEffect(() => { load() }, [])
 
   const deleteAccount = async (acc) => {
-    if (!confirm(`Supprimer définitivement le compte « ${acc.name} » (${acc.email}) ?\nCette action est irréversible.`)) return
+    if (!(await confirm({
+      title: 'Supprimer ce compte ?',
+      message: `Le compte « ${acc.name} » (${acc.email}) sera supprimé définitivement. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+    }))) return
     setDeletingId(acc.id)
     try {
       await api.delete(`/admin/accounts/${acc.id}`)
       setAccounts(p => p.filter(a => a.id !== acc.id))
+      // Keep the KPI tiles in sync without a full reload
+      setOverview(o => o ? {
+        ...o,
+        accounts_total: Math.max(0, (o.accounts_total || 1) - 1),
+        accounts_by_role: { ...o.accounts_by_role, [acc.role]: Math.max(0, (o.accounts_by_role?.[acc.role] || 1) - 1) },
+      } : o)
     } catch (e) {
       alert(e.response?.data?.detail || 'Erreur lors de la suppression')
     } finally {
@@ -153,8 +165,8 @@ export default function AdminPage() {
                 <th className="font-medium px-4 py-2.5">Nom</th>
                 <th className="font-medium px-4 py-2.5 hidden md:table-cell">Email</th>
                 <th className="font-medium px-4 py-2.5">Rôle</th>
-                <th className="font-medium px-4 py-2.5 hidden lg:table-cell">Dernière connexion</th>
-                <th className="font-medium px-4 py-2.5 hidden lg:table-cell">Créé le</th>
+                <th className="font-medium px-4 py-2.5 hidden md:table-cell">Dernière connexion</th>
+                <th className="font-medium px-4 py-2.5 hidden xl:table-cell">Créé le</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -167,8 +179,8 @@ export default function AdminPage() {
                   </td>
                   <td className="px-4 py-2.5 hidden md:table-cell" style={{ color: 'var(--text-muted)' }}>{acc.email}</td>
                   <td className="px-4 py-2.5"><RoleBadge role={acc.role} /></td>
-                  <td className="px-4 py-2.5 hidden lg:table-cell tabular" style={{ color: 'var(--text-muted)' }}>{fmtDateTime(acc.last_login_at)}</td>
-                  <td className="px-4 py-2.5 hidden lg:table-cell tabular" style={{ color: 'var(--text-faint)' }}>{fmtDate(acc.created_at)}</td>
+                  <td className="px-4 py-2.5 hidden md:table-cell tabular" style={{ color: 'var(--text-muted)' }}>{fmtDateTime(acc.last_login_at)}</td>
+                  <td className="px-4 py-2.5 hidden xl:table-cell tabular" style={{ color: 'var(--text-faint)' }}>{fmtDate(acc.created_at)}</td>
                   <td className="px-4 py-2.5 text-right">
                     {acc.id !== user?.id && (
                       <button

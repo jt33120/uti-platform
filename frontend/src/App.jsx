@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { ConfirmProvider } from './contexts/ConfirmContext'
 import Layout from './components/Layout'
 import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
@@ -44,7 +45,8 @@ function GuestRoute({ children }) {
 export default function App() {
   return (
     <AuthProvider>
-      <Routes>
+      <ConfirmProvider>
+        <Routes>
         <Route path="/" element={<Navigate to="/dashboard" replace />} />
         <Route path="/login" element={<GuestRoute><LoginPage /></GuestRoute>} />
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
@@ -80,7 +82,8 @@ export default function App() {
             </ProtectedRoute>
           } />
         </Route>
-      </Routes>
+        </Routes>
+      </ConfirmProvider>
     </AuthProvider>
   )
 }

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import {
   Users, Plus, X, Search, Euro, Clock, Briefcase,
   Mail, Loader2, Check, UserCircle2,
@@ -197,6 +198,7 @@ function ConsultantCard({ consultant, onDelete, canDelete, canContact, onContact
 
 export default function ConsultantsPage() {
   const { isAdmin, isStaff, isCommerce } = useAuth()
+  const confirm = useConfirm()
   const [consultants, setConsultants] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -214,7 +216,11 @@ export default function ConsultantsPage() {
   useEffect(() => { fetchConsultants() }, [])
 
   const handleDelete = async (id) => {
-    if (!confirm('Supprimer ce consultant ? Toutes ses soumissions seront perdues.')) return
+    if (!(await confirm({
+      title: 'Supprimer ce consultant ?',
+      message: 'Le consultant et toutes ses soumissions seront supprimés. Cette action est irréversible.',
+      confirmLabel: 'Supprimer',
+    }))) return
     try {
       await api.delete(`/consultants/${id}`)
       setConsultants(p => p.filter(c => c.id !== id))

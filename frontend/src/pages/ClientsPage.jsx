@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import { Building2, Plus, Pencil, Trash2, Search, Briefcase, UserCircle2, Mail, ArrowRight, AlertTriangle } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -190,6 +191,7 @@ function ClientModal({ client, onClose, onSaved, existingClients = [] }) {
 
 export default function ClientsPage() {
   const { isAdmin } = useAuth()
+  const confirm = useConfirm()
   const [clients, setClients] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -214,7 +216,11 @@ export default function ClientsPage() {
   useEffect(() => { fetchAll() }, [])
 
   const handleDelete = async (id) => {
-    if (!confirm('Supprimer ce client ? Les AOs liés deviendront orphelins.')) return
+    if (!(await confirm({
+      title: 'Supprimer ce client ?',
+      message: 'Les AOs liés deviendront orphelins. Cette action est irréversible.',
+      confirmLabel: 'Supprimer',
+    }))) return
     try {
       await api.delete(`/clients/${id}`)
       setClients(p => p.filter(c => c.id !== id))

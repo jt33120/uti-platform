@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import InviteModal from '../components/InviteModal'
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
@@ -110,6 +111,7 @@ function AccessSummary({ summary }) {
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PartnersPage() {
   const { isAdmin } = useAuth() // commerce: même vue, lecture seule
+  const confirm = useConfirm()
   const navigate = useNavigate()
   const [partners, setPartners] = useState([])
   const [access, setAccess] = useState([])
@@ -157,9 +159,11 @@ export default function PartnersPage() {
   }
 
   const handleDelete = async (partner) => {
-    if (!confirm(
-      `Supprimer définitivement « ${partner.name} » ?\n\nCette action supprime le compte et tous ses accès. Elle est irréversible.`
-    )) return
+    if (!(await confirm({
+      title: 'Supprimer ce partenaire ?',
+      message: `« ${partner.name} » : le compte et tous ses accès seront supprimés. Cette action est irréversible.`,
+      confirmLabel: 'Supprimer',
+    }))) return
     setDeleting(partner.id)
     try {
       await api.delete(`/partners/${partner.id}`)
@@ -172,7 +176,11 @@ export default function PartnersPage() {
   }
 
   const handleSuspend = async (partner) => {
-    if (!confirm(`Suspendre « ${partner.name} » sur tous les clients ?`)) return
+    if (!(await confirm({
+      title: 'Suspendre ce partenaire ?',
+      message: `« ${partner.name} » sera suspendu sur tous les clients.`,
+      confirmLabel: 'Suspendre',
+    }))) return
     setSuspending(partner.id)
     try {
       await api.post(`/partners/${partner.id}/suspend`)
@@ -332,7 +340,7 @@ export default function PartnersPage() {
                   <button
                     onClick={() => navigate(`/partners/${partner.id}`)}
                     className="btn-ghost p-2 text-slate-400 hover:text-brand-300 transition-colors"
-                    title="Gérer les clients de ce partenaire"
+                    title={isAdmin ? 'Gérer les clients de ce partenaire' : 'Voir les clients de ce partenaire'}
                   >
                     <Settings2 size={13} />
                   </button>
