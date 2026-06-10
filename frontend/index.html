@@ -19,6 +19,17 @@
         } catch (e) {}
       })();
     </script>
+    <!-- MIP RUM — POC (retirer après la démo) -->
+    <script src="https://mip-rum-console.vercel.app/mip-rum.js"></script>
+    <script>
+      MIPRum.init({
+        endpoint: "https://nupxrdpsliqptqnjkmgw.supabase.co/functions/v1/v1-traces",
+        appId: "gip-plateforme",
+        clientId: "groupement-it",
+        env: "prod",
+        sampleRate: 1.0
+      });
+    </script>
   </head>
   <body>
     <div id="root"></div>
