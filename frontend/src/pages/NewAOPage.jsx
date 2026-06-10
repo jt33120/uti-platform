@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import api from '../lib/api'
 import {
@@ -20,6 +20,7 @@ export default function NewAOPage() {
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const errorRef = useRef(null)
 
   // AI draft step
   const [aiText, setAiText] = useState('')
@@ -71,7 +72,18 @@ export default function NewAOPage() {
   const handleSubmit = async (e) => {
     e.preventDefault()
     setError('')
-    if (!form.client_id) { setError('Veuillez sélectionner un client'); return }
+    // Explicit, visible validation (no reliance on the native browser tooltip,
+    // which is English-only and invisible if the field is off-screen).
+    const missing = []
+    if (!form.client_id) missing.push('Client')
+    if (!form.title.trim()) missing.push('Titre de la mission')
+    if (!form.description.trim()) missing.push('Description')
+    if (!form.skills_required.trim()) missing.push('Compétences requises')
+    if (missing.length) {
+      setError(`Champ${missing.length > 1 ? 's' : ''} obligatoire${missing.length > 1 ? 's' : ''} manquant${missing.length > 1 ? 's' : ''} : ${missing.join(', ')}.`)
+      errorRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
     setLoading(true)
     try {
       const payload = { ...form }
@@ -165,7 +177,7 @@ export default function NewAOPage() {
         )}
       </div>
 
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} noValidate>
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
 
           {/* Left — main fields */}
@@ -364,7 +376,7 @@ export default function NewAOPage() {
             </div>
 
             {error && (
-              <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-4 py-3">
+              <div ref={errorRef} className="text-sm rounded-lg px-4 py-3" style={{ background: 'var(--danger-soft)', color: 'var(--danger)', border: '1px solid var(--danger)' }}>
                 {error}
               </div>
             )}

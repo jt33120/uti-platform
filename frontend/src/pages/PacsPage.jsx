@@ -1,5 +1,6 @@
 import { useEffect, useState, useMemo, useCallback } from 'react'
 import api from '../lib/api'
+import { useConfirm } from '../contexts/ConfirmContext'
 import {
   Package, Plus, Loader2, Trash2, Pencil, X, Search,
   Building2, Star, ListChecks, AlertCircle, ChevronDown,
@@ -279,6 +280,7 @@ function PacEditor({ pacId, onClose, onChanged }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PacsPage() {
+  const confirm = useConfirm()
   const [pacs, setPacs] = useState([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
@@ -299,7 +301,11 @@ export default function PacsPage() {
   useEffect(() => { fetchAll() }, [])
 
   const handleDelete = async (pac) => {
-    if (!confirm(`Supprimer le PAC « ${pac.name} » ?\n\nCela n'affecte pas les partenaires déjà liés à ces clients.`)) return
+    if (!(await confirm({
+      title: 'Supprimer ce PAC ?',
+      message: `« ${pac.name} » sera supprimé. Cela n'affecte pas les partenaires déjà liés à ces clients.`,
+      confirmLabel: 'Supprimer',
+    }))) return
     setDeleting(pac.id)
     try {
       await api.delete(`/pacs/${pac.id}`)

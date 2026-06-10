@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
+import { useConfirm } from '../contexts/ConfirmContext'
 import {
   ArrowLeft, Loader2, UserCircle2, Mail, Building2, Search,
   Star, ListChecks, Ban, AlertCircle, ChevronDown, CheckCircle2,
@@ -33,6 +34,7 @@ function TierBadge({ tier }) {
 }
 
 function ApplyPacModal({ partnerId, partnerName, onClose, onApplied }) {
+  const confirm = useConfirm()
   const [pacs, setPacs] = useState([])
   const [loading, setLoading] = useState(true)
   const [applying, setApplying] = useState(null)
@@ -46,7 +48,12 @@ function ApplyPacModal({ partnerId, partnerName, onClose, onApplied }) {
   }, [])
 
   const apply = async (pacId) => {
-    if (!confirm(`Appliquer ce PAC à ${partnerName} ?\n\nLes affectations existantes seront écrasées pour les clients du PAC.`)) return
+    if (!(await confirm({
+      title: 'Appliquer ce PAC ?',
+      message: `Les affectations existantes de ${partnerName} seront écrasées pour les clients du PAC.`,
+      confirmLabel: 'Appliquer',
+      danger: false,
+    }))) return
     setApplying(pacId)
     try {
       await api.post(`/partners/${partnerId}/apply-pac/${pacId}`)
