@@ -1,9 +1,10 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, BackgroundTasks
 from typing import Optional
 from services.supabase_client import supabase
 from services import storage
 from services.cv_parser import extract_text_from_pdf
-from routers.auth import get_current_user
+from services.matching_runner import auto_rescore_ao
+from routers.auth import get_current_user, is_staff
 import uuid
 
 router = APIRouter(prefix="/submissions", tags=["submissions"])
@@ -23,7 +24,7 @@ def _check_ao_access(ao_id: str, user: dict) -> dict:
     except Exception:
         raise HTTPException(status_code=404, detail="AO introuvable")
 
-    if user["role"] == "admin":
+    if is_staff(user):
         return ao
 
     access = supabase.table("partner_clients").select("tier").eq(
@@ -38,6 +39,7 @@ def _check_ao_access(ao_id: str, user: dict) -> dict:
 
 @router.post("")
 async def create_submission(
+    background_tasks: BackgroundTasks,
     ao_id: str = Form(...),
     consultant_id: Optional[str] = Form(None),
     name: Optional[str] = Form(None),
@@ -134,6 +136,10 @@ async def create_submission(
             pass
         raise HTTPException(status_code=500, detail=f"Erreur création soumission: {str(e)}")
 
+    # Auto-pipeline: every new CV triggers a re-score of the AO so the
+    # ranking stays current without anyone pressing a button.
+    background_tasks.add_task(auto_rescore_ao, ao_id, user["sub"])
+
     sub["consultant"] = consultant
     return sub
 
@@ -146,8 +152,8 @@ async def list_submissions_for_ao(ao_id: str, user: dict = Depends(get_current_u
     """
     _check_ao_access(ao_id, user)
     try:
-        # Admin gets submitter profile; partners only see their own submissions
-        if user["role"] == "admin":
+        # Staff get submitter profile; partners only see their own submissions
+        if is_staff(user):
             select = (
                 "*, "
                 "consultants(id, name, tjm, skills, experience_years, employment_type, availability), "

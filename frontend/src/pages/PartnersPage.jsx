@@ -7,6 +7,7 @@ import {
   Settings2,
 } from 'lucide-react'
 import clsx from 'clsx'
+import { useAuth } from '../contexts/AuthContext'
 import InviteModal from '../components/InviteModal'
 
 // ── Edit modal ────────────────────────────────────────────────────────────────
@@ -108,6 +109,7 @@ function AccessSummary({ summary }) {
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PartnersPage() {
+  const { isAdmin } = useAuth() // commerce: même vue, lecture seule
   const navigate = useNavigate()
   const [partners, setPartners] = useState([])
   const [access, setAccess] = useState([])
@@ -229,12 +231,14 @@ export default function PartnersPage() {
             )}
           </p>
         </div>
-        <button
-          onClick={() => setInviteOpen(true)}
-          className="btn-primary text-xs flex items-center gap-1.5"
-        >
-          <UserPlus size={13} /> Inviter un partenaire
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setInviteOpen(true)}
+            className="btn-primary text-xs flex items-center gap-1.5"
+          >
+            <UserPlus size={13} /> Inviter un partenaire
+          </button>
+        )}
       </div>
 
       {/* Stat pills */}
@@ -333,8 +337,8 @@ export default function PartnersPage() {
                     <Settings2 size={13} />
                   </button>
 
-                  {/* Suspend globally — only if has active access */}
-                  {summary.total > 0 && !isSuspendedEverywhere && (
+                  {/* Write actions — admin only; commerce keeps the same view read-only */}
+                  {isAdmin && summary.total > 0 && !isSuspendedEverywhere && (
                     <button
                       onClick={() => handleSuspend(partner)}
                       disabled={suspending === partner.id}
@@ -347,26 +351,28 @@ export default function PartnersPage() {
                     </button>
                   )}
 
-                  {/* Edit */}
-                  <button
-                    onClick={() => setEditPartner(partner)}
-                    className="btn-ghost p-2"
-                    title="Modifier"
-                  >
-                    <Pencil size={13} />
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => setEditPartner(partner)}
+                      className="btn-ghost p-2"
+                      title="Modifier"
+                    >
+                      <Pencil size={13} />
+                    </button>
+                  )}
 
-                  {/* Delete */}
-                  <button
-                    onClick={() => handleDelete(partner)}
-                    disabled={deleting === partner.id}
-                    className="btn-ghost p-2 hover:text-red-400 transition-colors"
-                    title="Supprimer définitivement"
-                  >
-                    {deleting === partner.id
-                      ? <Loader2 size={13} className="animate-spin" />
-                      : <Trash2 size={13} />}
-                  </button>
+                  {isAdmin && (
+                    <button
+                      onClick={() => handleDelete(partner)}
+                      disabled={deleting === partner.id}
+                      className="btn-ghost p-2 hover:text-red-400 transition-colors"
+                      title="Supprimer définitivement"
+                    >
+                      {deleting === partner.id
+                        ? <Loader2 size={13} className="animate-spin" />
+                        : <X size={13} />}
+                    </button>
+                  )}
                 </div>
               </div>
             )

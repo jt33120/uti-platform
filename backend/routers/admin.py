@@ -1,0 +1,153 @@
+"""
+Admin supervision console (admin only):
+  * accounts  — every profile with role + last connection, delete account
+  * tickets   — support messages with an open/resolved workflow
+  * overview  — high-level KPIs (accounts by role, activity over 30 days)
+"""
+from datetime import datetime, timedelta, timezone
+from fastapi import APIRouter, HTTPException, Depends
+from pydantic import BaseModel
+from typing import Literal
+import httpx
+
+from services.supabase_client import supabase
+from routers.auth import require_admin
+from config import settings
+
+router = APIRouter(prefix="/admin", tags=["admin"])
+
+
+@router.get("/overview")
+async def overview(user: dict = Depends(require_admin)):
+    """KPIs for the supervision page. Each block is best-effort."""
+    since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+
+    def _count(table, **filters):
+        try:
+            q = supabase.table(table).select("id")
+            for k, v in filters.items():
+                q = q.eq(k, v)
+            return len(q.execute().data or [])
+        except Exception:
+            return None
+
+    profiles = []
+    try:
+        profiles = supabase.table("profiles").select("id, role, last_login_at").execute().data or []
+    except Exception:
+        try:
+            profiles = supabase.table("profiles").select("id, role").execute().data or []
+        except Exception:
+            pass
+
+    by_role = {}
+    active_30d = 0
+    for p in profiles:
+        by_role[p["role"]] = by_role.get(p["role"], 0) + 1
+        if p.get("last_login_at") and p["last_login_at"] >= since:
+            active_30d += 1
+
+    def _count_since(table, ts_col):
+        try:
+            rows = supabase.table(table).select("id").gte(ts_col, since).execute().data
+            return len(rows or [])
+        except Exception:
+            return None
+
+    tickets_open = None
+    try:
+        rows = supabase.table("support_messages").select("id, status").execute().data or []
+        tickets_open = sum(1 for r in rows if r.get("status", "open") != "resolved")
+    except Exception:
+        try:
+            tickets_open = len(supabase.table("support_messages").select("id").execute().data or [])
+        except Exception:
+            pass
+
+    return {
+        "accounts_total": len(profiles),
+        "accounts_by_role": by_role,
+        "active_accounts_30d": active_30d,
+        "aos_total": _count("appels_offres"),
+        "aos_open": _count("appels_offres", status="open"),
+        "aos_30d": _count_since("appels_offres", "created_at"),
+        "submissions_30d": _count_since("submissions", "submitted_at"),
+        "matchings_30d": _count_since("matchings", "created_at"),
+        "tickets_open": tickets_open,
+    }
+
+
+@router.get("/accounts")
+async def list_accounts(user: dict = Depends(require_admin)):
+    """All accounts (admin, commerce, partners) + pending invitations."""
+    try:
+        accounts = supabase.table("profiles").select(
+            "id, email, name, role, created_at, last_login_at, avatar_url"
+        ).order("created_at", desc=True).execute().data or []
+    except Exception:
+        # last_login_at column not migrated yet — degrade gracefully
+        accounts = supabase.table("profiles").select(
+            "id, email, name, role, created_at, avatar_url"
+        ).order("created_at", desc=True).execute().data or []
+
+    pending = []
+    try:
+        now = datetime.now(timezone.utc).isoformat()
+        pending = supabase.table("invitations").select(
+            "id, email, name, role, expires_at, created_at"
+        ).is_("used_at", "null").gte("expires_at", now).order(
+            "created_at", desc=True
+        ).execute().data or []
+    except Exception:
+        pass
+
+    return {"accounts": accounts, "pending_invitations": pending}
+
+
+@router.delete("/accounts/{account_id}")
+async def delete_account(account_id: str, user: dict = Depends(require_admin)):
+    """Permanently delete any account (profile + Supabase Auth user)."""
+    if account_id == user["sub"]:
+        raise HTTPException(status_code=400, detail="Vous ne pouvez pas supprimer votre propre compte.")
+    try:
+        supabase.table("profiles").delete().eq("id", account_id).execute()
+        with httpx.Client(timeout=10) as client:
+            client.delete(
+                f"{settings.supabase_url}/auth/v1/admin/users/{account_id}",
+                headers={
+                    "apikey": settings.supabase_service_key,
+                    "Authorization": f"Bearer {settings.supabase_service_key}",
+                },
+            )
+        return {"message": "Compte supprimé"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/tickets")
+async def list_tickets(user: dict = Depends(require_admin)):
+    try:
+        return supabase.table("support_messages").select("*").order(
+            "created_at", desc=True
+        ).execute().data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+class TicketUpdate(BaseModel):
+    status: Literal["open", "resolved"]
+
+
+@router.patch("/tickets/{ticket_id}")
+async def update_ticket(ticket_id: str, body: TicketUpdate, user: dict = Depends(require_admin)):
+    try:
+        response = supabase.table("support_messages").update(
+            {"status": body.status}
+        ).eq("id", ticket_id).execute()
+        if not response.data:
+            raise HTTPException(status_code=404, detail="Ticket introuvable")
+        return response.data[0]
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

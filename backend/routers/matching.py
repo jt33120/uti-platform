@@ -1,8 +1,8 @@
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from services.supabase_client import supabase
-from services.ai_matching import score_consultants_batch
-from routers.auth import get_current_user, require_admin
+from services.matching_runner import run_submission_matching
+from routers.auth import get_current_user, require_staff
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
@@ -13,101 +13,25 @@ class MatchRequest(BaseModel):
 
 
 @router.post("/run")
-async def run_matching(body: MatchRequest, user: dict = Depends(require_admin)):
+async def run_matching(body: MatchRequest, user: dict = Depends(require_staff)):
     """
     Score all consultants who have submitted a CV to this AO.
     Returns the top N scored submissions with breakdown + explanation.
-    Admin only.
+    UTI staff (admin or commerce). Also runs automatically when a new CV
+    is submitted — this endpoint remains for manual re-runs.
     """
     try:
-        ao = supabase.table("appels_offres").select("*").eq("id", body.ao_id).single().execute().data
-    except Exception:
-        raise HTTPException(status_code=404, detail="AO introuvable")
-
-    # Fetch submissions joined with consultant info
-    try:
-        submissions = supabase.table("submissions").select(
-            "id, cv_text, consultant_id, consultants(id, name, tjm, skills, experience_years, employment_type)"
-        ).eq("ao_id", body.ao_id).execute().data
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur récupération soumissions: {str(e)}")
-
-    if not submissions:
-        raise HTTPException(status_code=404, detail="Aucun CV soumis pour cet AO")
-
-    # Build the list the AI service expects. We pass submission.id as the id so
-    # results round-trip back to the right submission row.
-    valid = []
-    for s in submissions:
-        c = s.get("consultants") or {}
-        if not s.get("cv_text"):
-            continue
-        valid.append({
-            "id": s["id"],
-            "consultant_id": s["consultant_id"],
-            "name": c.get("name", "Inconnu"),
-            "tjm": c.get("tjm"),
-            "skills": c.get("skills", ""),
-            "experience_years": c.get("experience_years"),
-            "cv_text": s["cv_text"],
-        })
-
-    if not valid:
-        raise HTTPException(status_code=422, detail="Aucun CV lisible pour cet AO")
-
-    try:
-        all_scores, cost_usd = await score_consultants_batch(ao, valid)
+        return await run_submission_matching(body.ao_id, user["sub"], body.top_n)
+    except LookupError as e:
+        raise HTTPException(status_code=404, detail=str(e))
     except ValueError as e:
         raise HTTPException(status_code=422, detail=str(e))
     except RuntimeError as e:
         raise HTTPException(status_code=502, detail=str(e))
 
-    top_results = all_scores[:body.top_n]
-
-    # Re-map AI results: ai_matching uses "consultant_id" key but we passed
-    # submission.id there. Recover both ids for storage.
-    sub_index = {s["id"]: s for s in valid}
-    for r in top_results:
-        sub_id = r.get("consultant_id")  # this is submission.id from our perspective
-        sub = sub_index.get(sub_id, {})
-        r["submission_id"] = sub_id
-        r["consultant_id"] = sub.get("consultant_id")
-        r["consultant_name"] = sub.get("name")
-        r["consultant_tjm"] = sub.get("tjm")
-        r["consultant_skills"] = sub.get("skills")
-
-    # Persist results: clear previous, insert new
-    try:
-        supabase.table("matchings").delete().eq("ao_id", body.ao_id).execute()
-        for rank, result in enumerate(top_results, start=1):
-            supabase.table("matchings").insert({
-                "ao_id": body.ao_id,
-                "submission_id": result["submission_id"],
-                "consultant_id": result["consultant_id"],
-                "score_total": result["score_total"],
-                "breakdown": result["breakdown"],
-                "points_forts": result["points_forts"],
-                "points_faibles": result["points_faibles"],
-                "resume_matching": result["resume_matching"],
-                "recommandation": result["recommandation"],
-                "rank": rank,
-                "cost_usd": cost_usd,
-                "ran_by": user["sub"],
-            }).execute()
-    except Exception as e:
-        print(f"Warning: Could not save matching results: {e}")
-
-    return {
-        "ao_id": body.ao_id,
-        "ao_title": ao["title"],
-        "total_consultants_evaluated": len(valid),
-        "top_n": body.top_n,
-        "results": top_results,
-    }
-
 
 @router.get("/stats")
-async def get_matching_stats(user: dict = Depends(require_admin)):
+async def get_matching_stats(user: dict = Depends(require_staff)):
     """Get AI matching statistics: total matchings, model used, total cost."""
     try:
         # Try with cost_usd column; fall back if column doesn't exist yet
@@ -120,7 +44,7 @@ async def get_matching_stats(user: dict = Depends(require_admin)):
 
         return {
             "total_matchings": len(matchings),
-            "model_used": "GPT-4o",
+            "model_used": "Claude 3.5 Haiku",
             "total_cost_usd": round(total_cost, 2),
             "status": "active",
         }

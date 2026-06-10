@@ -1,10 +1,11 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from services.supabase_client import supabase
 from services.cv_parser import extract_text_from_pdf, extract_text_from_docx
 from services import ao_drafter
-from routers.auth import get_current_user, require_admin
+from services.matching_runner import run_vivier_matching
+from routers.auth import get_current_user, require_staff, is_staff
 
 router = APIRouter(prefix="/aos", tags=["appels_offres"])
 
@@ -53,7 +54,7 @@ def _accessible_client_ids(user: dict) -> Optional[list[str]]:
     Returns the list of client_ids a partner can see, or None for admin (= all).
     Suspended access is excluded.
     """
-    if user["role"] == "admin":
+    if is_staff(user):
         return None
     access = supabase.table("partner_clients").select("client_id").eq(
         "partner_id", user["sub"]
@@ -70,12 +71,12 @@ async def get_ao_types():
 async def draft_ao(
     pasted_text: str = Form(""),
     files: list[UploadFile] = File(default=[]),
-    user: dict = Depends(require_admin),
+    user: dict = Depends(require_staff),
 ):
     """
     Generate editable AO fields from raw source material: pasted email text and/or
-    attachments (PDF, DOCX, TXT). The admin reviews and edits the result before
-    saving — nothing is persisted here.
+    attachments (PDF, DOCX, TXT). The staff member reviews and edits the result
+    before saving — nothing is persisted here.
     """
     if not ao_drafter.is_available():
         raise HTTPException(status_code=503, detail="Génération IA indisponible (clé OpenRouter non configurée).")
@@ -119,7 +120,7 @@ async def draft_ao(
 
 
 @router.post("")
-async def create_ao(body: AOCreate, user: dict = Depends(require_admin)):
+async def create_ao(body: AOCreate, background_tasks: BackgroundTasks, user: dict = Depends(require_staff)):
     try:
         response = supabase.table("appels_offres").insert({
             "client_id": body.client_id,
@@ -135,7 +136,11 @@ async def create_ao(body: AOCreate, user: dict = Depends(require_admin)):
             "status": "open",
             "created_by": user["sub"],
         }).execute()
-        return response.data[0]
+        ao = response.data[0]
+        # Kick off vivier recommendations right away — staff get suggested
+        # consultants before any partner submits a CV.
+        background_tasks.add_task(run_vivier_matching, ao["id"], user["sub"])
+        return ao
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
@@ -216,9 +221,9 @@ async def get_ao(ao_id: str, user: dict = Depends(get_current_user)):
 
 
 @router.get("/{ao_id}/stats")
-async def get_ao_stats(ao_id: str, user: dict = Depends(require_admin)):
+async def get_ao_stats(ao_id: str, user: dict = Depends(require_staff)):
     """
-    Funnel analytics for an AO (admin only).
+    Funnel analytics for an AO (UTI staff).
 
     Returns, for this AO:
     - partners who *could* answer it (list_1/list_2 access to the AO's client)
@@ -283,7 +288,7 @@ async def get_ao_stats(ao_id: str, user: dict = Depends(require_admin)):
 
 
 @router.patch("/{ao_id}")
-async def update_ao(ao_id: str, body: AOUpdate, user: dict = Depends(require_admin)):
+async def update_ao(ao_id: str, body: AOUpdate, user: dict = Depends(require_staff)):
     try:
         update_data = body.model_dump(exclude_none=True)
         response = supabase.table("appels_offres").update(update_data).eq("id", ao_id).execute()
@@ -292,8 +297,24 @@ async def update_ao(ao_id: str, body: AOUpdate, user: dict = Depends(require_adm
         raise HTTPException(status_code=500, detail=str(e))
 
 
+class BulkDeleteRequest(BaseModel):
+    ids: list[str]
+
+
+@router.post("/bulk-delete")
+async def bulk_delete_aos(body: BulkDeleteRequest, user: dict = Depends(require_staff)):
+    """Delete several AOs in one shot (multi-select on the AO list)."""
+    if not body.ids:
+        raise HTTPException(status_code=422, detail="Aucun AO sélectionné")
+    try:
+        supabase.table("appels_offres").delete().in_("id", body.ids).execute()
+        return {"message": f"{len(body.ids)} AO(s) supprimé(s)", "count": len(body.ids)}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
 @router.delete("/{ao_id}")
-async def delete_ao(ao_id: str, user: dict = Depends(require_admin)):
+async def delete_ao(ao_id: str, user: dict = Depends(require_staff)):
     try:
         supabase.table("appels_offres").delete().eq("id", ao_id).execute()
         return {"message": "AO supprimé"}

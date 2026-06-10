@@ -11,6 +11,11 @@ const SUGGESTIONS = {
     'Montre les AOs par type',
     'Où créer un appel d\'offres ?',
   ],
+  commerce: [
+    "Combien d'AOs ouverts ?",
+    'Montre les AOs par type',
+    'Où créer un appel d\'offres ?',
+  ],
   ao: [
     'Combien de consultants dans mon vivier ?',
     "Voir les appels d'offres",
@@ -103,7 +108,7 @@ export default function AssistantWidget() {
 
   if (!user) return null
 
-  const role = isAdmin ? 'admin' : 'ao'
+  const role = user?.role || 'ao'
 
   const send = async (text) => {
     const content = (text ?? input).trim()

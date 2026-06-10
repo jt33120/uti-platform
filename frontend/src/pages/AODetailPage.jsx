@@ -745,7 +745,8 @@ function AOInsightsChart({ aoId }) {
 // ─── Main page ──────────────────────────────────────────────────
 export default function AODetailPage() {
   const { id } = useParams()
-  const { isAdmin, user } = useAuth()
+  const { isAdmin: isAdminRole, isStaff, user } = useAuth()
+  const isAdmin = isStaff // staff view (admin + commerce) — naming kept to avoid touching every usage below
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -1013,7 +1014,7 @@ export default function AODetailPage() {
                   <SubmissionRow
                     key={s.id}
                     sub={s}
-                    canDelete={isAdmin || s.submitted_by === user.id}
+                    canDelete={isAdminRole || s.submitted_by === user.id}
                     onDelete={handleDeleteSubmission}
                     isAdmin={isAdmin}
                     aoSkillsRequired={ao.skills_required}

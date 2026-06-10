@@ -21,7 +21,7 @@ class RegisterRequest(BaseModel):
     email: EmailStr
     password: str
     name: str
-    role: str  # "admin" or "ao"
+    role: str  # "admin", "commerce" (UTI sales) or "ao" (partner)
     invite_token: Optional[str] = None
 
 
@@ -53,10 +53,25 @@ async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(s
     return decode_token(credentials.credentials)
 
 
+VALID_ROLES = ("admin", "commerce", "ao")
+
+
 async def require_admin(user: dict = Depends(get_current_user)) -> dict:
     if user.get("role") != "admin":
         raise HTTPException(status_code=403, detail="Accès réservé aux administrateurs")
     return user
+
+
+async def require_staff(user: dict = Depends(get_current_user)) -> dict:
+    """UTI internal staff: admin or commerce. Commerce drives AOs + matching
+    but stays read-only on clients/partners governance (those keep require_admin)."""
+    if user.get("role") not in ("admin", "commerce"):
+        raise HTTPException(status_code=403, detail="Accès réservé à l'équipe UTI")
+    return user
+
+
+def is_staff(user: dict) -> bool:
+    return user.get("role") in ("admin", "commerce")
 
 
 async def require_ao(user: dict = Depends(get_current_user)) -> dict:
@@ -145,8 +160,8 @@ async def register(body: RegisterRequest):
         if invitation.get("name"):
             body.name = invitation["name"]
 
-    if body.role not in ("admin", "ao"):
-        raise HTTPException(status_code=400, detail="Rôle invalide. Utilisez 'admin' ou 'ao'.")
+    if body.role not in VALID_ROLES:
+        raise HTTPException(status_code=400, detail="Rôle invalide. Utilisez 'admin', 'commerce' ou 'ao'.")
 
     if len(body.password) < 6:
         raise HTTPException(status_code=422, detail="Le mot de passe doit contenir au moins 6 caractères.")
@@ -291,6 +306,14 @@ async def login(body: LoginRequest):
             status_code=404,
             detail="Profil utilisateur introuvable. Votre compte est peut-être incomplet — réinscrivez-vous."
         )
+
+    # Track last connection (powers the admin supervision page) — best-effort
+    try:
+        supabase.table("profiles").update({
+            "last_login_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", user_id).execute()
+    except Exception:
+        pass
 
     token = create_token(user_id, body.email, profile["role"])
 

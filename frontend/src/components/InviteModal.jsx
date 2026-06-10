@@ -1,10 +1,16 @@
 import { useState, useEffect } from 'react'
-import { X, Copy, Check, Mail, AlertTriangle, Send, Loader2 } from 'lucide-react'
+import { X, Copy, Check, Mail, AlertTriangle, Send, Loader2, Briefcase, BadgePercent } from 'lucide-react'
 import api from '../lib/api'
 
-export default function InviteModal({ onClose }) {
+const INVITE_ROLES = [
+  { value: 'ao', label: 'Partenaire', desc: 'Propose des consultants sur vos AOs', icon: Briefcase },
+  { value: 'commerce', label: 'Commercial UTI', desc: 'Crée les besoins, lance le matching', icon: BadgePercent },
+]
+
+export default function InviteModal({ onClose, defaultRole = 'ao' }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
+  const [role, setRole] = useState(defaultRole)
   const [inviteUrl, setInviteUrl] = useState(null)
   const [inviteToken, setInviteToken] = useState(null)
   const [emailSent, setEmailSent] = useState(false)
@@ -25,7 +31,7 @@ export default function InviteModal({ onClose }) {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post('/invitations', { name, email })
+      const res = await api.post('/invitations', { name, email, role })
       setInviteUrl(res.data.url)
       // Extract token from the returned URL so we can re-send if needed
       try {
@@ -81,7 +87,7 @@ export default function InviteModal({ onClose }) {
         <div className="flex items-start justify-between mb-4">
           <div>
             <h2 className="text-[15px] font-semibold tracking-tightest text-[var(--text)]">
-              Inviter un partenaire
+              Inviter un compte
             </h2>
             <p className="text-[12px] text-[var(--text-muted)] mt-0.5">
               Lien valable 7 jours, à usage unique
@@ -98,11 +104,37 @@ export default function InviteModal({ onClose }) {
         {!inviteUrl ? (
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
-              <label className="label">Nom du partenaire</label>
+              <label className="label">Type de compte</label>
+              <div className="grid grid-cols-2 gap-2">
+                {INVITE_ROLES.map(r => {
+                  const Icon = r.icon
+                  const selected = role === r.value
+                  return (
+                    <button
+                      key={r.value}
+                      type="button"
+                      onClick={() => setRole(r.value)}
+                      className="flex flex-col items-start gap-1 p-2.5 rounded-md text-left transition-colors"
+                      style={{
+                        background: selected ? 'var(--surface-2)' : 'var(--surface)',
+                        border: `1px solid ${selected ? 'var(--text)' : 'var(--border)'}`,
+                      }}
+                    >
+                      <Icon size={14} strokeWidth={1.75} className="text-[var(--text)]" />
+                      <span className="text-[12px] font-semibold text-[var(--text)]">{r.label}</span>
+                      <span className="text-[10.5px] text-[var(--text-faint)] leading-tight">{r.desc}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+
+            <div>
+              <label className="label">Nom affiché</label>
               <input
                 type="text"
                 className="input"
-                placeholder="ex: Partenaire Île-de-France"
+                placeholder={role === 'commerce' ? 'ex: Jean Dupont' : 'ex: Partenaire Île-de-France'}
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
@@ -110,16 +142,16 @@ export default function InviteModal({ onClose }) {
                 minLength={2}
               />
               <p className="text-[11px] text-[var(--text-faint)] mt-1">
-                Ce nom sera fixé sur le compte — le partenaire ne pourra pas le modifier.
+                Ce nom sera fixé sur le compte — l'invité ne pourra pas le modifier.
               </p>
             </div>
 
             <div>
-              <label className="label">Email du partenaire</label>
+              <label className="label">Email</label>
               <input
                 type="email"
                 className="input"
-                placeholder="partenaire@exemple.com"
+                placeholder={role === 'commerce' ? 'prenom.nom@uti-group.com' : 'partenaire@exemple.com'}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
