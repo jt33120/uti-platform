@@ -2,7 +2,7 @@ import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
-from typing import Optional
+from typing import Optional, Literal
 from services.supabase_client import supabase
 from services.email import send_email
 from routers.auth import require_admin
@@ -13,7 +13,8 @@ router = APIRouter(prefix="/invitations", tags=["invitations"])
 
 class CreateInviteRequest(BaseModel):
     email: EmailStr
-    name: str  # Partner name set by admin
+    name: str  # Display name set by admin
+    role: Literal["ao", "commerce"] = "ao"  # partner (default) or UTI sales
 
 
 def _is_expired(expires_at: str) -> bool:
@@ -21,12 +22,13 @@ def _is_expired(expires_at: str) -> bool:
     return dt < datetime.now(timezone.utc)
 
 
-def _send_invite_email(to_email: str, partner_name: str, invite_url: str) -> tuple[bool, Optional[str]]:
+def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: str = "ao") -> tuple[bool, Optional[str]]:
     """
     Send the invitation email via SMTP.
     Returns (success, error_message). Never raises — caller decides what to do.
     """
-    subject = "Invitation — UTI Group Plateforme Partenaires"
+    role_label = "l'équipe commerciale UTI Group" if role == "commerce" else "la plateforme partenaires UTI Group"
+    subject = "Invitation — UTI Group Plateforme"
     html = f"""\
 <!DOCTYPE html>
 <html lang="fr">
@@ -43,7 +45,7 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str) -> tup
             </tr>
             <tr>
               <td style="padding:16px 32px 24px;font-size:15px;line-height:1.55;color:#1d1d1f;">
-                Vous êtes invité(e) à rejoindre la <strong>plateforme partenaires UTI Group</strong>.
+                Vous êtes invité(e) à rejoindre <strong>{role_label}</strong>.
                 Créez votre compte en cliquant sur le bouton ci-dessous.
                 <p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 7 jours.</p>
               </td>
@@ -74,7 +76,7 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str) -> tup
 
     text = (
         f"Bonjour {partner_name},\n\n"
-        "Vous êtes invité(e) à rejoindre la plateforme partenaires UTI Group.\n"
+        f"Vous êtes invité(e) à rejoindre {role_label}.\n"
         "Créez votre compte en ouvrant le lien ci-dessous (usage unique, expire dans 7 jours) :\n\n"
         f"{invite_url}\n\n"
         "Si vous n'attendiez pas cette invitation, ignorez simplement cet email."
@@ -85,13 +87,13 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str) -> tup
 @router.post("")
 async def create_invitation(body: CreateInviteRequest, user: dict = Depends(require_admin)):
     """
-    Create a single-use, time-limited invitation link for a partner (role='ao').
-    The admin sets both the email and the display name of the partner.
-    If a pending unused invite already exists for this email, it is revoked and replaced.
+    Create a single-use, time-limited invitation link for a partner (role='ao')
+    or a UTI sales account (role='commerce'). The admin sets both the email and
+    the display name. A pending unused invite for this email is replaced.
     """
     name = body.name.strip()
     if len(name) < 2:
-        raise HTTPException(status_code=422, detail="Le nom du partenaire doit contenir au moins 2 caractères.")
+        raise HTTPException(status_code=422, detail="Le nom doit contenir au moins 2 caractères.")
 
     # Revoke any existing unused invites for this email
     supabase.table("invitations").delete() \
@@ -104,7 +106,7 @@ async def create_invitation(body: CreateInviteRequest, user: dict = Depends(requ
         "token": token,
         "email": body.email,
         "name": name,
-        "role": "ao",
+        "role": body.role,
         "invited_by": user["sub"],
         "expires_at": expires_at,
     }).execute()
@@ -112,7 +114,7 @@ async def create_invitation(body: CreateInviteRequest, user: dict = Depends(requ
     invite_url = f"{settings.frontend_url}/register?invite={token}"
 
     # Best-effort email send. Failure is non-blocking — admin can still copy the link.
-    email_sent, email_error = _send_invite_email(body.email, name, invite_url)
+    email_sent, email_error = _send_invite_email(body.email, name, invite_url, body.role)
     if not email_sent:
         print(f"[INVITATIONS] Email not sent to {body.email}: {email_error}")
 
@@ -145,7 +147,7 @@ async def resend_invitation(body: ResendInviteRequest, user: dict = Depends(requ
         raise HTTPException(status_code=410, detail="Cette invitation a expiré")
 
     invite_url = f"{settings.frontend_url}/register?invite={body.token}"
-    email_sent, email_error = _send_invite_email(inv["email"], inv.get("name", ""), invite_url)
+    email_sent, email_error = _send_invite_email(inv["email"], inv.get("name", ""), invite_url, inv.get("role", "ao"))
 
     if not email_sent:
         raise HTTPException(status_code=502, detail=f"Échec d'envoi: {email_error}")

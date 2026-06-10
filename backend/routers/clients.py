@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional
 from services.supabase_client import supabase
-from routers.auth import get_current_user, require_admin
+from routers.auth import get_current_user, require_admin, require_staff, is_staff
 
 router = APIRouter(prefix="/clients", tags=["clients"])
 
@@ -57,11 +57,11 @@ async def create_client(body: ClientCreate, user: dict = Depends(require_admin))
 @router.get("")
 async def list_clients(user: dict = Depends(get_current_user)):
     """
-    Admin: sees all clients.
+    Staff (admin/commerce): sees all clients.
     Partner (ao): sees only clients they have list_1 or list_2 access to.
     """
     try:
-        if user["role"] == "admin":
+        if is_staff(user):
             response = supabase.table("clients").select("*").order("name").execute()
             return response.data
 
@@ -86,7 +86,7 @@ async def list_clients(user: dict = Depends(get_current_user)):
 
 
 @router.get("/{client_id}/partners")
-async def list_partners_for_client(client_id: str, user: dict = Depends(require_admin)):
+async def list_partners_for_client(client_id: str, user: dict = Depends(require_staff)):
     """
     Returns all partners (role='ao') with their access tier for this client.
     Partners without any row in partner_clients get tier=None.

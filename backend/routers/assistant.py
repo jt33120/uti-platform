@@ -36,10 +36,10 @@ MODEL = settings.assistant_model
 
 # ── Capability catalog ─────────────────────────────────────────────
 CAPABILITIES = [
-    {"path": "/dashboard", "label": "Tableau de bord", "roles": ["admin", "ao"], "prefill": []},
-    {"path": "/aos", "label": "Liste des appels d'offres", "roles": ["admin", "ao"], "prefill": []},
-    {"path": "/consultants", "label": "Vivier de consultants", "roles": ["admin", "ao"], "prefill": []},
-    {"path": "/clients", "label": "Clients", "roles": ["admin", "ao"], "prefill": []},
+    {"path": "/dashboard", "label": "Tableau de bord", "roles": ["admin", "commerce", "ao"], "prefill": []},
+    {"path": "/aos", "label": "Liste des appels d'offres", "roles": ["admin", "commerce", "ao"], "prefill": []},
+    {"path": "/consultants", "label": "Vivier de consultants", "roles": ["admin", "commerce", "ao"], "prefill": []},
+    {"path": "/clients", "label": "Clients", "roles": ["admin", "commerce", "ao"], "prefill": []},
     {
         "path": "/consultants/new",
         "label": "Ajouter un consultant au vivier",
@@ -49,14 +49,15 @@ CAPABILITIES = [
     {
         "path": "/aos/new",
         "label": "Créer un appel d'offres",
-        "roles": ["admin"],
+        "roles": ["admin", "commerce"],
         "prefill": ["title", "description", "skills_required", "budget_max", "location", "duration", "context", "ao_type", "deadline"],
     },
     {"path": "/clients/new", "label": "Créer un client", "roles": ["admin"], "prefill": []},
-    {"path": "/partners", "label": "Partenaires", "roles": ["admin"], "prefill": []},
-    {"path": "/partners-access", "label": "Accès partenaires", "roles": ["admin"], "prefill": []},
-    {"path": "/graph", "label": "Cartographie", "roles": ["admin"], "prefill": []},
+    {"path": "/partners", "label": "Partenaires", "roles": ["admin", "commerce"], "prefill": []},
+    {"path": "/partners-access", "label": "Accès partenaires", "roles": ["admin", "commerce"], "prefill": []},
+    {"path": "/graph", "label": "Cartographie", "roles": ["admin", "commerce"], "prefill": []},
     {"path": "/pacs", "label": "PACs", "roles": ["admin"], "prefill": []},
+    {"path": "/admin", "label": "Supervision (comptes, tickets, KPIs)", "roles": ["admin"], "prefill": []},
 ]
 
 
@@ -83,7 +84,7 @@ class ChatResponse(BaseModel):
 def _build_data_context(user: dict) -> str:
     role = user.get("role")
     try:
-        if role == "admin":
+        if role in ("admin", "commerce"):
             consultants = supabase.table("consultants").select(
                 "name, skills, experience_years, tjm, employment_type").limit(50).execute().data or []
             aos = supabase.table("appels_offres").select(
@@ -119,7 +120,7 @@ def _build_data_context(user: dict) -> str:
         parts.append(f"Consultants ({len(consultants)}) : " + "; ".join(cons_line(c) for c in consultants[:40]))
         parts.append(f"Appels d'offres ({len(aos)}, dont {open_n} ouverts) : " + "; ".join(ao_line(a) for a in aos[:40]))
         parts.append(f"Clients ({len(clients)}) : " + "; ".join(f"{c['name']} [{c.get('sector') or '?'}]" for c in clients[:40]))
-        if role == "admin":
+        if role in ("admin", "commerce"):
             acc_count = {}
             for r in access:
                 if r["tier"] in ("list_1", "list_2"):
@@ -133,7 +134,7 @@ def _build_data_context(user: dict) -> str:
 
 
 def _build_system_prompt(role: str) -> str:
-    role_label = "administrateur" if role == "admin" else "partenaire"
+    role_label = {"admin": "administrateur", "commerce": "commercial UTI"}.get(role, "partenaire")
     caps = _allowed(role)
     catalog = "\n".join(
         f"- {c['path']} : {c['label']}" + (f" (pré-remplissable : {', '.join(c['prefill'])})" if c["prefill"] else "")
@@ -232,7 +233,7 @@ def _fallback(messages: list[ChatMessage], role: str) -> ChatResponse:
     def nav(path, cta):
         return [{"type": "navigate", "path": path, "prefill": None, "cta": cta}] if path in caps else []
 
-    if role == "admin" and any(w in last for w in ["créer un ao", "creer un ao", "nouvel ao", "nouvel appel", "créer un appel", "creer un appel"]):
+    if role in ("admin", "commerce") and any(w in last for w in ["créer un ao", "creer un ao", "nouvel ao", "nouvel appel", "créer un appel", "creer un appel"]):
         return ChatResponse(reply="Je vous amène au formulaire d'appel d'offres. Vous validez vous-même.", actions=nav("/aos/new", "Ouvrir le formulaire d'AO"))
     if any(w in last for w in ["ajouter un consultant", "nouveau consultant", "ajouter au vivier"]):
         return ChatResponse(reply="Direction l'ajout de consultant. Vérifiez puis validez vous-même.", actions=nav("/consultants/new", "Ouvrir le formulaire consultant"))

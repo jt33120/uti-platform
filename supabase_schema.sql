@@ -8,13 +8,15 @@ CREATE TABLE IF NOT EXISTS public.profiles (
   id          UUID PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   email       TEXT NOT NULL UNIQUE,
   name        TEXT NOT NULL,
-  role        TEXT NOT NULL CHECK (role IN ('admin', 'ao')),
+  role        TEXT NOT NULL CHECK (role IN ('admin', 'commerce', 'ao')),
   avatar_url  TEXT,
+  last_login_at TIMESTAMPTZ,
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Add avatar_url to existing deployments
+-- Add avatar_url / last_login_at to existing deployments
 ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS avatar_url TEXT;
+ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 
 -- 2. Clients
 --    Dimension de cloisonnement : chaque AO et chaque partenaire
@@ -125,7 +127,7 @@ CREATE TABLE IF NOT EXISTS public.invitations (
   token      TEXT NOT NULL UNIQUE,
   email      TEXT NOT NULL,
   name       TEXT,
-  role       TEXT NOT NULL DEFAULT 'ao' CHECK (role IN ('admin', 'ao')),
+  role       TEXT NOT NULL DEFAULT 'ao' CHECK (role IN ('admin', 'commerce', 'ao')),
   invited_by UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
   expires_at TIMESTAMPTZ NOT NULL,
   used_at    TIMESTAMPTZ,
@@ -207,6 +209,7 @@ CREATE TABLE IF NOT EXISTS public.support_messages (
   type        TEXT NOT NULL DEFAULT 'question' CHECK (type IN ('bug', 'question', 'suggestion', 'other')),
   subject     TEXT NOT NULL,
   message     TEXT NOT NULL,
+  status      TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'resolved')),
   created_at  TIMESTAMPTZ DEFAULT NOW()
 );
 

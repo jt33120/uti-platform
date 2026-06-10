@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, Literal
 from services.supabase_client import supabase
-from routers.auth import get_current_user, require_admin
+from routers.auth import get_current_user, require_admin, require_staff
 from config import settings
 import httpx
 
@@ -20,7 +20,7 @@ class PartnerUpdate(BaseModel):
 
 
 @router.get("")
-async def list_partners(user: dict = Depends(require_admin)):
+async def list_partners(user: dict = Depends(require_staff)):
     """List all users with role='ao' (partners)."""
     try:
         response = supabase.table("profiles").select(
@@ -32,7 +32,7 @@ async def list_partners(user: dict = Depends(require_admin)):
 
 
 @router.get("/access")
-async def list_all_access(user: dict = Depends(require_admin)):
+async def list_all_access(user: dict = Depends(require_staff)):
     """Return all partner_clients rows. Used to build the access matrix UI."""
     try:
         response = supabase.table("partner_clients").select("*").execute()
@@ -42,7 +42,7 @@ async def list_all_access(user: dict = Depends(require_admin)):
 
 
 @router.get("/{partner_id}/clients")
-async def list_clients_for_partner(partner_id: str, user: dict = Depends(require_admin)):
+async def list_clients_for_partner(partner_id: str, user: dict = Depends(require_staff)):
     """
     Returns all clients with this partner's tier for each.
     Clients without any row in partner_clients get tier=None.
