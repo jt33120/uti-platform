@@ -109,7 +109,7 @@ function ClientEditModal({ client, onClose, onSaved }) {
 export default function ClientDetailPage() {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { isAdmin } = useAuth()
+  const { isAdmin, isStaff } = useAuth()
 
   const [client, setClient] = useState(null)
   const [aos, setAos] = useState([])
@@ -143,7 +143,8 @@ export default function ClientDetailPage() {
   }, [id])
 
   const fetchPartners = useCallback(async () => {
-    if (!isAdmin) { setLoadingPartners(false); return }
+    // Staff only — commerce gets the same view in read-only
+    if (!isStaff) { setLoadingPartners(false); return }
     try {
       const { data } = await api.get(`/clients/${id}/partners`)
       setPartners(data)
@@ -152,7 +153,7 @@ export default function ClientDetailPage() {
     } finally {
       setLoadingPartners(false)
     }
-  }, [id, isAdmin])
+  }, [id, isStaff])
 
   useEffect(() => {
     fetchClient()
@@ -254,7 +255,7 @@ export default function ClientDetailPage() {
                 <FileText size={13} className="text-brand-400" /> Appels d'Offres
                 <span className="text-slate-600 font-normal">({aos.length})</span>
               </h2>
-              {isAdmin && (
+              {isStaff && (
                 <Link to="/aos/new" className="btn-ghost text-xs py-1 px-2.5 flex items-center gap-1">
                   <Plus size={12} /> Nouvel AO
                 </Link>
@@ -277,8 +278,8 @@ export default function ClientDetailPage() {
           </div>
         </div>
 
-        {/* Right: Partner selection (admin only) */}
-        {isAdmin && (
+        {/* Right: Partner access — admin edits, commerce reads */}
+        {isStaff && (
           <div className="space-y-5">
             <div className="card p-5 space-y-3">
               <div className="flex items-center justify-between">
@@ -290,7 +291,9 @@ export default function ClientDetailPage() {
                 </Link>
               </div>
               <p className="text-[11px] text-slate-600">
-                Définissez le niveau d'accès de chaque partenaire pour ce client.
+                {isAdmin
+                  ? "Définissez le niveau d'accès de chaque partenaire pour ce client."
+                  : "Niveaux d'accès des partenaires pour ce client (lecture seule)."}
               </p>
 
               {loadingPartners ? (
@@ -321,21 +324,28 @@ export default function ClientDetailPage() {
                           <CheckCircle2 size={12} className="text-emerald-500/60 shrink-0" />
                         )}
                       </div>
-                      <div className="relative">
-                        <select
-                          value={p.tier || ''}
-                          onChange={e => handleTierChange(p.id, e.target.value)}
-                          disabled={savingPartner === p.id}
-                          className="input appearance-none pr-7 text-[11px] py-1.5 w-full"
-                        >
-                          {TIER_OPTIONS.map(o => (
-                            <option key={o.value} value={o.value} className="bg-navy-900">
-                              {o.label}
-                            </option>
-                          ))}
-                        </select>
-                        <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                      </div>
+                      {isAdmin ? (
+                        <div className="relative">
+                          <select
+                            value={p.tier || ''}
+                            onChange={e => handleTierChange(p.id, e.target.value)}
+                            disabled={savingPartner === p.id}
+                            className="input appearance-none pr-7 text-[11px] py-1.5 w-full"
+                          >
+                            {TIER_OPTIONS.map(o => (
+                              <option key={o.value} value={o.value} className="bg-navy-900">
+                                {o.label}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                        </div>
+                      ) : (
+                        <div className="text-[11px] px-2 py-1 rounded"
+                             style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                          {TIER_OPTIONS.find(o => o.value === (p.tier || ''))?.label || 'Aucun accès'}
+                        </div>
+                      )}
                     </div>
                   ))}
                 </div>

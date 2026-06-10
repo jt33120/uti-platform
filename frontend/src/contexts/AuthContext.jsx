@@ -74,10 +74,12 @@ export function AuthProvider({ children }) {
   }
 
   const isAdmin = user?.role === 'admin'
+  const isCommerce = user?.role === 'commerce'
+  const isStaff = isAdmin || isCommerce // équipe UTI (admin + commercial)
   const isAO = user?.role === 'ao'
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isAO, updateProfile, uploadAvatar, deleteAvatar }}>
+    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isCommerce, isStaff, isAO, updateProfile, uploadAvatar, deleteAvatar }}>
       {children}
     </AuthContext.Provider>
   )

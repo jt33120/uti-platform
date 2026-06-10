@@ -22,13 +22,18 @@ import PacsPage from './pages/PacsPage'
 
 // Lazy — keeps the graph library out of the main bundle
 const GraphPage = lazy(() => import('./pages/GraphPage'))
+const AdminPage = lazy(() => import('./pages/AdminPage'))
 
-function ProtectedRoute({ children, adminOnly = false }) {
+// roles: array of allowed roles; omitted = any authenticated user.
+function ProtectedRoute({ children, roles = null }) {
   const { user } = useAuth()
   if (!user) return <Navigate to="/login" replace />
-  if (adminOnly && user.role !== 'admin') return <Navigate to="/dashboard" replace />
+  if (roles && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />
   return children
 }
+
+const STAFF = ['admin', 'commerce']
+const ADMIN = ['admin']
 
 function GuestRoute({ children }) {
   const { user } = useAuth()
@@ -53,20 +58,27 @@ export default function App() {
           <Route path="/consultants" element={<ConsultantsPage />} />
           <Route path="/consultants/new" element={<NewConsultantPage />} />
           <Route path="/aos" element={<AOSPage />} />
-          <Route path="/aos/new" element={<ProtectedRoute adminOnly><NewAOPage /></ProtectedRoute>} />
-          <Route path="/clients/new" element={<ProtectedRoute adminOnly><NewClientPage /></ProtectedRoute>} />
+          <Route path="/aos/new" element={<ProtectedRoute roles={STAFF}><NewAOPage /></ProtectedRoute>} />
+          <Route path="/clients/new" element={<ProtectedRoute roles={ADMIN}><NewClientPage /></ProtectedRoute>} />
           <Route path="/aos/:id" element={<AODetailPage />} />
-          <Route path="/partners" element={<ProtectedRoute adminOnly><PartnersPage /></ProtectedRoute>} />
-          <Route path="/partners/:id" element={<ProtectedRoute adminOnly><PartnerDetailPage /></ProtectedRoute>} />
-          <Route path="/partners-access" element={<ProtectedRoute adminOnly><PartnerAccessPage /></ProtectedRoute>} />
+          <Route path="/partners" element={<ProtectedRoute roles={STAFF}><PartnersPage /></ProtectedRoute>} />
+          <Route path="/partners/:id" element={<ProtectedRoute roles={STAFF}><PartnerDetailPage /></ProtectedRoute>} />
+          <Route path="/partners-access" element={<ProtectedRoute roles={STAFF}><PartnerAccessPage /></ProtectedRoute>} />
           <Route path="/graph" element={
-            <ProtectedRoute adminOnly>
+            <ProtectedRoute roles={STAFF}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement de la cartographie…</div>}>
                 <GraphPage />
               </Suspense>
             </ProtectedRoute>
           } />
-          <Route path="/pacs" element={<ProtectedRoute adminOnly><PacsPage /></ProtectedRoute>} />
+          <Route path="/pacs" element={<ProtectedRoute roles={ADMIN}><PacsPage /></ProtectedRoute>} />
+          <Route path="/admin" element={
+            <ProtectedRoute roles={ADMIN}>
+              <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
+                <AdminPage />
+              </Suspense>
+            </ProtectedRoute>
+          } />
         </Route>
       </Routes>
     </AuthProvider>

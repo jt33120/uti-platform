@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
   Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
-  HelpCircle, Mail, Compass
+  HelpCircle, Mail, Compass, Gauge
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
@@ -24,6 +24,16 @@ const ADMIN_STEPS = [
   { selector: '[data-tour="nav-new-ao"]', title: 'Créer un AO', text: 'Le raccourci pour publier un nouvel appel d’offres en quelques secondes.' },
   { selector: '[data-tour="assistant"]', title: 'Assistant', text: 'Votre copilote : il vous guide vers la bonne page et pré-remplit les formulaires — mais ne valide jamais à votre place.' },
   { selector: '[data-tour="theme"]', title: 'Thème clair / sombre', text: 'Basculez l’apparence quand vous le souhaitez.' },
+]
+
+const COMMERCE_STEPS = [
+  { selector: '[data-tour="brand"]', title: 'Bienvenue 👋', text: "Voici un tour rapide de votre espace commercial UTI. Vous pouvez le passer à tout moment." },
+  { selector: '[data-tour="nav-aos"]', title: "Appels d'offres", text: "Votre cœur de métier : créez les besoins clients et suivez-les. Le matching IA se lance automatiquement à chaque CV reçu — et dès la création, des consultants du vivier vous sont recommandés." },
+  { selector: '[data-tour="nav-new-ao"]', title: 'Créer un AO', text: "Le raccourci pour publier un besoin en quelques secondes — l'IA peut le générer depuis un email." },
+  { selector: '[data-tour="nav-consultants"]', title: 'Vivier de consultants', text: "Tous les consultants des partenaires, en consultation. Un bouton vous permet de contacter directement le partenaire porteur." },
+  { selector: '[data-tour="nav-clients"]', title: 'Clients', text: "Tous les clients, en lecture : la création et la modification restent réservées aux administrateurs." },
+  { selector: '[data-tour="nav-partners"]', title: 'Partenaires', text: "La même vue que les administrateurs, en lecture seule — les rattachements partenaires ↔ clients ne sont pas modifiables." },
+  { selector: '[data-tour="assistant"]', title: 'Assistant', text: 'Votre copilote : il répond sur vos données, vous guide et pré-remplit les formulaires — sans jamais valider à votre place.' },
 ]
 
 const AO_STEPS = [
@@ -73,7 +83,7 @@ const SectionLabel = ({ children }) => (
 )
 
 export default function Layout() {
-  const { user, logout, isAdmin } = useAuth()
+  const { user, logout, isAdmin, isCommerce, isStaff } = useAuth()
   const navigate = useNavigate()
 
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
@@ -146,9 +156,9 @@ export default function Layout() {
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
           <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" end tour="nav-dashboard" />
-          <NavItem to="/aos" icon={FileText} label={isAdmin ? "Appels d'offres" : "Mes AOs"} tour="nav-aos" />
-          <NavItem to="/clients" icon={Building2} label={isAdmin ? "Clients" : "Mes clients"} tour="nav-clients" />
-          <NavItem to="/consultants" icon={Users} label={isAdmin ? "Consultants" : "Mes consultants"} tour="nav-consultants" />
+          <NavItem to="/aos" icon={FileText} label={isStaff ? "Appels d'offres" : "Mes AOs"} tour="nav-aos" />
+          <NavItem to="/clients" icon={Building2} label={isStaff ? "Clients" : "Mes clients"} tour="nav-clients" />
+          <NavItem to="/consultants" icon={Users} label={isStaff ? "Consultants" : "Mes consultants"} tour="nav-consultants" />
 
           {isAdmin && (
             <>
@@ -156,14 +166,27 @@ export default function Layout() {
               <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
               <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
               <NavItem to="/clients/new" icon={Plus} label="Nouveau client" />
-              <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter partenaire" />
+              <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
               <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
               <NavItem to="/graph" icon={Compass} label="Cartographie" />
               <NavItem to="/pacs" icon={Package} label="PACs" />
+              <SectionLabel>Administration</SectionLabel>
+              <NavItem to="/admin" icon={Gauge} label="Supervision" />
             </>
           )}
 
-          {!isAdmin && (
+          {isCommerce && (
+            <>
+              <SectionLabel>Raccourcis</SectionLabel>
+              <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
+              <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
+              <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
+              <NavItem to="/graph" icon={Compass} label="Cartographie" />
+              <NavButton onClick={() => openContact('question')} icon={Mail} label="Contacter l'équipe" tour="nav-contact" />
+            </>
+          )}
+
+          {!isStaff && (
             <>
               <SectionLabel>Raccourcis</SectionLabel>
               <NavItem to="/consultants/new" icon={Plus} label="Ajouter consultant" tour="nav-add-consultant" />
@@ -223,7 +246,7 @@ export default function Layout() {
             <div className="flex-1 min-w-0 text-left">
               <div className="text-[12px] font-medium truncate text-[var(--text)]">{user?.name}</div>
               <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">
-                {user?.role === 'admin' ? 'Administrateur' : 'Partenaire'}
+                {user?.role === 'admin' ? 'Administrateur' : user?.role === 'commerce' ? 'Commercial UTI' : 'Partenaire'}
               </div>
             </div>
           </button>
@@ -268,7 +291,7 @@ export default function Layout() {
       {/* First-login guided tour (role-aware, shown once) */}
       {showTour && (
         <OnboardingTour
-          steps={isAdmin ? ADMIN_STEPS : AO_STEPS}
+          steps={isAdmin ? ADMIN_STEPS : isCommerce ? COMMERCE_STEPS : AO_STEPS}
           onClose={finishTour}
         />
       )}

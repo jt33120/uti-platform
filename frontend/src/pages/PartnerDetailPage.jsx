@@ -1,6 +1,7 @@
 import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useParams, useNavigate, Link } from 'react-router-dom'
 import api from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowLeft, Loader2, UserCircle2, Mail, Building2, Search,
   Star, ListChecks, Ban, AlertCircle, ChevronDown, CheckCircle2,
@@ -119,6 +120,7 @@ function ApplyPacModal({ partnerId, partnerName, onClose, onApplied }) {
 }
 
 export default function PartnerDetailPage() {
+  const { isAdmin } = useAuth() // commerce : même vue, lecture seule
   const { id } = useParams()
   const navigate = useNavigate()
 
@@ -201,12 +203,14 @@ export default function PartnerDetailPage() {
             <Mail size={11} /> {partner.email}
           </p>
         </div>
-        <button
-          onClick={() => setShowPac(true)}
-          className="btn-primary text-xs flex items-center gap-1.5"
-        >
-          <Package size={13} /> Appliquer un PAC
-        </button>
+        {isAdmin && (
+          <button
+            onClick={() => setShowPac(true)}
+            className="btn-primary text-xs flex items-center gap-1.5"
+          >
+            <Package size={13} /> Appliquer un PAC
+          </button>
+        )}
       </div>
 
       {/* Stat pills */}
@@ -254,7 +258,9 @@ export default function PartnerDetailPage() {
           </Link>
         </div>
         <p className="text-[11px] text-slate-600">
-          Définissez pour chaque client le niveau d'accès de {partner.name}.
+          {isAdmin
+            ? `Définissez pour chaque client le niveau d'accès de ${partner.name}.`
+            : `Niveaux d'accès de ${partner.name} par client (lecture seule).`}
         </p>
 
         {filtered.length === 0 ? (
@@ -288,21 +294,28 @@ export default function PartnerDetailPage() {
                 {savingClient !== c.id && c.tier && c.tier !== 'suspended' && (
                   <CheckCircle2 size={12} className="text-emerald-500/60 shrink-0" />
                 )}
-                <div className="relative w-44 shrink-0">
-                  <select
-                    value={c.tier || ''}
-                    onChange={e => handleTierChange(c.id, e.target.value)}
-                    disabled={savingClient === c.id}
-                    className="input appearance-none pr-7 text-[11px] py-1.5 w-full"
-                  >
-                    {TIER_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value} className="bg-navy-900">
-                        {o.label}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-                </div>
+                {isAdmin ? (
+                  <div className="relative w-44 shrink-0">
+                    <select
+                      value={c.tier || ''}
+                      onChange={e => handleTierChange(c.id, e.target.value)}
+                      disabled={savingClient === c.id}
+                      className="input appearance-none pr-7 text-[11px] py-1.5 w-full"
+                    >
+                      {TIER_OPTIONS.map(o => (
+                        <option key={o.value} value={o.value} className="bg-navy-900">
+                          {o.label}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown size={11} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                  </div>
+                ) : (
+                  <div className="w-44 shrink-0 text-[11px] px-2 py-1.5 rounded text-center"
+                       style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}>
+                    {TIER_OPTIONS.find(o => o.value === (c.tier || ''))?.label || 'Aucun accès'}
+                  </div>
+                )}
               </div>
             ))}
           </div>

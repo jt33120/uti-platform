@@ -55,7 +55,7 @@ function QuickAction({ to, onClick, icon: Icon, title, desc }) {
 }
 
 export default function DashboardPage() {
-  const { user, isAdmin } = useAuth()
+  const { user, isAdmin, isCommerce, isStaff } = useAuth()
   const [inviteOpen, setInviteOpen] = useState(false)
   const [consultants, setConsultants] = useState([])
   const [aos, setAos] = useState([])
@@ -71,8 +71,8 @@ export default function DashboardPage() {
         settle(api.get('/consultants')),
         settle(api.get('/aos')),
         settle(api.get('/clients')),
-        isAdmin ? Promise.resolve({ ok: false }) : settle(api.get('/submissions/mine')),
-        isAdmin ? settle(api.get('/matching/stats')) : Promise.resolve({ ok: false }),
+        isStaff ? Promise.resolve({ ok: false }) : settle(api.get('/submissions/mine')),
+        isStaff ? settle(api.get('/matching/stats')) : Promise.resolve({ ok: false }),
       ])
       if (c.ok) setConsultants(c.data)
       if (a.ok) setAos(a.data)
@@ -82,7 +82,7 @@ export default function DashboardPage() {
       setLoading(false)
     }
     run()
-  }, [isAdmin])
+  }, [isStaff])
 
   const d = useMemo(() => {
     const open = aos.filter(a => a.status === 'open').length
@@ -131,7 +131,7 @@ export default function DashboardPage() {
           Bonjour, {user?.name?.split(' ')[0]}
         </h1>
         <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-          {isAdmin ? "Pilotez vos appels d'offres et le scoring IA en un coup d'œil." : 'Soumettez des consultants et suivez les appels d\'offres.'}
+          {isStaff ? "Pilotez vos appels d'offres et le scoring IA en un coup d'œil." : 'Soumettez des consultants et suivez les appels d\'offres.'}
         </p>
       </div>
 
@@ -139,11 +139,11 @@ export default function DashboardPage() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-6 pt-7 pb-8" style={hairline}>
         <Kpi icon={Users} label="Consultants" value={consultants.length} to="/consultants"
           sub={d.avgTjm ? `TJM moy. ${d.avgTjm} €` : null} />
-        <Kpi icon={Briefcase} label={isAdmin ? "Appels d'offres" : 'Mes AOs'} value={aos.length} to="/aos"
+        <Kpi icon={Briefcase} label={isStaff ? "Appels d'offres" : 'Mes AOs'} value={aos.length} to="/aos"
           sub={`${d.open} ouvert${d.open > 1 ? 's' : ''}`} />
         <Kpi icon={Building2} label="Clients" value={clients.length} to="/clients"
           sub={d.sectors.length ? `${d.sectors.length} secteurs` : null} />
-        {isAdmin
+        {isStaff
           ? <Kpi icon={Sparkles} label="Matchings IA" value={ai.matchings}
               sub={ai.cost != null ? `${ai.model || '—'} · $${ai.cost}` : ai.model} />
           : <Kpi icon={FileText} label="CVs soumis" value={submissions} />}
@@ -221,10 +221,10 @@ export default function DashboardPage() {
         <div>
           <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold mb-1.5" style={{ color: 'var(--text-faint)' }}>Raccourcis</h2>
           <div className="divide-y" style={{ borderColor: 'var(--border)' }}>
-            {isAdmin && <QuickAction to="/aos/new" icon={Plus} title="Nouvel appel d'offres" desc="IA : générer depuis un email" />}
+            {isStaff && <QuickAction to="/aos/new" icon={Plus} title="Nouvel appel d'offres" desc="IA : générer depuis un email" />}
             {isAdmin && <QuickAction to="/clients/new" icon={Building2} title="Nouveau client" desc="Créer un dossier client" />}
-            <QuickAction to="/consultants/new" icon={Users} title="Ajouter un consultant" desc="Profil + CV PDF" />
-            {isAdmin && <QuickAction onClick={() => setInviteOpen(true)} icon={UserPlus} title="Inviter un partenaire" desc="Lien sécurisé à 7 jours" />}
+            {!isCommerce && <QuickAction to="/consultants/new" icon={Users} title="Ajouter un consultant" desc="Profil + CV PDF" />}
+            {isAdmin && <QuickAction onClick={() => setInviteOpen(true)} icon={UserPlus} title="Inviter un compte" desc="Partenaire ou commercial UTI" />}
           </div>
         </div>
       </div>

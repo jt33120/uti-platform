@@ -107,11 +107,8 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="text-center text-[13px] text-[var(--text-muted)] mt-6">
-          Pas encore de compte ?{' '}
-          <Link to="/register" className="font-medium text-[var(--text)] hover:underline underline-offset-2">
-            S'inscrire
-          </Link>
+        <p className="text-center text-[12px] text-[var(--text-faint)] mt-6">
+          L'accès à la plateforme se fait uniquement sur invitation.
         </p>
       </div>
     </div>

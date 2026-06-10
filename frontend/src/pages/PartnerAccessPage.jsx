@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../lib/api'
+import { useAuth } from '../contexts/AuthContext'
 import {
   Building2, Users, Loader2, AlertCircle, ChevronDown,
   Star, ListChecks, Ban, UserCircle2, ShieldOff, GripVertical,
@@ -25,12 +26,12 @@ function Avatar({ name, size = 28 }) {
   )
 }
 
-function PartnerCard({ partner, onDragStart }) {
+function PartnerCard({ partner, onDragStart, readOnly }) {
   return (
     <div
-      draggable
-      onDragStart={onDragStart}
-      className="flex items-center gap-2.5 p-2.5 rounded-lg cursor-grab active:cursor-grabbing transition-all duration-150 group"
+      draggable={!readOnly}
+      onDragStart={readOnly ? undefined : onDragStart}
+      className={`flex items-center gap-2.5 p-2.5 rounded-lg transition-all duration-150 group ${readOnly ? '' : 'cursor-grab active:cursor-grabbing'}`}
       style={{ background: 'var(--surface)', border: '1px solid var(--border)' }}
     >
       <Avatar name={partner.name} />
@@ -38,12 +39,12 @@ function PartnerCard({ partner, onDragStart }) {
         <div className="text-xs font-semibold truncate" style={{ color: 'var(--text)' }}>{partner.name}</div>
         <div className="text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>{partner.email}</div>
       </div>
-      <GripVertical size={13} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--text-faint)' }} />
+      {!readOnly && <GripVertical size={13} className="opacity-0 group-hover:opacity-100 transition-opacity" style={{ color: 'var(--text-faint)' }} />}
     </div>
   )
 }
 
-function Column({ col, partners, onDrop, onDragOver, onDragLeave, isTarget }) {
+function Column({ col, partners, onDrop, onDragOver, onDragLeave, isTarget, readOnly }) {
   const Icon = col.icon
   return (
     <div
@@ -68,11 +69,12 @@ function Column({ col, partners, onDrop, onDragOver, onDragLeave, isTarget }) {
       <div className="space-y-1.5">
         {partners.length === 0 ? (
           <div className="text-[11px] text-center py-8 italic" style={{ color: 'var(--text-faint)' }}>
-            Glissez un partenaire ici
+            {readOnly ? 'Aucun partenaire' : 'Glissez un partenaire ici'}
           </div>
         ) : (
           partners.map(p => (
-            <PartnerCard key={p.id} partner={p} onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)} />
+            <PartnerCard key={p.id} partner={p} readOnly={readOnly}
+              onDragStart={(e) => e.dataTransfer.setData('partnerId', p.id)} />
           ))
         )}
       </div>
@@ -81,6 +83,8 @@ function Column({ col, partners, onDrop, onDragOver, onDragLeave, isTarget }) {
 }
 
 export default function PartnerAccessPage() {
+  const { isAdmin } = useAuth() // commerce : même vue, lecture seule
+  const readOnly = !isAdmin
   const [clients, setClients] = useState([])
   const [partners, setPartners] = useState([])
   const [access, setAccess] = useState([])
@@ -198,7 +202,9 @@ export default function PartnerAccessPage() {
             Accès partenaires
           </h1>
           <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            Sélectionnez un client, puis glissez-déposez les partenaires entre les listes.
+            {readOnly
+              ? 'Sélectionnez un client pour consulter les listes — lecture seule (modifications réservées aux administrateurs).'
+              : 'Sélectionnez un client, puis glissez-déposez les partenaires entre les listes.'}
           </p>
         </div>
         {saving && (
@@ -241,10 +247,11 @@ export default function PartnerAccessPage() {
                 key={col.key}
                 col={col}
                 partners={grouped[col.key]}
-                isTarget={dragTarget === col.key}
-                onDragOver={(e) => { e.preventDefault(); setDragTarget(col.key) }}
-                onDragLeave={() => setDragTarget(t => (t === col.key ? null : t))}
-                onDrop={(e) => { e.preventDefault(); handleDrop(col.key, e.dataTransfer.getData('partnerId')) }}
+                readOnly={readOnly}
+                isTarget={!readOnly && dragTarget === col.key}
+                onDragOver={readOnly ? undefined : (e) => { e.preventDefault(); setDragTarget(col.key) }}
+                onDragLeave={readOnly ? undefined : () => setDragTarget(t => (t === col.key ? null : t))}
+                onDrop={readOnly ? undefined : (e) => { e.preventDefault(); handleDrop(col.key, e.dataTransfer.getData('partnerId')) }}
               />
             ))}
           </div>
@@ -254,7 +261,8 @@ export default function PartnerAccessPage() {
             Les partenaires de la <span style={{ color: 'var(--accent-text)', fontWeight: 600 }}>Liste 1</span> sont prioritaires sur les AOs de ce client.
           </p>
 
-          {/* Global suspension */}
+          {/* Global suspension — admin only */}
+          {isAdmin && (
           <div className="mt-8">
             <h2 className="text-xs font-semibold uppercase tracking-widest mb-3 flex items-center gap-2" style={{ color: 'var(--text-muted)' }}>
               <ShieldOff size={13} style={{ color: 'var(--danger)' }} /> Suspension globale
@@ -289,6 +297,7 @@ export default function PartnerAccessPage() {
               })}
             </div>
           </div>
+          )}
         </>
       )}
     </div>

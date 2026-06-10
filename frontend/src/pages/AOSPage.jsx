@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   FileText, Plus, Euro, MapPin, Clock, ArrowRight, Search,
   Building2, Users, Star, ListChecks, Calendar, CalendarClock,
-  Pencil, Trash2, X, Loader2, ChevronDown,
+  Pencil, X, Loader2, ChevronDown, Check, Trash2,
 } from 'lucide-react'
 
 const formatDate = (iso) => {
@@ -184,13 +184,31 @@ function AOEditModal({ ao, onClose, onSaved }) {
 }
 
 // ── AO card ───────────────────────────────────────────────────────────────────
-function AOCard({ ao, isAdmin, onEdit, onDelete, navigate }) {
+function AOCard({ ao, isStaff, onEdit, onDelete, navigate, selected, onToggleSelect }) {
   const isOpen = ao.status === 'open'
   return (
     <div
-      className="card p-4 hover:border-white/10 transition-all duration-150 group cursor-pointer"
+      className="card p-4 hover:border-white/10 transition-all duration-150 group cursor-pointer relative"
+      style={selected ? { borderColor: 'var(--accent)', boxShadow: '0 0 0 1px var(--accent)' } : undefined}
       onClick={() => navigate(`/aos/${ao.id}`)}
     >
+      {isStaff && (
+        <button
+          onClick={e => { e.stopPropagation(); onToggleSelect(ao.id) }}
+          className={clsx(
+            'absolute -top-2 -left-2 w-5 h-5 rounded-md flex items-center justify-center transition-all z-10',
+            selected ? '' : 'opacity-0 group-hover:opacity-100'
+          )}
+          style={{
+            background: selected ? 'var(--accent)' : 'var(--surface)',
+            border: `1px solid ${selected ? 'var(--accent)' : 'var(--border-strong)'}`,
+            color: '#fff',
+          }}
+          title={selected ? 'Désélectionner' : 'Sélectionner'}
+        >
+          {selected && <Check size={12} strokeWidth={3} />}
+        </button>
+      )}
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="flex-1 min-w-0">
           {ao.clients?.name && (
@@ -265,7 +283,7 @@ function AOCard({ ao, isAdmin, onEdit, onDelete, navigate }) {
             {formatDate(ao.created_at)}
           </span>
         )}
-        {isAdmin ? (
+        {isStaff ? (
           <>
             <span className="flex items-center gap-1 ml-auto text-brand-300">
               <Users size={10} />
@@ -284,7 +302,7 @@ function AOCard({ ao, isAdmin, onEdit, onDelete, navigate }) {
                 className="btn-ghost p-1.5 hover:text-red-400"
                 title="Supprimer"
               >
-                <Trash2 size={12} />
+                <X size={13} />
               </button>
             </div>
           </>
@@ -297,7 +315,7 @@ function AOCard({ ao, isAdmin, onEdit, onDelete, navigate }) {
 }
 
 export default function AOSPage() {
-  const { isAdmin } = useAuth()
+  const { isStaff } = useAuth()
   const navigate = useNavigate()
   const [aos, setAos] = useState([])
   const [loading, setLoading] = useState(true)
@@ -307,6 +325,8 @@ export default function AOSPage() {
   const [groupBy, setGroupBy] = useState('client') // 'client' | 'none'
   const [editAo, setEditAo] = useState(null)
   const [deleting, setDeleting] = useState(null)
+  const [selected, setSelected] = useState(() => new Set())
+  const [bulkDeleting, setBulkDeleting] = useState(false)
 
   const fetchAos = () =>
     api.get('/aos')
@@ -319,10 +339,36 @@ export default function AOSPage() {
     try {
       await api.delete(`/aos/${ao.id}`)
       setAos(p => p.filter(a => a.id !== ao.id))
+      setSelected(p => { const n = new Set(p); n.delete(ao.id); return n })
     } catch (e) {
       alert(e.response?.data?.detail || 'Erreur lors de la suppression')
     } finally {
       setDeleting(null)
+    }
+  }
+
+  const toggleSelect = (id) => {
+    setSelected(p => {
+      const n = new Set(p)
+      n.has(id) ? n.delete(id) : n.add(id)
+      return n
+    })
+  }
+
+  const handleBulkDelete = async () => {
+    const n = selected.size
+    if (!n) return
+    if (!confirm(`Supprimer ${n} AO${n > 1 ? 's' : ''} ? Cette action est irréversible.`)) return
+    setBulkDeleting(true)
+    try {
+      const ids = Array.from(selected)
+      await api.post('/aos/bulk-delete', { ids })
+      setAos(p => p.filter(a => !selected.has(a.id)))
+      setSelected(new Set())
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Erreur lors de la suppression')
+    } finally {
+      setBulkDeleting(false)
     }
   }
 
@@ -370,22 +416,30 @@ export default function AOSPage() {
       <div className="page-header">
         <div>
           <h1 className="section-title flex items-center gap-2">
-            <FileText size={20} className="text-brand-400" />
+            <FileText size={20} strokeWidth={1.75} style={{ color: 'var(--accent-text)' }} />
             Appels d'Offres
             <span className="text-sm font-normal text-slate-500">({aos.length})</span>
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            {isAdmin
+            {isStaff
               ? 'Cliquez sur un AO — le matching IA se lance automatiquement'
               : 'Cliquez sur un AO pour proposer un consultant'}
           </p>
         </div>
-        {isAdmin && (
-          <Link to="/aos/new" className="btn-primary">
-            <Plus size={15} />
-            Nouvel AO
-          </Link>
-        )}
+        <div className="flex items-center gap-2">
+          {isStaff && selected.size > 0 && (
+            <button onClick={handleBulkDelete} disabled={bulkDeleting} className="btn-danger">
+              {bulkDeleting ? <Loader2 size={14} className="animate-spin" /> : <Trash2 size={14} strokeWidth={1.75} />}
+              Supprimer ({selected.size})
+            </button>
+          )}
+          {isStaff && (
+            <Link to="/aos/new" className="btn-primary">
+              <Plus size={15} />
+              Nouvel AO
+            </Link>
+          )}
+        </div>
       </div>
 
       <div className="flex gap-3 mb-5 flex-wrap">
@@ -445,7 +499,7 @@ export default function AOSPage() {
           <p className="text-slate-500 text-sm">
             {search ? 'Aucun résultat' : 'Aucun appel d\'offres accessible pour le moment'}
           </p>
-          {isAdmin && (
+          {isStaff && (
             <Link to="/aos/new" className="btn-primary mt-4 mx-auto">
               <Plus size={14} /> Créer le premier AO
             </Link>
@@ -463,10 +517,12 @@ export default function AOSPage() {
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
                 {group.items.map(ao => (
-                  <AOCard key={ao.id} ao={ao} isAdmin={isAdmin}
+                  <AOCard key={ao.id} ao={ao} isStaff={isStaff}
                     navigate={navigate}
                     onEdit={setEditAo}
                     onDelete={handleDeleteAo}
+                    selected={selected.has(ao.id)}
+                    onToggleSelect={toggleSelect}
                   />
                 ))}
               </div>
@@ -476,10 +532,12 @@ export default function AOSPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {sorted.map(ao => (
-            <AOCard key={ao.id} ao={ao} isAdmin={isAdmin}
+            <AOCard key={ao.id} ao={ao} isStaff={isStaff}
               navigate={navigate}
               onEdit={setEditAo}
               onDelete={handleDeleteAo}
+              selected={selected.has(ao.id)}
+              onToggleSelect={toggleSelect}
             />
           ))}
         </div>
