@@ -145,7 +145,7 @@ export default function Layout() {
         style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)' }}
       >
         {/* Brand */}
-        <div data-tour="brand" className="px-4 h-14 flex items-center gap-2.5" style={{ borderBottom: '1px solid var(--border)' }}>
+        <div data-tour="brand" className="px-4 h-14 flex items-center gap-2.5" style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}>
           <img src="/logo.jpeg" alt="UTI Group" className="h-7 w-7 rounded object-cover" />
           <div className="leading-tight">
             <div className="text-[13px] font-semibold tracking-tightest text-[var(--text)]">UTI Group</div>
@@ -262,7 +262,7 @@ export default function Layout() {
         {/* Top bar */}
         <div
           className="h-14 flex items-center justify-end gap-1 px-6"
-          style={{ borderBottom: '1px solid var(--border)' }}
+          style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}
         >
           <button
             onClick={() => openContact('bug')}
