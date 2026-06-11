@@ -2,23 +2,26 @@ import { useState, useRef, useEffect } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import api from '../lib/api'
+import UTILoader from './UTILoader'
 import { Sparkles, X, Minus, Send, Loader2, ArrowRight, Eye } from 'lucide-react'
 
-// Role-aware starter suggestions — showcase the 3 capabilities: Q&A, chart, highlight.
+// Role-aware starter suggestions — showcase the capabilities: data Q&A, chart, highlight.
 const SUGGESTIONS = {
   admin: [
     "Combien d'AOs ouverts ?",
-    'Montre les AOs par type',
-    'Où créer un appel d\'offres ?',
+    'TJM moyen du vivier ?',
+    'Montre les clients par secteur',
+    "Où créer un appel d'offres ?",
   ],
   commerce: [
     "Combien d'AOs ouverts ?",
     'Montre les AOs par type',
-    'Où créer un appel d\'offres ?',
+    'TJM moyen du vivier ?',
+    "Où créer un appel d'offres ?",
   ],
   ao: [
     'Combien de consultants dans mon vivier ?',
-    "Voir les appels d'offres",
+    'Quels AOs sont ouverts ?',
     'Où ajouter un consultant ?',
   ],
 }
@@ -261,10 +264,10 @@ export default function AssistantWidget() {
             {loading && (
               <div className="flex justify-start">
                 <div
-                  className="px-3 py-2 rounded-lg flex items-center gap-2 text-[13px]"
+                  className="px-3 py-2 rounded-lg flex items-center gap-2.5 text-[12px]"
                   style={{ background: 'var(--surface-2)', color: 'var(--text-muted)' }}
                 >
-                  <Loader2 size={13} className="animate-spin" /> …
+                  <UTILoader size={18} /> Analyse de vos données…
                 </div>
               </div>
             )}
