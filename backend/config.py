@@ -34,6 +34,13 @@ class Settings(BaseSettings):
     assistant_openrouter_key: Optional[str] = None
     assistant_model: str = "anthropic/claude-3.5-sonnet"
 
+    # MIP RUM — distributed tracing (optional; unset = middleware inactive).
+    # Read here because pydantic-settings loads .env without exporting to
+    # os.environ, which the middleware would otherwise rely on.
+    mip_rum_endpoint: Optional[str] = None
+    mip_rum_app_id: Optional[str] = None
+    mip_rum_api_key: Optional[str] = None
+
     model_config = {
         "env_file": ".env",
         "extra": "ignore",

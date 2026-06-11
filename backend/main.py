@@ -14,7 +14,14 @@ app = FastAPI(
 # ── MIP RUM — tracing distribué (inactif sans MIP_RUM_ENDPOINT/MIP_RUM_APP_ID) ──
 # Lit le traceparent posé par le snippet RUM du frontend et expédie un span
 # http.server (route template + durée + statut, rien d'autre) vers MIP RUM.
-app.add_middleware(MIPRumMiddleware)
+# Config via settings : le .env est chargé par pydantic-settings, pas exporté
+# dans os.environ.
+app.add_middleware(
+    MIPRumMiddleware,
+    endpoint=settings.mip_rum_endpoint,
+    app_id=settings.mip_rum_app_id,
+    api_key=settings.mip_rum_api_key,
+)
 
 def is_allowed_origin(origin: str) -> bool:
     """Check if origin is allowed (production URL, localhost, or Vercel preview)."""
