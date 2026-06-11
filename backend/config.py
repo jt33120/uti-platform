@@ -31,8 +31,10 @@ class Settings(BaseSettings):
 
     # In-app AI assistant — optional dedicated OpenRouter key + model
     # (falls back to openrouter_key when unset)
+    # NB: claude-3.5-sonnet was retired upstream (Oct 2025) — requests to it
+    # error out and the assistant silently degrades to its keyword fallback.
     assistant_openrouter_key: Optional[str] = None
-    assistant_model: str = "anthropic/claude-3.5-sonnet"
+    assistant_model: str = "anthropic/claude-sonnet-4.5"
 
     # MIP RUM — distributed tracing (optional; unset = middleware inactive).
     # Read here because pydantic-settings loads .env without exporting to

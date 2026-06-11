@@ -274,6 +274,46 @@ html.dark {
   box-shadow: var(--btn-inset), var(--btn-shadow);
 }
 
+/* ── UTI loader — "Orbital scan" signature spinner (components/UTILoader.jsx)
+   Comet sweep accelerates through the pass (a radar, not a spin); the
+   counter-arc runs at exactly 2× the period so the loop closes seamlessly;
+   the core breathes in sync; echo dots flash as the comet head passes them.
+   Transform/opacity only → GPU-composited. Cycle: var(--uti-dur, 1.1s). */
+.uti-spin .uti-comet, .uti-spin .uti-inner, .uti-spin .uti-core {
+  transform-box: view-box;
+  transform-origin: center;
+}
+@keyframes uti-sweep   { to { transform: rotate(360deg); } }
+@keyframes uti-counter { to { transform: rotate(-360deg); } }
+@keyframes uti-breathe {
+  0%, 100% { transform: scale(1);   opacity: 0.6; }
+  50%      { transform: scale(1.3); opacity: 1; }
+}
+@keyframes uti-echo { 0%, 4%, 16%, 100% { opacity: 0.18; } 10% { opacity: 0.95; } }
+.uti-comet { animation: uti-sweep var(--uti-dur, 1.1s) cubic-bezier(0.55, 0.08, 0.3, 0.96) infinite; }
+.uti-inner { animation: uti-counter calc(var(--uti-dur, 1.1s) * 2) linear infinite; }
+.uti-core  { animation: uti-breathe var(--uti-dur, 1.1s) cubic-bezier(0.45, 0, 0.55, 1) infinite; }
+.uti-echo  { opacity: 0.18; animation: uti-echo var(--uti-dur, 1.1s) linear infinite; }
+
+/* Inline shimmer for KPI numbers while their data loads */
+@keyframes uti-shimmer { to { background-position: -200% 0; } }
+.uti-skel {
+  display: inline-block;
+  height: 0.85em;
+  width: 2.2ch;
+  border-radius: 6px;
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--border) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%;
+  animation: uti-shimmer 1.3s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .uti-spin * { animation: none !important; }
+  /* frozen 270° arc — still unambiguously a loading state, zero movement */
+  .uti-spin .uti-arc { stroke-dasharray: 94.2 31.5; }
+  .uti-skel { animation: none; }
+}
+
 /* Score ring animation — kept but no auto-playing slide-ups elsewhere */
 @keyframes score-fill {
   from { stroke-dashoffset: 283; }

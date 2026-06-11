@@ -7,6 +7,7 @@ import {
   Briefcase, Layers, Zap, Award, BarChart3,
 } from 'lucide-react'
 import InviteModal from '../components/InviteModal'
+import UTILoader, { ChartLoader } from '../components/UTILoader'
 import { ChartCard, EmptyHint, Donut, Legend, VBars, HBars, BRAND, NEUTRAL } from '../components/charts'
 
 const parseSkills = (s) => (s || '').split(/[,;/]+/).map(x => x.trim()).filter(Boolean)
@@ -135,18 +136,19 @@ export default function DashboardPage() {
         </p>
       </div>
 
-      {/* Stat band — no boxes. Numbers carry the weight; hairlines do the splitting. */}
+      {/* Stat band — no boxes. Numbers carry the weight; hairlines do the splitting.
+          While data loads, a quiet shimmer holds each number's place. */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-6 pt-7 pb-8" style={hairline}>
-        <Kpi icon={Users} label="Consultants" value={consultants.length} to="/consultants"
-          sub={d.avgTjm ? `TJM moy. ${d.avgTjm} €` : null} />
-        <Kpi icon={Briefcase} label={isStaff ? "Appels d'offres" : 'Mes AOs'} value={aos.length} to="/aos"
-          sub={`${d.open} ouvert${d.open > 1 ? 's' : ''}`} />
-        <Kpi icon={Building2} label="Clients" value={clients.length} to="/clients"
-          sub={d.sectors.length ? `${d.sectors.length} secteurs` : null} />
+        <Kpi icon={Users} label="Consultants" value={loading ? <span className="uti-skel" /> : consultants.length} to="/consultants"
+          sub={!loading && d.avgTjm ? `TJM moy. ${d.avgTjm} €` : null} />
+        <Kpi icon={Briefcase} label={isStaff ? "Appels d'offres" : 'Mes AOs'} value={loading ? <span className="uti-skel" /> : aos.length} to="/aos"
+          sub={loading ? null : `${d.open} ouvert${d.open > 1 ? 's' : ''}`} />
+        <Kpi icon={Building2} label="Clients" value={loading ? <span className="uti-skel" /> : clients.length} to="/clients"
+          sub={!loading && d.sectors.length ? `${d.sectors.length} secteurs` : null} />
         {isStaff
-          ? <Kpi icon={Sparkles} label="Matchings IA" value={ai.matchings}
-              sub={ai.cost != null ? `${ai.model || '—'} · $${ai.cost}` : ai.model} />
-          : <Kpi icon={FileText} label="CVs soumis" value={submissions} />}
+          ? <Kpi icon={Sparkles} label="Matchings IA" value={loading ? <span className="uti-skel" /> : ai.matchings}
+              sub={!loading && ai.cost != null ? `${ai.model || '—'} · $${ai.cost}` : (!loading ? ai.model : null)} />
+          : <Kpi icon={FileText} label="CVs soumis" value={loading ? <span className="uti-skel" /> : submissions} />}
       </div>
 
       {/* Analyse — frameless charts on the page surface, split by whitespace.
@@ -154,22 +156,24 @@ export default function DashboardPage() {
       <div className="pt-7" style={hairline}>
         <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold mb-5" style={{ color: 'var(--text-faint)' }}>Analyse</h2>
 
+        {/* Each plot carries its own loader while the data is in flight,
+            sized to the chart it replaces so the grid never jumps. */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-x-8 gap-y-9 mb-9">
           <ChartCard title="Appels d'offres par type" icon={Layers} className="lg:col-span-2">
-            {d.aoTypes.length ? <VBars data={d.aoTypes} /> : <EmptyHint />}
+            {loading ? <ChartLoader /> : d.aoTypes.length ? <VBars data={d.aoTypes} /> : <EmptyHint />}
           </ChartCard>
           <ChartCard title="Statut des AO" icon={BarChart3}>
-            {d.aoStatus.length ? <><Donut data={d.aoStatus} centerLabel="AO" /><Legend data={d.aoStatus} /></> : <EmptyHint />}
+            {loading ? <ChartLoader height={212} /> : d.aoStatus.length ? <><Donut data={d.aoStatus} centerLabel="AO" /><Legend data={d.aoStatus} /></> : <EmptyHint />}
           </ChartCard>
 
           <ChartCard title="Top compétences demandées" icon={Zap}>
-            {d.topSkills.length ? <HBars data={d.topSkills} /> : <EmptyHint />}
+            {loading ? <ChartLoader height={200} /> : d.topSkills.length ? <HBars data={d.topSkills} /> : <EmptyHint />}
           </ChartCard>
           <ChartCard title="Séniorité du vivier" icon={Award}>
-            {consultants.length ? <VBars data={d.seniority} /> : <EmptyHint />}
+            {loading ? <ChartLoader /> : consultants.length ? <VBars data={d.seniority} /> : <EmptyHint />}
           </ChartCard>
           <ChartCard title="Clients par secteur" icon={Building2}>
-            {d.sectors.length ? <><Donut data={d.sectors} centerLabel="clients" /><Legend data={d.sectors} /></> : <EmptyHint />}
+            {loading ? <ChartLoader height={212} /> : d.sectors.length ? <><Donut data={d.sectors} centerLabel="clients" /><Legend data={d.sectors} /></> : <EmptyHint />}
           </ChartCard>
         </div>
       </div>
@@ -187,7 +191,9 @@ export default function DashboardPage() {
             </Link>
           </div>
           {loading ? (
-            <div className="py-10 text-center text-[13px]" style={{ color: 'var(--text-faint)' }}>Chargement…</div>
+            <div className="py-10 flex justify-center">
+              <UTILoader size={34} label="Chargement…" />
+            </div>
           ) : recentAOs.length === 0 ? (
             <div className="py-10 text-center text-[13px]" style={{ color: 'var(--text-faint)' }}>Aucun appel d'offres pour le moment.</div>
           ) : (
