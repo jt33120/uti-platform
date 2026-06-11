@@ -3,12 +3,18 @@ from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings
 from routers import auth, consultants, aos, matching, clients, partners, submissions, invitations, pacs, support, assistant, admin
+from mip_rum_middleware import MIPRumMiddleware
 
 app = FastAPI(
     title="G-IT Plateforme Partenaires — POC",
     description="API de matching IA entre consultants et Appels d'Offres",
     version="0.1.0",
 )
+
+# ── MIP RUM — tracing distribué (inactif sans MIP_RUM_ENDPOINT/MIP_RUM_APP_ID) ──
+# Lit le traceparent posé par le snippet RUM du frontend et expédie un span
+# http.server (route template + durée + statut, rien d'autre) vers MIP RUM.
+app.add_middleware(MIPRumMiddleware)
 
 def is_allowed_origin(origin: str) -> bool:
     """Check if origin is allowed (production URL, localhost, or Vercel preview)."""
@@ -42,7 +48,7 @@ async def cors_middleware(request: Request, call_next):
                     "Access-Control-Allow-Origin": origin,
                     "Access-Control-Allow-Credentials": "true",
                     "Access-Control-Allow-Methods": "GET, POST, PUT, PATCH, DELETE, OPTIONS",
-                    "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin",
+                    "Access-Control-Allow-Headers": "Authorization, Content-Type, Accept, Origin, traceparent, tracestate",
                     "Access-Control-Max-Age": "600",
                 },
             )
