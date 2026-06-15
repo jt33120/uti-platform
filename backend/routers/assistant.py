@@ -31,6 +31,7 @@ from openai import AsyncOpenAI
 
 from config import settings
 from services.supabase_client import supabase
+from services.ratelimit import rate_limit
 from routers.auth import get_current_user
 
 router = APIRouter(prefix="/assistant", tags=["assistant"])
@@ -723,7 +724,7 @@ def _fallback(messages: list[ChatMessage], role: str, snap: Optional[dict]) -> C
     )
 
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat", response_model=ChatResponse, dependencies=[Depends(rate_limit(20, 60))])
 async def chat(body: ChatRequest, user: dict = Depends(get_current_user)):
     role = user.get("role", "ao")
     snap = _build_snapshot(user)

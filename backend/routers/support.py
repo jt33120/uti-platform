@@ -4,6 +4,7 @@ from typing import Literal, Optional
 from routers.auth import get_current_user
 from services.supabase_client import supabase
 from services.email import send_email
+from services.ratelimit import rate_limit
 from config import settings
 
 router = APIRouter(prefix="/support", tags=["support"])
@@ -91,7 +92,7 @@ def _send_support_email(
     )
 
 
-@router.post("/contact")
+@router.post("/contact", dependencies=[Depends(rate_limit(5, 300))])
 async def contact(body: ContactRequest, user: dict = Depends(get_current_user)):
     if not body.subject.strip():
         raise HTTPException(status_code=422, detail="Le sujet est requis.")

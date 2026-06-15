@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from services.supabase_client import supabase
 from services.matching_runner import run_submission_matching
 from routers.auth import get_current_user, require_staff
+from services.ratelimit import rate_limit
 
 router = APIRouter(prefix="/matching", tags=["matching"])
 
@@ -12,7 +13,7 @@ class MatchRequest(BaseModel):
     top_n: int = 3
 
 
-@router.post("/run")
+@router.post("/run", dependencies=[Depends(rate_limit(10, 60))])
 async def run_matching(body: MatchRequest, user: dict = Depends(require_staff)):
     """
     Score all consultants who have submitted a CV to this AO.

@@ -128,8 +128,9 @@ def _parse_supabase_error(error_msg: str) -> tuple[int, str]:
     if "connection" in msg or "timeout" in msg or "could not connect" in msg:
         return 503, "Impossible de joindre Supabase. Vérifiez votre SUPABASE_URL et votre connexion réseau."
 
-    # ── Fallback with raw message for debugging ───────────────────
-    return 400, f"Erreur d'inscription : {error_msg}"
+    # ── Fallback — generic to the client; the raw message stays in logs ──
+    print(f"[AUTH] unmapped registration error: {error_msg}")
+    return 400, "Inscription impossible pour le moment. Réessayez ou contactez le support."
 
 
 @router.post("/register")

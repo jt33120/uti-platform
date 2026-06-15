@@ -5,6 +5,7 @@ from services.supabase_client import supabase
 from services.cv_parser import extract_text_from_pdf, extract_text_from_docx
 from services import ao_drafter
 from services.matching_runner import run_vivier_matching
+from services.ratelimit import rate_limit
 from routers.auth import get_current_user, require_staff, is_staff
 
 router = APIRouter(prefix="/aos", tags=["appels_offres"])
@@ -67,7 +68,7 @@ async def get_ao_types():
     return AO_TYPES
 
 
-@router.post("/draft")
+@router.post("/draft", dependencies=[Depends(rate_limit(10, 60))])
 async def draft_ao(
     pasted_text: str = Form(""),
     files: list[UploadFile] = File(default=[]),
