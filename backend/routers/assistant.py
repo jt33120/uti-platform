@@ -57,7 +57,8 @@ CAPABILITIES = [
     {"path": "/partners-access", "label": "Accès partenaires", "roles": ["admin", "commerce"], "prefill": []},
     {"path": "/graph", "label": "Cartographie", "roles": ["admin", "commerce"], "prefill": []},
     {"path": "/pacs", "label": "PACs", "roles": ["admin"], "prefill": []},
-    {"path": "/admin", "label": "Supervision (comptes, tickets, KPIs)", "roles": ["admin"], "prefill": []},
+    {"path": "/admin", "label": "Admin comptes Utilisateurs", "roles": ["admin"], "prefill": []},
+    {"path": "/tickets", "label": "Tickets support", "roles": ["admin"], "prefill": []},
 ]
 
 

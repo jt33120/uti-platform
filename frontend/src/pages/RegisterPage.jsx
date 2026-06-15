@@ -46,9 +46,9 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
       <div className="w-full max-w-[380px]">
         <div className="flex items-center gap-2.5 mb-8">
-          <img src="/logo.jpeg" alt="UTI Group" className="h-8 w-8 rounded object-cover" />
+          <img src="/logo.jpeg" alt="GROUPEMENT-IT" className="h-8 w-8 rounded object-cover" />
           <div className="leading-tight">
-            <div className="text-[14px] font-semibold tracking-tightest text-[var(--text)]">UTI Group</div>
+            <div className="text-[14px] font-semibold tracking-tightest text-[var(--text)]">GROUPEMENT-IT</div>
             <div className="text-[11px] text-[var(--text-faint)]">Plateforme Partenaires</div>
           </div>
         </div>
