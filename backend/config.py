@@ -7,6 +7,9 @@ class Settings(BaseSettings):
     openai_api_key: Optional[str] = None
     openrouter_key: Optional[str] = None
     jwt_secret: str = "change-me-in-production"
+    # Deployment environment: "production" (default, hardened) or "dev"/"local".
+    # Drives /docs exposure, security headers and the JWT-secret guard below.
+    app_env: str = "production"
     frontend_url: str = "https://git-alpha-hazel.vercel.app"
     resend_key: Optional[str] = None
     resend_from: str = "UTI Group <onboarding@resend.dev>"
@@ -49,3 +52,25 @@ class Settings(BaseSettings):
     }
 
 settings = Settings()
+
+# ── Security guards ────────────────────────────────────────────────
+INSECURE_JWT_DEFAULT = "change-me-in-production"
+
+
+def is_prod() -> bool:
+    return settings.app_env.lower() in ("prod", "production")
+
+
+# Fail-closed: a known signing secret means anyone can forge admin tokens.
+# Refuse to boot in production with the default; warn loudly in dev.
+if settings.jwt_secret == INSECURE_JWT_DEFAULT:
+    if is_prod():
+        raise RuntimeError(
+            "JWT_SECRET non configuré (valeur par défaut détectée). "
+            "Générez un secret fort et placez-le dans backend/.env :\n"
+            "    JWT_SECRET=$(openssl rand -hex 32)\n"
+            "Sans cela, n'importe qui peut forger des jetons d'authentification "
+            "(y compris admin). Pour le développement local : APP_ENV=dev."
+        )
+    print("[CONFIG] ⚠️  JWT_SECRET par défaut — OK en dev, à NE JAMAIS utiliser en prod.")
+

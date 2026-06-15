@@ -3,6 +3,7 @@ from pydantic import BaseModel
 from typing import Optional, Literal
 from services.supabase_client import supabase
 from services.email import send_email
+from services.ratelimit import rate_limit
 from routers.auth import get_current_user, require_staff, is_staff
 
 router = APIRouter(prefix="/consultants", tags=["consultants"])
@@ -108,7 +109,7 @@ class ContactPartnerRequest(BaseModel):
     message: str
 
 
-@router.post("/{consultant_id}/contact-partner")
+@router.post("/{consultant_id}/contact-partner", dependencies=[Depends(rate_limit(10, 300))])
 async def contact_partner(consultant_id: str, body: ContactPartnerRequest, user: dict = Depends(require_staff)):
     """
     Email the partner who carries this consultant. The message is written by
