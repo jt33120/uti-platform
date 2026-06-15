@@ -66,7 +66,9 @@ def _apply_security_headers(response: Response) -> None:
     response.headers["Content-Security-Policy"] = "default-src 'none'; frame-ancestors 'none'"
     if IS_PROD:
         response.headers["Strict-Transport-Security"] = "max-age=63072000; includeSubDomains"
-    response.headers.pop("server", None)  # ne pas révéler le framework/serveur
+    # Starlette MutableHeaders n'a pas .pop() — suppression sûre du header Server.
+    if "server" in response.headers:
+        del response.headers["server"]
 
 
 @app.exception_handler(Exception)
