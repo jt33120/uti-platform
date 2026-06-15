@@ -24,6 +24,7 @@ import PacsPage from './pages/PacsPage'
 // Lazy — keeps the graph library out of the main bundle
 const GraphPage = lazy(() => import('./pages/GraphPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
+const TicketsPage = lazy(() => import('./pages/TicketsPage'))
 
 // roles: array of allowed roles; omitted = any authenticated user.
 function ProtectedRoute({ children, roles = null }) {
@@ -78,6 +79,13 @@ export default function App() {
             <ProtectedRoute roles={ADMIN}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
                 <AdminPage />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/tickets" element={
+            <ProtectedRoute roles={ADMIN}>
+              <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
+                <TicketsPage />
               </Suspense>
             </ProtectedRoute>
           } />

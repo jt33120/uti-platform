@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
   Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
-  HelpCircle, Mail, Compass, Gauge
+  HelpCircle, Mail, Compass, Gauge, Ticket
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
@@ -166,12 +166,14 @@ export default function Layout() {
               <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
               <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
               <NavItem to="/clients/new" icon={Plus} label="Nouveau client" />
-              <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
-              <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
               <NavItem to="/graph" icon={Compass} label="Cartographie" />
               <NavItem to="/pacs" icon={Package} label="PACs" />
+              <NavItem to="/tickets" icon={Ticket} label="Tickets support" />
+
               <SectionLabel>Administration</SectionLabel>
-              <NavItem to="/admin" icon={Gauge} label="Supervision" />
+              <NavItem to="/admin" icon={Gauge} label="Admin comptes Utilisateurs" />
+              <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
+              <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
             </>
           )}
 

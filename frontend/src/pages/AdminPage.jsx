@@ -3,8 +3,8 @@ import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useConfirm } from '../contexts/ConfirmContext'
 import {
-  Gauge, Users, FileText, Sparkles, Ticket, UserPlus, X, Loader2,
-  Shield, Briefcase, BadgePercent, Check, RotateCcw, Inbox,
+  Gauge, Users, FileText, Sparkles, UserPlus, X, Loader2,
+  Shield, Briefcase, BadgePercent,
 } from 'lucide-react'
 import InviteModal from '../components/InviteModal'
 
@@ -53,23 +53,18 @@ export default function AdminPage() {
   const [overview, setOverview] = useState(null)
   const [accounts, setAccounts] = useState([])
   const [pending, setPending] = useState([])
-  const [tickets, setTickets] = useState([])
   const [loading, setLoading] = useState(true)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
-  const [ticketBusy, setTicketBusy] = useState(null)
-  const [ticketFilter, setTicketFilter] = useState('open')
 
   const load = async () => {
     const settle = (p) => p.then(r => ({ ok: true, data: r.data })).catch(() => ({ ok: false }))
-    const [o, a, t] = await Promise.all([
+    const [o, a] = await Promise.all([
       settle(api.get('/admin/overview')),
       settle(api.get('/admin/accounts')),
-      settle(api.get('/admin/tickets')),
     ])
     if (o.ok) setOverview(o.data)
     if (a.ok) { setAccounts(a.data.accounts || []); setPending(a.data.pending_invitations || []) }
-    if (t.ok) setTickets(t.data)
     setLoading(false)
   }
 
@@ -98,26 +93,10 @@ export default function AdminPage() {
     }
   }
 
-  const setTicketStatus = async (ticket, status) => {
-    setTicketBusy(ticket.id)
-    try {
-      await api.patch(`/admin/tickets/${ticket.id}`, { status })
-      setTickets(p => p.map(t => (t.id === ticket.id ? { ...t, status } : t)))
-    } catch (e) {
-      alert(e.response?.data?.detail || 'Erreur de mise à jour du ticket')
-    } finally {
-      setTicketBusy(null)
-    }
-  }
-
-  const shownTickets = tickets.filter(t =>
-    ticketFilter === 'all' ? true : (t.status || 'open') === ticketFilter
-  )
-  const openCount = tickets.filter(t => (t.status || 'open') === 'open').length
   const hairline = { borderTop: '1px solid var(--border)' }
 
   if (loading) {
-    return <div className="py-20 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement de la supervision…</div>
+    return <div className="py-20 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement des comptes…</div>
   }
 
   return (
@@ -126,10 +105,10 @@ export default function AdminPage() {
         <div>
           <h1 className="section-title flex items-center gap-2">
             <Gauge size={20} strokeWidth={1.75} style={{ color: 'var(--accent-text)' }} />
-            Supervision
+            Admin comptes Utilisateurs
           </h1>
           <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            Comptes, tickets et activité de la plateforme.
+            Comptes, accès et activité de la plateforme.
           </p>
         </div>
         <button onClick={() => setInviteOpen(true)} className="btn-primary">
@@ -211,70 +190,6 @@ export default function AdminPage() {
                 </span>
               ))}
             </div>
-          </div>
-        )}
-      </div>
-
-      {/* Tickets */}
-      <div className="pt-7 mt-7" style={hairline}>
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }}>
-            <Ticket size={13} strokeWidth={2} /> Tickets support ({openCount} ouvert{openCount > 1 ? 's' : ''})
-          </h2>
-          <div className="flex gap-1 rounded-lg p-1" style={{ background: 'var(--surface-2)' }}>
-            {[{ k: 'open', l: 'Ouverts' }, { k: 'resolved', l: 'Traités' }, { k: 'all', l: 'Tous' }].map(o => (
-              <button key={o.k} onClick={() => setTicketFilter(o.k)}
-                className={ticketFilter === o.k ? 'seg-active px-3 py-1 text-xs rounded-md font-medium' : 'px-3 py-1 text-xs rounded-md font-medium text-[var(--text-muted)] hover:text-[var(--text)]'}>
-                {o.l}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {shownTickets.length === 0 ? (
-          <div className="py-12 text-center text-[13px]" style={{ color: 'var(--text-faint)' }}>
-            <Inbox size={26} className="mx-auto mb-2 opacity-50" />
-            {ticketFilter === 'open' ? 'Aucun ticket ouvert. 🎉' : 'Aucun ticket.'}
-          </div>
-        ) : (
-          <div className="space-y-2.5">
-            {shownTickets.map(t => {
-              const resolved = (t.status || 'open') === 'resolved'
-              return (
-                <div key={t.id} className="card p-4" style={resolved ? { opacity: 0.65 } : undefined}>
-                  <div className="flex items-start justify-between gap-3 mb-1.5">
-                    <div className="min-w-0">
-                      <div className="text-[13px] font-semibold truncate" style={{ color: 'var(--text)' }}>{t.subject}</div>
-                      <div className="text-[11px] mt-0.5" style={{ color: 'var(--text-faint)' }}>
-                        {t.from_name} ({t.from_email}) · {t.type} · {fmtDateTime(t.created_at)}
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => setTicketStatus(t, resolved ? 'open' : 'resolved')}
-                      disabled={ticketBusy === t.id}
-                      className="btn-ghost shrink-0 !h-7 !px-2.5 text-[11px]"
-                      title={resolved ? 'Rouvrir' : 'Marquer comme traité'}
-                    >
-                      {ticketBusy === t.id
-                        ? <Loader2 size={12} className="animate-spin" />
-                        : resolved
-                          ? <><RotateCcw size={11} strokeWidth={2} /> Rouvrir</>
-                          : <><Check size={12} strokeWidth={2} /> Traité</>}
-                    </button>
-                  </div>
-                  <p className="text-[12.5px] whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-muted)' }}>
-                    {t.message}
-                  </p>
-                  <a
-                    href={`mailto:${t.from_email}?subject=${encodeURIComponent(`Re: ${t.subject}`)}`}
-                    className="inline-flex items-center gap-1 mt-2 text-[11.5px] font-medium hover:underline"
-                    style={{ color: 'var(--accent-text)' }}
-                  >
-                    Répondre par email
-                  </a>
-                </div>
-              )
-            })}
           </div>
         )}
       </div>
