@@ -190,6 +190,7 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
     ...(prefill || {}),
   })
   const [cvFile, setCvFile] = useState(null)
+  const [consent, setConsent] = useState(false)
   const [dragOver, setDragOver] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -207,11 +208,13 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
     e.preventDefault()
     setError('')
     if (!cvFile) { setError('Veuillez joindre un CV PDF'); return }
+    if (!consent) { setError('Vous devez accepter la notice de confidentialité (RGPD)'); return }
     setLoading(true)
     try {
       const fd = new FormData()
       fd.append('ao_id', aoId)
       fd.append('cv_file', cvFile)
+      fd.append('consent', 'true')
       if (mode === 'existing') {
         if (!consultantId) { setError('Sélectionnez un consultant'); setLoading(false); return }
         fd.append('consultant_id', consultantId)
@@ -353,6 +356,15 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
             )}
           </div>
 
+          <label className="flex items-start gap-2 text-xs text-slate-400 cursor-pointer">
+            <input type="checkbox" className="mt-0.5 accent-brand-500"
+                   checked={consent} onChange={e => setConsent(e.target.checked)} />
+            <span>
+              Je certifie disposer du consentement du consultant pour le traitement
+              de ses données personnelles (CV) au titre de cette candidature, conformément au RGPD.
+            </span>
+          </label>
+
           {error && (
             <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2">
               {error}
@@ -361,7 +373,7 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
 
           <div className="flex gap-2 justify-end pt-1">
             <button type="button" onClick={onClose} className="btn-ghost">Annuler</button>
-            <button type="submit" disabled={loading} className="btn-primary">
+            <button type="submit" disabled={loading || !consent} className="btn-primary">
               {loading ? <><Loader2 size={14} className="animate-spin" />Envoi...</> : 'Soumettre'}
             </button>
           </div>

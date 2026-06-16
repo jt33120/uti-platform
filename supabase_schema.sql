@@ -2,6 +2,11 @@
 -- G-IT Plateforme Partenaires — Supabase Schema
 -- Run this in your Supabase SQL Editor
 -- ============================================================
+-- RGPD — Rétention des données : les consultants inactifs (created_at > 2 ans
+-- et sans aucune submission) PEUVENT être purgés automatiquement. Le droit à
+-- l'effacement (art. 17) est servi par DELETE /users/{user_id}/gdpr (backend),
+-- qui supprime aussi les fichiers CV du bucket de stockage.
+-- ============================================================
 
 -- 1. Profiles (linked to Supabase Auth users)
 CREATE TABLE IF NOT EXISTS public.profiles (
