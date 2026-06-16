@@ -48,6 +48,7 @@ async def create_submission(
     experience_years: Optional[int] = Form(None),
     employment_type: Optional[str] = Form(None),
     availability: Optional[str] = Form(None),
+    consent: bool = Form(False),
     cv_file: UploadFile = File(...),
     user: dict = Depends(get_current_user),
 ):
@@ -59,6 +60,14 @@ async def create_submission(
     - Pass consultant fields (name, skills, ...) to create + submit in one shot
     """
     _check_ao_access(ao_id, user)
+
+    # RGPD — explicit consent is mandatory before any CV (personal data) is
+    # uploaded, parsed, stored and sent to the AI matching model.
+    if not consent:
+        raise HTTPException(
+            status_code=422,
+            detail="Le consentement RGPD est requis pour soumettre un CV.",
+        )
 
     # Validate file
     if cv_file.content_type not in ALLOWED_MIME_TYPES:
