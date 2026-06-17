@@ -45,18 +45,60 @@ def get_public_url(bucket: str, path: str) -> str:
 
 
 def upload(bucket: str, path: str, content: bytes, content_type: str) -> str:
-    """Upload bytes and return the object's public URL."""
+    """Upload bytes and return the object's public URL (or path for private buckets)."""
     if _use_s3():
+        # CVs stay private on S3 too — no public-read ACL.
+        extra = {} if bucket == "cvs" else {"ACL": "public-read"}
         _s3().put_object(
             Bucket=settings.s3_bucket,
             Key=f"{bucket}/{path}",
             Body=content,
             ContentType=content_type,
-            ACL="public-read",
+            **extra,
         )
     else:
         supabase.storage.from_(bucket).upload(path, content, {"content-type": content_type})
     return get_public_url(bucket, path)
+
+
+def _object_path(bucket: str, stored: Optional[str]) -> Optional[str]:
+    """Recover the object path inside `bucket` from a stored value that may be a
+    full public URL (legacy rows) or already a bare path."""
+    if not stored:
+        return stored
+    marker = f"/{bucket}/"
+    if marker in stored:
+        return stored.split(marker, 1)[1].split("?", 1)[0]
+    return stored.lstrip("/")
+
+
+def signed_url(bucket: str, path: str, expires_in: int = 3600) -> Optional[str]:
+    """Time-limited URL for a private object (Supabase or S3)."""
+    if not path:
+        return None
+    if _use_s3():
+        return _s3().generate_presigned_url(
+            "get_object",
+            Params={"Bucket": settings.s3_bucket, "Key": f"{bucket}/{path}"},
+            ExpiresIn=expires_in,
+        )
+    res = supabase.storage.from_(bucket).create_signed_url(path, expires_in)
+    url = None
+    if isinstance(res, dict):
+        url = res.get("signedURL") or res.get("signedUrl") or res.get("signed_url")
+    if url and not url.startswith("http"):
+        base = settings.supabase_url.rstrip("/")
+        url = f"{base}{url if url.startswith('/') else '/' + url}"
+    return url
+
+
+def signed_cv_url(stored: Optional[str], expires_in: int = 3600) -> Optional[str]:
+    """Fresh signed URL for a CV, whatever is stored in submissions.cv_url
+    (legacy public URL or bare path). Works whether the bucket is public or
+    private, so it's safe to ship before flipping the bucket to private."""
+    if not stored:
+        return stored
+    return signed_url("cvs", _object_path("cvs", stored), expires_in)
 
 
 def remove(bucket: str, paths: list[str]) -> None:

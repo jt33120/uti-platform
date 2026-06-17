@@ -178,7 +178,12 @@ async def list_submissions_for_ao(ao_id: str, user: dict = Depends(get_current_u
         if user["role"] == "ao":
             query = query.eq("submitted_by", user["sub"])
 
-        return query.execute().data
+        rows = query.execute().data or []
+        # Serve CVs via short-lived signed URLs (the 'cvs' bucket is private).
+        for row in rows:
+            if row.get("cv_url"):
+                row["cv_url"] = storage.signed_cv_url(row["cv_url"])
+        return rows
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

@@ -153,41 +153,16 @@ ALTER TABLE public.submissions    ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.matchings      ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.invitations    ENABLE ROW LEVEL SECURITY;
 
--- profiles: read own; backend writes via service role
-CREATE POLICY "profiles_select_own" ON public.profiles
-  FOR SELECT USING (auth.uid() = id);
-
--- clients: all authenticated can read (access filtering done in backend)
-CREATE POLICY "clients_select_all" ON public.clients
-  FOR SELECT TO authenticated USING (true);
-
--- consultants: all authenticated can read
-CREATE POLICY "consultants_select_all" ON public.consultants
-  FOR SELECT TO authenticated USING (true);
-
--- consultants: partner can insert their own
-CREATE POLICY "consultants_insert_own" ON public.consultants
-  FOR INSERT TO authenticated WITH CHECK (auth.uid() = created_by);
-
--- consultants: partner can delete their own
-CREATE POLICY "consultants_delete_own" ON public.consultants
-  FOR DELETE TO authenticated USING (auth.uid() = created_by);
-
--- appels_offres: all authenticated can read
-CREATE POLICY "aos_select_all" ON public.appels_offres
-  FOR SELECT TO authenticated USING (true);
-
--- partner_clients: all authenticated can read (access filtering done in backend)
-CREATE POLICY "partner_clients_select_all" ON public.partner_clients
-  FOR SELECT TO authenticated USING (true);
-
--- submissions: all authenticated can read (access filtering done in backend)
-CREATE POLICY "submissions_select_all" ON public.submissions
-  FOR SELECT TO authenticated USING (true);
-
--- matchings: all authenticated can read
-CREATE POLICY "matchings_select_all" ON public.matchings
-  FOR SELECT TO authenticated USING (true);
+-- ── Modèle d'accès : deny-all direct + service_role côté backend ──
+-- L'app n'accède JAMAIS à la base en direct depuis le front : tout passe par
+-- l'API FastAPI, qui utilise la clé service_role (laquelle CONTOURNE la RLS et
+-- applique elle-même l'autorisation : rôles + filtres created_by/partner_clients).
+-- On NE crée donc AUCUNE policy d'accès client : RLS activée + zéro policy =
+-- accès direct (anon/authenticated) intégralement refusé. C'est l'état le plus
+-- restrictif possible, et il n'impacte pas le backend (service_role).
+--
+-- ⚠️ Ne pas réintroduire de policy « USING (true) » : cela rouvrirait une
+-- lecture cross-tenant via l'API REST publique. Voir supabase_migration_rls_lockdown.sql.
 
 -- ============================================================
 -- Storage bucket for CVs
@@ -219,10 +194,7 @@ CREATE TABLE IF NOT EXISTS public.support_messages (
 );
 
 ALTER TABLE public.support_messages ENABLE ROW LEVEL SECURITY;
-
--- Only admins (via service role backend) can read all messages
-CREATE POLICY "support_insert_own" ON public.support_messages
-  FOR INSERT TO authenticated WITH CHECK (auth.uid() = user_id);
+-- Aucune policy : insertion/lecture des tickets uniquement via le backend (service_role).
 
 -- ============================================================
 -- Indexes
