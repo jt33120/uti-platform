@@ -2,6 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from services.supabase_client import supabase
 from services.matching_runner import run_submission_matching
+from services import storage
 from routers.auth import get_current_user, require_staff
 from services.ratelimit import rate_limit
 
@@ -78,7 +79,7 @@ async def get_matching_results(ao_id: str, user: dict = Depends(get_current_user
             r["consultant_tjm"] = c.get("tjm")
             r["consultant_skills"] = c.get("skills")
             r["employment_type"] = c.get("employment_type")
-            r["cv_url"] = s.get("cv_url")
+            r["cv_url"] = storage.signed_cv_url(s.get("cv_url"))
             r["cv_filename"] = s.get("cv_filename")
 
         return {"ao_id": ao_id, "results": response.data}
