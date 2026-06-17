@@ -27,7 +27,7 @@ export default function ForgotPasswordPage() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
       <div className="w-full max-w-[360px]">
         <div className="flex items-center gap-2.5 mb-8">
-          <img src="/logo.jpeg" alt="UTI Group" className="h-8 w-8 rounded object-cover" />
+          <img src="/logo.png" alt="UTI Group" className="h-8 w-8 object-contain" />
           <div className="leading-tight">
             <div className="text-[14px] font-semibold tracking-tightest text-[var(--text)]">UTI Group</div>
             <div className="text-[11px] text-[var(--text-faint)]">Plateforme Partenaires</div>

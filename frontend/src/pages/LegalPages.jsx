@@ -9,7 +9,7 @@ function LegalLayout({ title, updated, children }) {
   return (
     <div className="min-h-screen app-bg" style={{ color: 'var(--text)' }}>
       <header className="h-14 flex items-center px-6 gap-2.5" style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}>
-        <img src="/logo.jpeg" alt="UTI Group" className="h-7 w-7 rounded object-cover" />
+        <img src="/logo.png" alt="UTI Group" className="h-7 w-7 object-contain" />
         <span className="text-[13px] font-semibold" style={{ color: 'var(--text)' }}>UTI Group</span>
       </header>
       <main className="max-w-3xl mx-auto px-6 py-10">

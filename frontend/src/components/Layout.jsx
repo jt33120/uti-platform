@@ -147,7 +147,7 @@ export default function Layout() {
       >
         {/* Brand */}
         <div data-tour="brand" className="px-4 h-14 flex items-center gap-2.5" style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}>
-          <img src="/logo.jpeg" alt="UTI Group" className="h-7 w-7 rounded object-cover" />
+          <img src="/logo.png" alt="UTI Group" className="h-7 w-7 object-contain" />
           <div className="leading-tight">
             <div className="text-[13px] font-semibold tracking-tightest text-[var(--text)]">UTI Group</div>
             <div className="text-[10px] text-[var(--text-faint)]">Plateforme Partenaires</div>
