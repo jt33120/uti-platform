@@ -1,0 +1,135 @@
+"""
+Tests unitaires du scoring déterministe et de la pseudonymisation.
+
+Pures fonctions, sans réseau : exécutables en CI. Démontrent la reproductibilité
+(Art. 15) et la base de l'invariance au biais (Art. 10).
+"""
+from services.scoring import (
+    score_consultant, GRID_VERSION, RECO_FORT_MIN, RECO_MOYEN_MIN,
+)
+from services.pseudonymize import strip_pii
+
+
+AO = {
+    "id": "ao-1",
+    "title": "Développeur Python Banque",
+    "skills_required": "Python, FastAPI, PostgreSQL",
+    "budget_max": 600,
+    "ao_type": "Banque/Finance",
+    "context": "Migration d'un système bancaire",
+}
+
+
+def _consultant(**over):
+    base = {"skills": "Python, FastAPI, PostgreSQL", "tjm": 500, "experience_years": 10}
+    base.update(over)
+    return base
+
+
+def _features(**over):
+    base = {"skills": ["Python", "FastAPI", "PostgreSQL"],
+            "experience_years": 10, "sectors": ["banque"], "summary": "Profil banque"}
+    base.update(over)
+    return base
+
+
+# ── Reproductibilité (Art. 15) ─────────────────────────────────────
+
+def test_scoring_is_deterministic():
+    a = score_consultant(_features(), _consultant(), AO)
+    b = score_consultant(_features(), _consultant(), AO)
+    assert a == b
+
+
+def test_breakdown_sums_to_total():
+    res = score_consultant(_features(), _consultant(), AO)
+    assert sum(res["breakdown"].values()) == res["score_total"]
+    assert 0 <= res["score_total"] <= 100
+
+
+# ── Invariance au biais : le nom/genre ne doit pas changer le score (Art. 10) ──
+
+def test_score_invariant_to_name_in_features():
+    # Les features ne portent pas d'identité ; deux "personnes" aux mêmes features
+    # obtiennent strictement le même score.
+    woman = score_consultant(_features(), _consultant(), AO)
+    man = score_consultant(_features(), _consultant(), AO)
+    assert woman["score_total"] == man["score_total"]
+
+
+# ── Compétences ────────────────────────────────────────────────────
+
+def test_full_skill_match_scores_high():
+    res = score_consultant(_features(), _consultant(), AO)
+    assert res["breakdown"]["competences_techniques"] == 40
+
+
+def test_no_skill_match_scores_zero_competences():
+    res = score_consultant(
+        _features(skills=["Cobol"]),
+        _consultant(skills="Cobol"),
+        AO,
+    )
+    assert res["breakdown"]["competences_techniques"] == 0
+
+
+# ── TJM ────────────────────────────────────────────────────────────
+
+def test_tjm_within_budget_is_full():
+    res = score_consultant(_features(), _consultant(tjm=600), AO)
+    assert res["breakdown"]["compatibilite_tjm"] == 20
+
+
+def test_tjm_far_over_budget_is_penalised():
+    res = score_consultant(_features(), _consultant(tjm=1200), AO)
+    assert res["breakdown"]["compatibilite_tjm"] < 20
+
+
+def test_missing_tjm_is_neutral():
+    res = score_consultant(_features(), _consultant(tjm=None), AO)
+    assert res["breakdown"]["compatibilite_tjm"] == 10  # NEUTRAL_RATIO * 20
+
+
+# ── Recommandation ─────────────────────────────────────────────────
+
+def test_strong_profile_reco_fort():
+    res = score_consultant(_features(), _consultant(tjm=500), AO)
+    assert res["score_total"] >= RECO_FORT_MIN
+    assert res["recommandation"] == "FORT"
+
+
+def test_weak_profile_reco_faible():
+    res = score_consultant(
+        _features(skills=["Cobol"], experience_years=0, sectors=[]),
+        _consultant(skills="Cobol", experience_years=0, tjm=2000),
+        AO,
+    )
+    assert res["recommandation"] == "FAIBLE"
+
+
+# ── Robustesse : features vides => fallback sur le déclaré, jamais d'erreur ──
+
+def test_empty_features_falls_back_to_declared():
+    res = score_consultant({}, _consultant(), AO)
+    assert 0 <= res["score_total"] <= 100
+    # Les compétences déclarées suffisent à matcher.
+    assert res["breakdown"]["competences_techniques"] == 40
+
+
+def test_grid_version_exposed():
+    assert isinstance(GRID_VERSION, str) and GRID_VERSION
+
+
+# ── Pseudonymisation (Art. 10 + RGPD) ──────────────────────────────
+
+def test_strip_pii_removes_email_and_phone():
+    txt = "Jean Dupont, jean.dupont@example.com, +33 6 12 34 56 78, Python expert"
+    out = strip_pii(txt, name="Jean Dupont")
+    assert "jean.dupont@example.com" not in out
+    assert "Dupont" not in out
+    assert "Jean" not in out
+    assert "Python" in out  # l'info utile est conservée
+
+
+def test_strip_pii_handles_none():
+    assert strip_pii(None) == ""

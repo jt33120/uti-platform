@@ -44,9 +44,15 @@ async def get_matching_stats(user: dict = Depends(require_staff)):
             matchings = supabase.table("matchings").select("id").execute().data or []
             total_cost = 0.0
 
+        from services.ai_matching import EXTRACTION_MODEL
+        from services.scoring import GRID_VERSION
+
         return {
             "total_matchings": len(matchings),
-            "model_used": "Claude 3.5 Haiku",
+            # Architecture hybride : le LLM extrait, le score est déterministe.
+            "extraction_model": EXTRACTION_MODEL,
+            "scoring": "déterministe",
+            "grid_version": GRID_VERSION,
             "total_cost_usd": round(total_cost, 2),
             "status": "active",
         }
