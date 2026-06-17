@@ -84,7 +84,95 @@ function BreakdownBar({ label, value, max }) {
   )
 }
 
-function MatchCard({ result, rank }) {
+// Décision humaine sur un résultat (AI Act Art. 14 — supervision & override).
+// Le staff retient/écarte un profil ; justification obligatoire pour un ajustement.
+function DecisionBar({ aoId, result, rank }) {
+  const [recorded, setRecorded] = useState(null)
+  const [overrideMode, setOverrideMode] = useState(false)
+  const [justification, setJustification] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const labels = { retained: 'Retenu', rejected: 'Écarté', overridden: 'Classement ajusté' }
+
+  const record = async (decision, just = null) => {
+    if (decision === 'overridden' && !just?.trim()) {
+      setError('Une justification est requise pour ajuster le classement.')
+      return
+    }
+    setLoading(true); setError('')
+    try {
+      await api.post('/decisions', {
+        ao_id: aoId,
+        submission_id: result.submission_id || null,
+        consultant_id: result.consultant_id || null,
+        ai_rank: rank,
+        ai_score: result.score_total,
+        decision,
+        justification: just,
+      })
+      setRecorded(decision)
+      setOverrideMode(false)
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Erreur lors de l’enregistrement')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="border-t border-white/5 pt-3 mt-1">
+      <div className="flex items-center justify-between gap-2 flex-wrap">
+        <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">
+          Décision humaine
+        </span>
+        {recorded ? (
+          <span className="badge bg-brand-500/10 text-brand-300 border border-brand-500/20 text-[10px] inline-flex items-center gap-1">
+            <CheckCircle size={10} /> {labels[recorded]}
+            <button onClick={() => { setRecorded(null); setOverrideMode(false) }} className="ml-1 text-slate-500 hover:text-slate-300">modifier</button>
+          </span>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => record('retained')} disabled={loading}
+              className="btn-ghost text-[11px] px-2 py-1 gap-1 text-emerald-400 hover:text-emerald-300">
+              <CheckCircle size={11} /> Retenir
+            </button>
+            <button onClick={() => record('rejected')} disabled={loading}
+              className="btn-ghost text-[11px] px-2 py-1 gap-1 text-slate-400 hover:text-red-400">
+              <X size={11} /> Écarter
+            </button>
+            <button onClick={() => setOverrideMode(o => !o)} disabled={loading}
+              className="btn-ghost text-[11px] px-2 py-1 gap-1 text-amber-400 hover:text-amber-300">
+              <Pencil size={11} /> Ajuster
+            </button>
+          </div>
+        )}
+      </div>
+
+      {overrideMode && !recorded && (
+        <div className="mt-2 space-y-2">
+          <textarea
+            className="input text-xs min-h-[56px] resize-y"
+            placeholder="Justification de l'ajustement (obligatoire)…"
+            value={justification}
+            onChange={e => setJustification(e.target.value)}
+          />
+          <div className="flex justify-end gap-2">
+            <button onClick={() => setOverrideMode(false)} className="btn-ghost text-[11px] px-2 py-1">Annuler</button>
+            <button onClick={() => record('overridden', justification)} disabled={loading}
+              className="btn-primary text-[11px] px-3 py-1">
+              {loading ? <Loader2 size={11} className="animate-spin" /> : 'Valider l’ajustement'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {error && <p className="text-[11px] text-red-400 mt-1.5">{error}</p>}
+    </div>
+  )
+}
+
+function MatchCard({ result, rank, aoId, isAdmin }) {
   const [expanded, setExpanded] = useState(rank === 1)
   const bd = result.breakdown || {}
   const bdEntries = [
@@ -172,6 +260,9 @@ function MatchCard({ result, rank }) {
                className="btn-ghost text-xs w-full justify-center">
               <FileText size={13} /> Consulter le CV soumis
             </a>
+          )}
+          {isAdmin && result.submission_id && (
+            <DecisionBar aoId={aoId} result={result} rank={rank} />
           )}
         </div>
       )}
@@ -1096,7 +1187,7 @@ export default function AODetailPage() {
                   <div className="mt-3 p-3 bg-brand-500/5 border border-brand-500/15 rounded-lg">
                     <div className="flex items-center gap-2 text-xs text-brand-300">
                       <Loader2 size={12} className="animate-spin" />
-                      GPT-4o analyse les CVs... 15–30 secondes.
+                      Extraction IA + scoring déterministe en cours... 15–30 secondes.
                     </div>
                   </div>
                 )}
@@ -1114,7 +1205,7 @@ export default function AODetailPage() {
                     <span>Top {matchResults.length} · classés par score IA</span>
                   </div>
                   {matchResults.map((result, i) => (
-                    <MatchCard key={result.submission_id || result.consultant_id || i} result={result} rank={i + 1} />
+                    <MatchCard key={result.submission_id || result.consultant_id || i} result={result} rank={i + 1} aoId={id} isAdmin />
                   ))}
                 </div>
               ) : !matching && submissions.length === 0 ? (

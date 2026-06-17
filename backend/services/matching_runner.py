@@ -17,6 +17,7 @@ from typing import Optional
 from services.supabase_client import supabase
 from services.ai_matching import extract_features, EXTRACTION_MODEL
 from services.scoring import score_consultant, GRID_VERSION
+from services.scoring_settings import get_config
 from services.pseudonymize import strip_pii
 from services import audit
 
@@ -54,12 +55,13 @@ async def _score_all(
     ao: dict, items: list[dict], run_id: str, ran_by: Optional[str]
 ) -> tuple[list[dict], float]:
     """Extrait (concurremment) puis score chaque candidat ; journalise chaque score."""
+    config = get_config()  # surcharges de grille pilotées par l'admin (best-effort)
     extracted = await asyncio.gather(*[_features_for(it) for it in items])
     total_cost = 0.0
     results: list[dict] = []
     for it, (features, cost) in zip(items, extracted):
         total_cost += cost
-        score = score_consultant(features, it, ao)
+        score = score_consultant(features, it, ao, config)
         score["submission_id"] = it.get("submission_id")
         score["consultant_id"] = it.get("consultant_id")
         score["consultant_name"] = it.get("name")
