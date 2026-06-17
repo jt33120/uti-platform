@@ -1,45 +1,50 @@
 -- ============================================================
--- Durcissement RLS — verrouillage de l'accès client direct
+-- Durcissement RLS — verrouillage de l'accès client direct (deny-all)
 -- À exécuter dans Supabase → SQL Editor (idempotent).
 -- ============================================================
 --
+-- ⚠️ CRITIQUE — la base live portait des policies « poc_* » accordant au rôle
+-- `public` (donc anon = tout le monde) un accès « ALL USING (true) » sur
+-- profiles, clients, appels_offres, consultants, invitations, matchings, etc.
+-- → lecture ET écriture/suppression par n'importe qui via l'API REST publique
+-- (dont : lire tous les emails, s'auto-promouvoir admin, forger des invitations).
+--
 -- Modèle de sécurité de l'app :
 --   • Le backend FastAPI accède à la base avec la clé `service_role`, qui
---     CONTOURNE la RLS. C'est lui — et lui seul — qui applique l'autorisation
---     (rôles admin/commerce/ao + filtres created_by / partner_clients).
+--     CONTOURNE la RLS et applique lui-même l'autorisation (rôles + filtres).
 --   • Le frontend ne parle JAMAIS à Supabase en direct (aucune dépendance
---     @supabase/*). L'app n'a donc AUCUN besoin d'accès client (anon/authenticated).
+--     @supabase/*). L'app n'a donc AUCUN besoin d'accès client direct.
 --
--- Conséquence : les anciennes policies « SELECT USING (true) » étaient dormantes
--- pour l'app, mais exposaient une LECTURE CROSS-TENANT via l'API REST publique
--- (https://<ref>.supabase.co/rest/v1) à quiconque dispose de la clé anon + d'un
--- JWT `authenticated`. On les supprime. RLS reste ACTIVÉE → sans policy, l'accès
--- direct est intégralement refusé. Le backend (service_role) n'est pas affecté.
+-- → On supprime TOUTES les policies du schéma public (les noms varient :
+--   poc_*, *_select_all, *_select_own…), et on garde la RLS ACTIVÉE partout.
+--   Résultat : deny-all par défaut pour anon/authenticated ; le backend
+--   (service_role) n'est pas affecté.
 
--- 1) Supprimer toutes les policies d'accès direct (permissives ou non — l'app
---    n'en a besoin d'aucune).
-DROP POLICY IF EXISTS "profiles_select_own"        ON public.profiles;
-DROP POLICY IF EXISTS "clients_select_all"         ON public.clients;
-DROP POLICY IF EXISTS "consultants_select_all"     ON public.consultants;
-DROP POLICY IF EXISTS "consultants_insert_own"     ON public.consultants;
-DROP POLICY IF EXISTS "consultants_delete_own"     ON public.consultants;
-DROP POLICY IF EXISTS "aos_select_all"             ON public.appels_offres;
-DROP POLICY IF EXISTS "partner_clients_select_all" ON public.partner_clients;
-DROP POLICY IF EXISTS "submissions_select_all"     ON public.submissions;
-DROP POLICY IF EXISTS "matchings_select_all"       ON public.matchings;
-DROP POLICY IF EXISTS "support_insert_own"         ON public.support_messages;
+-- 1) Supprimer dynamiquement toutes les policies du schéma public.
+DO $$
+DECLARE p record;
+BEGIN
+  FOR p IN
+    SELECT tablename, policyname FROM pg_policies WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('DROP POLICY IF EXISTS %I ON public.%I', p.policyname, p.tablename);
+  END LOOP;
+END $$;
 
--- 2) Garantir que la RLS reste ACTIVÉE partout (deny-all par défaut, sans policy).
-ALTER TABLE public.profiles         ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.clients          ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.consultants      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.appels_offres    ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.partner_clients  ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.submissions      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.matchings        ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.invitations      ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.support_messages ENABLE ROW LEVEL SECURITY;
+-- 2) Garantir la RLS ACTIVÉE sur toutes les tables du schéma public
+--    (deny-all sans policy).
+DO $$
+DECLARE t record;
+BEGIN
+  FOR t IN
+    SELECT tablename FROM pg_tables WHERE schemaname = 'public'
+  LOOP
+    EXECUTE format('ALTER TABLE public.%I ENABLE ROW LEVEL SECURITY', t.tablename);
+  END LOOP;
+END $$;
 
--- 3) Vérification (doit renvoyer 0 ligne = aucune policy d'accès direct restante).
--- SELECT tablename, policyname, cmd, roles, qual
--- FROM pg_policies WHERE schemaname = 'public';
+-- 3) Vérifications (la 1re doit renvoyer 0 ligne) :
+-- SELECT tablename, policyname FROM pg_policies WHERE schemaname = 'public';
+-- SELECT relname, relrowsecurity FROM pg_class c
+--   JOIN pg_namespace n ON n.oid = c.relnamespace
+--   WHERE n.nspname = 'public' AND c.relkind = 'r' ORDER BY relname;  -- tout à true
