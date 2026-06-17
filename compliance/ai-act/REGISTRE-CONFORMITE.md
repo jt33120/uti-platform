@@ -20,10 +20,10 @@ Légende statut : 🟥 À FAIRE · 🟧 EN COURS · 🟩 VALIDÉ · ⬜ Sans obj
 | 12 | Système de gestion des risques | 2 | Art. 9 | Non-code | 🟥 | Conformité | [risques](phase-2-risques-donnees/01-systeme-gestion-risques.md) |
 | 13 | Gouvernance des données | 2 | Art. 10 | Mixte | 🟥 | Produit/Data | [donnees](phase-2-risques-donnees/02-gouvernance-donnees.md) |
 | 14 | Campagne de test de biais | 2 | Art. 10, 15 | Code | 🟥 | Data | [biais](phase-2-risques-donnees/03-plan-test-biais.md) |
-| 15 | Architecture hybride (extraction LLM / scoring déterministe) | 3 | Art. 13, 15 | Code | 🟥 | Dev | [archi](phase-3-technique/02-spec-architecture-hybride.md) |
-| 16 | Pseudonymisation de l'entrée LLM | 3 | Art. 10, RGPD | Code | 🟥 | Dev | [archi](phase-3-technique/02-spec-architecture-hybride.md) |
-| 17 | Journalisation automatique | 3 | Art. 12 | Code | 🟥 | Dev | [journalisation](phase-3-technique/03-spec-journalisation.md) |
-| 18 | Supervision humaine effective (override + justification) | 3 | Art. 14 | Code | 🟥 | Dev | [supervision](phase-3-technique/04-spec-supervision-humaine.md) |
+| 15 | Architecture hybride (extraction LLM / scoring déterministe) | 3 | Art. 13, 15 | Code | 🟧 | Dev | [archi](phase-3-technique/02-spec-architecture-hybride.md) — _code livré ; seuils métier à valider_ |
+| 16 | Pseudonymisation de l'entrée LLM | 3 | Art. 10, RGPD | Code | 🟩 | Dev | `services/pseudonymize.py` |
+| 17 | Journalisation automatique | 3 | Art. 12 | Code | 🟧 | Dev | [journalisation](phase-3-technique/03-spec-journalisation.md) — _code livré ; migration `audit_log` à appliquer_ |
+| 18 | Supervision humaine effective (override + justification) | 3 | Art. 14 | Code | 🟧 | Dev | [supervision](phase-3-technique/04-spec-supervision-humaine.md) — _endpoint livré ; migration `human_decision` à appliquer_ |
 | 19 | Exactitude / robustesse / cybersécurité | 3 | Art. 15 | Mixte | 🟧 | Dev | [robustesse](phase-3-technique/05-exactitude-robustesse-cyber.md) |
 | 20 | Notice d'utilisation | 3 | Art. 13 | Non-code | 🟥 | Produit | [notice](phase-3-technique/01-notice-utilisation.md) |
 | 21 | Dossier technique Annexe IV | 4 | Art. 11, Annexe IV | Non-code | 🟥 | Conformité | [annexe-IV](phase-4-documentation-qms/01-dossier-technique-annexe-IV.md) |

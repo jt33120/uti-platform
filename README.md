@@ -18,8 +18,11 @@ poc-platform/
 │   │   ├── aos.py         # Appels d'Offres CRUD
 │   │   └── matching.py    # AI scoring endpoint
 │   └── services/
-│       ├── cv_parser.py   # PDF → text (pdfplumber)
-│       └── ai_matching.py # GPT-4o scoring engine
+│       ├── cv_parser.py     # PDF → text (pdfplumber)
+│       ├── pseudonymize.py  # retrait des PII avant LLM (AI Act Art. 10)
+│       ├── ai_matching.py   # extraction LLM des features (étape 1)
+│       ├── scoring.py       # scoring déterministe & explicable (étape 2, Art. 13/15)
+│       └── audit.py         # journal d'audit du matching (Art. 12)
 ├── frontend/              # React + Vite + Tailwind
 │   └── src/
 │       ├── pages/         # All pages

@@ -1,6 +1,9 @@
 """
-Shared matching engine — one core, three entry points:
-  * POST /matching/run             (manual, staff)
+Moteur de matching — orchestration hybride (AI Act Phase 3).
+
+Pipeline : CV → [extraction LLM, pseudonymisée] → features → [scoring déterministe]
+→ persistance + journal d'audit. Trois points d'entrée :
+  * POST /matching/run             (manuel, staff)
   * new CV submitted               (auto re-score, background task)
   * AO created                     (vivier recommendations, background task)
 
@@ -9,12 +12,22 @@ submitted a CV, so staff see recommendations immediately. Those rows are
 stored with submission_id=NULL and are naturally replaced by the first
 submission-based run (which clears previous matchings for the AO).
 """
+import asyncio
 from typing import Optional
 from services.supabase_client import supabase
-from services.ai_matching import score_consultants_batch
+from services.ai_matching import extract_features, EXTRACTION_MODEL
+from services.scoring import score_consultant, GRID_VERSION
+from services.pseudonymize import strip_pii
+from services import audit
 
 # Keep vivier runs bounded — most recent consultants first
 VIVIER_MAX_CONSULTANTS = 20
+
+
+async def _features_for(item: dict) -> tuple[dict, float]:
+    """Extraction pseudonymisée des features d'un candidat (best-effort)."""
+    clean = strip_pii(item.get("cv_text"), item.get("name"))
+    return await extract_features(clean)
 
 
 def _persist(ao_id: str, results: list[dict], cost_usd: float, ran_by: Optional[str]):
@@ -37,12 +50,45 @@ def _persist(ao_id: str, results: list[dict], cost_usd: float, ran_by: Optional[
         }).execute()
 
 
+async def _score_all(
+    ao: dict, items: list[dict], run_id: str, ran_by: Optional[str]
+) -> tuple[list[dict], float]:
+    """Extrait (concurremment) puis score chaque candidat ; journalise chaque score."""
+    extracted = await asyncio.gather(*[_features_for(it) for it in items])
+    total_cost = 0.0
+    results: list[dict] = []
+    for it, (features, cost) in zip(items, extracted):
+        total_cost += cost
+        score = score_consultant(features, it, ao)
+        score["submission_id"] = it.get("submission_id")
+        score["consultant_id"] = it.get("consultant_id")
+        score["consultant_name"] = it.get("name")
+        score["consultant_tjm"] = it.get("tjm")
+        score["consultant_skills"] = it.get("skills")
+        results.append(score)
+        audit.log_event(
+            "score", run_id,
+            ao_id=ao.get("id"), actor_id=ran_by,
+            model_version=EXTRACTION_MODEL, grid_version=GRID_VERSION,
+            input_hash=audit.features_hash(features),
+            payload={
+                "submission_id": it.get("submission_id"),
+                "consultant_id": it.get("consultant_id"),
+                "score_total": score["score_total"],
+                "breakdown": score["breakdown"],
+                "recommandation": score["recommandation"],
+            },
+        )
+    results.sort(key=lambda r: r["score_total"], reverse=True)
+    return results, total_cost
+
+
 async def run_submission_matching(ao_id: str, ran_by: Optional[str], top_n: int = 3) -> dict:
     """
     Score every submitted CV for this AO and persist the top N.
-    Raises LookupError (no AO / no submissions), ValueError (no readable CV
-    or parse error) or RuntimeError (LLM API error).
+    Raises LookupError (no AO / no submissions) or ValueError (no readable CV).
     """
+    run_id = audit.new_run_id()
     try:
         ao = supabase.table("appels_offres").select("*").eq("id", ao_id).single().execute().data
     except Exception:
@@ -55,14 +101,13 @@ async def run_submission_matching(ao_id: str, ran_by: Optional[str], top_n: int 
     if not submissions:
         raise LookupError("Aucun CV soumis pour cet AO")
 
-    # ai_matching round-trips on `id` — pass submission.id so results map back
-    valid = []
+    items = []
     for s in submissions:
         c = s.get("consultants") or {}
         if not s.get("cv_text"):
             continue
-        valid.append({
-            "id": s["id"],
+        items.append({
+            "submission_id": s["id"],
             "consultant_id": s["consultant_id"],
             "name": c.get("name", "Inconnu"),
             "tjm": c.get("tjm"),
@@ -71,31 +116,31 @@ async def run_submission_matching(ao_id: str, ran_by: Optional[str], top_n: int 
             "cv_text": s["cv_text"],
         })
 
-    if not valid:
+    if not items:
         raise ValueError("Aucun CV lisible pour cet AO")
 
-    all_scores, cost_usd = await score_consultants_batch(ao, valid)
-    top_results = all_scores[:top_n]
+    audit.log_event(
+        "run_start", run_id, ao_id=ao_id, actor_id=ran_by,
+        model_version=EXTRACTION_MODEL, grid_version=GRID_VERSION,
+        payload={"trigger": "submission", "candidates": len(items)},
+    )
 
-    sub_index = {s["id"]: s for s in valid}
-    for r in top_results:
-        sub_id = r.get("consultant_id")  # ai_matching echoes our `id` here
-        sub = sub_index.get(sub_id, {})
-        r["submission_id"] = sub_id
-        r["consultant_id"] = sub.get("consultant_id")
-        r["consultant_name"] = sub.get("name")
-        r["consultant_tjm"] = sub.get("tjm")
-        r["consultant_skills"] = sub.get("skills")
+    results, cost_usd = await _score_all(ao, items, run_id, ran_by)
+    top_results = results[:top_n]
 
     try:
         _persist(ao_id, top_results, cost_usd, ran_by)
     except Exception as e:
+        audit.log_event(
+            "error", run_id, ao_id=ao_id, severity="error",
+            payload={"stage": "persist", "error": str(e)},
+        )
         print(f"[MATCHING] Warning: could not save results for AO {ao_id}: {e}")
 
     return {
         "ao_id": ao_id,
         "ao_title": ao["title"],
-        "total_consultants_evaluated": len(valid),
+        "total_consultants_evaluated": len(items),
         "top_n": top_n,
         "results": top_results,
     }
@@ -107,6 +152,7 @@ async def run_vivier_matching(ao_id: str, ran_by: Optional[str], top_n: int = 3)
     Only consultants owned by partners with active access to the AO's client
     (or by UTI staff) are eligible. Never raises — background-task friendly.
     """
+    run_id = audit.new_run_id()
     try:
         ao = supabase.table("appels_offres").select("*").eq("id", ao_id).single().execute().data
         if not ao:
@@ -137,8 +183,8 @@ async def run_vivier_matching(ao_id: str, ran_by: Optional[str], top_n: int = 3)
             return None
 
         # CVs are anonymised / often absent in the vivier — fall back to a
-        # profile sheet so the scorer always has something to read.
-        valid = []
+        # profile sheet so the extractor always has something to read.
+        items = []
         for c in pool:
             cv = c.get("cv_text") or (
                 f"Profil consultant (fiche vivier, CV non fourni)\n"
@@ -148,8 +194,9 @@ async def run_vivier_matching(ao_id: str, ran_by: Optional[str], top_n: int = 3)
                 f"Disponibilité : {c.get('availability') or 'N/A'}\n"
                 f"Statut : {c.get('employment_type') or 'N/A'}"
             )
-            valid.append({
-                "id": c["id"],
+            items.append({
+                "submission_id": None,  # vivier recommendation — no CV submitted yet
+                "consultant_id": c["id"],
                 "name": c.get("name", "Inconnu"),
                 "tjm": c.get("tjm"),
                 "skills": c.get("skills", ""),
@@ -157,11 +204,14 @@ async def run_vivier_matching(ao_id: str, ran_by: Optional[str], top_n: int = 3)
                 "cv_text": cv,
             })
 
-        all_scores, cost_usd = await score_consultants_batch(ao, valid)
-        top_results = all_scores[:top_n]
-        for r in top_results:
-            r["submission_id"] = None  # vivier recommendation — no CV submitted yet
+        audit.log_event(
+            "run_start", run_id, ao_id=ao_id, actor_id=ran_by,
+            model_version=EXTRACTION_MODEL, grid_version=GRID_VERSION,
+            payload={"trigger": "vivier", "candidates": len(items)},
+        )
 
+        results, cost_usd = await _score_all(ao, items, run_id, ran_by)
+        top_results = results[:top_n]
         _persist(ao_id, top_results, cost_usd, ran_by)
         return {"ao_id": ao_id, "results": top_results}
     except Exception as e:

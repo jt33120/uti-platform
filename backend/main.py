@@ -2,7 +2,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import Response, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from config import settings, is_prod
-from routers import auth, consultants, aos, matching, clients, partners, submissions, invitations, pacs, support, assistant, admin, gdpr
+from routers import auth, consultants, aos, matching, clients, partners, submissions, invitations, pacs, support, assistant, admin, gdpr, decisions
 from mip_rum_middleware import MIPRumMiddleware
 
 IS_PROD = is_prod()
@@ -119,6 +119,7 @@ app.include_router(consultants.router)
 app.include_router(aos.router)
 app.include_router(submissions.router)
 app.include_router(matching.router)
+app.include_router(decisions.router)
 app.include_router(support.router)
 app.include_router(assistant.router)
 app.include_router(admin.router)
