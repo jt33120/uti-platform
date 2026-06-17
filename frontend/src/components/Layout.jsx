@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
   Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
-  HelpCircle, Mail, Compass, Gauge, Ticket
+  HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
@@ -12,6 +12,7 @@ import SettingsModal from './SettingsModal'
 import ContactModal from './ContactModal'
 import AssistantWidget from './AssistantWidget'
 import OnboardingTour from './OnboardingTour'
+import Footer from './Footer'
 
 const TOUR_KEY = 'uti_tour_v1' // bump suffix to re-show the tour to everyone
 
@@ -174,6 +175,7 @@ export default function Layout() {
               <NavItem to="/admin" icon={Gauge} label="Admin comptes Utilisateurs" />
               <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
               <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
+              <NavItem to="/admin/scoring" icon={SlidersHorizontal} label="Paramètres scoring" />
             </>
           )}
 
@@ -284,6 +286,7 @@ export default function Layout() {
         </div>
         <div className="px-6 py-6 max-w-6xl mx-auto">
           <Outlet />
+          <Footer />
         </div>
       </main>
 

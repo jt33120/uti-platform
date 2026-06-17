@@ -20,11 +20,14 @@ import PartnerAccessPage from './pages/PartnerAccessPage'
 import PartnersPage from './pages/PartnersPage'
 import PartnerDetailPage from './pages/PartnerDetailPage'
 import PacsPage from './pages/PacsPage'
+import CookieBanner from './components/CookieBanner'
+import { MentionsLegales, Confidentialite, CGU } from './pages/LegalPages'
 
 // Lazy — keeps the graph library out of the main bundle
 const GraphPage = lazy(() => import('./pages/GraphPage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const TicketsPage = lazy(() => import('./pages/TicketsPage'))
+const ScoringSettingsPage = lazy(() => import('./pages/ScoringSettingsPage'))
 
 // roles: array of allowed roles; omitted = any authenticated user.
 function ProtectedRoute({ children, roles = null }) {
@@ -54,6 +57,11 @@ export default function App() {
         <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
 
+        {/* Pages légales — publiques (lisibles avant connexion) */}
+        <Route path="/legal/mentions" element={<MentionsLegales />} />
+        <Route path="/legal/confidentialite" element={<Confidentialite />} />
+        <Route path="/legal/cgu" element={<CGU />} />
+
         <Route element={<ProtectedRoute><Layout /></ProtectedRoute>}>
           <Route path="/dashboard" element={<DashboardPage />} />
           <Route path="/clients" element={<ClientsPage />} />
@@ -75,6 +83,13 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/pacs" element={<ProtectedRoute roles={ADMIN}><PacsPage /></ProtectedRoute>} />
+          <Route path="/admin/scoring" element={
+            <ProtectedRoute roles={ADMIN}>
+              <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
+                <ScoringSettingsPage />
+              </Suspense>
+            </ProtectedRoute>
+          } />
           <Route path="/admin" element={
             <ProtectedRoute roles={ADMIN}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
@@ -91,6 +106,7 @@ export default function App() {
           } />
         </Route>
         </Routes>
+        <CookieBanner />
       </ConfirmProvider>
     </AuthProvider>
   )
