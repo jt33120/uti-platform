@@ -20,9 +20,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      localStorage.removeItem('token')
-      localStorage.removeItem('user')
-      window.location.href = '/login'
+      // Ne pas rebondir l'utilisateur déjà sur une page d'auth publique.
+      // Ex : la page /reset-password sonde le backend avec un token de
+      // récupération Supabase qui 401 légitimement — sans ce garde-fou,
+      // l'utilisateur serait renvoyé vers /login avant de pouvoir changer
+      // son mot de passe.
+      const authPaths = ['/login', '/reset-password', '/forgot-password', '/register']
+      const onAuthPage = authPaths.some((p) => window.location.pathname.startsWith(p))
+      if (!onAuthPage) {
+        localStorage.removeItem('token')
+        localStorage.removeItem('user')
+        window.location.href = '/login'
+      }
     }
     return Promise.reject(error)
   }
