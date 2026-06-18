@@ -268,29 +268,59 @@ async def register(body: RegisterRequest):
     }
 
 
+def _verify_credentials(email: str, password: str) -> Optional[dict]:
+    """
+    Vérifie un couple email/mot de passe auprès de GoTrue SANS passer par
+    ``supabase.auth.sign_in_with_password()``.
+
+    Pourquoi : supabase-py lie la session de l'utilisateur connecté au client
+    ``supabase`` partagé. Du coup, toutes les requêtes ``.table()`` suivantes
+    s'exécutent en tant que cet utilisateur (role ``authenticated``) au lieu de
+    ``service_role`` — et se font refuser par la RLS deny-all (« profil
+    introuvable »). En tapant directement l'endpoint REST GoTrue, le singleton
+    reste un pur ``service_role`` qui contourne la RLS.
+
+    Retourne le dict user GoTrue si OK, None si identifiants invalides.
+    Lève HTTPException pour les cas email non confirmé / rate limit.
+    """
+    with httpx.Client(timeout=15) as client:
+        resp = client.post(
+            f"{settings.supabase_url}/auth/v1/token",
+            params={"grant_type": "password"},
+            headers={
+                "apikey": settings.supabase_service_key,
+                "Content-Type": "application/json",
+            },
+            json={"email": email, "password": password},
+        )
+    if resp.status_code == 200:
+        return resp.json().get("user")
+    msg = resp.text.lower()
+    if "email not confirmed" in msg:
+        raise HTTPException(status_code=403, detail="Email non confirmé. Vérifiez votre boîte mail.")
+    if resp.status_code == 429 or "rate limit" in msg or "too many requests" in msg:
+        raise HTTPException(status_code=429, detail="Trop de tentatives. Réessayez dans quelques minutes.")
+    return None
+
+
 @router.post("/login")
 async def login(body: LoginRequest):
-    # ── Step 1: Supabase Auth sign-in ─────────────────────────────
+    # ── Step 1: vérifier les identifiants via GoTrue ──────────────
+    # NB: on N'utilise PAS supabase.auth.sign_in_with_password (cela lierait la
+    # session au client service_role partagé → lectures suivantes en role
+    # 'authenticated' → bloquées par la RLS deny-all). Voir _verify_credentials.
     try:
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": body.email,
-            "password": body.password,
-        })
+        auth_user = _verify_credentials(body.email, body.password)
+    except HTTPException:
+        raise
     except Exception as e:
-        msg = str(e).lower()
         print(f"[AUTH] login failed: {e}")
-        if "invalid login credentials" in msg or "invalid password" in msg:
-            raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
-        if "email not confirmed" in msg:
-            raise HTTPException(status_code=403, detail="Email non confirmé. Vérifiez votre boîte mail.")
-        if "too many requests" in msg or "rate limit" in msg:
-            raise HTTPException(status_code=429, detail="Trop de tentatives. Réessayez dans quelques minutes.")
-        raise HTTPException(status_code=401, detail="Échec de la connexion. Vérifiez vos identifiants.")
+        raise HTTPException(status_code=503, detail="Service d'authentification indisponible. Réessayez dans un instant.")
 
-    if not getattr(auth_response, 'user', None):
+    if not auth_user or not auth_user.get("id"):
         raise HTTPException(status_code=401, detail="Email ou mot de passe incorrect.")
 
-    user_id = auth_response.user.id
+    user_id = auth_user["id"]
 
     # ── Step 2: Fetch profile ─────────────────────────────────────
     try:
@@ -516,19 +546,13 @@ async def update_profile(body: UpdateProfileRequest, user: dict = Depends(get_cu
         if not body.current_password:
             raise HTTPException(status_code=422, detail="Mot de passe actuel requis pour changer l'email ou le mot de passe.")
         try:
-            auth_resp = supabase.auth.sign_in_with_password({
-                "email": current_email,
-                "password": body.current_password,
-            })
-            if not getattr(auth_resp, 'user', None):
-                raise HTTPException(status_code=401, detail="Mot de passe actuel incorrect.")
+            verified = _verify_credentials(current_email, body.current_password)
         except HTTPException:
             raise
-        except Exception as e:
-            msg = str(e).lower()
-            if "invalid" in msg or "credentials" in msg:
-                raise HTTPException(status_code=401, detail="Mot de passe actuel incorrect.")
+        except Exception:
             raise HTTPException(status_code=500, detail="Erreur de vérification du mot de passe.")
+        if not verified:
+            raise HTTPException(status_code=401, detail="Mot de passe actuel incorrect.")
 
         if body.new_password and len(body.new_password) < 6:
             raise HTTPException(status_code=422, detail="Le nouveau mot de passe doit contenir au moins 6 caractères.")
