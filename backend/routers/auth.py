@@ -6,6 +6,7 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from services.supabase_client import supabase
 from services import storage
+from services.email import send_email
 from config import settings
 import traceback
 import httpx
@@ -348,26 +349,107 @@ class ResetPasswordRequest(BaseModel):
     new_password: str
 
 
+def _send_reset_email(to_email: str, reset_url: str) -> tuple[bool, Optional[str]]:
+    """
+    Send the password-reset email via our own SMTP (Infomaniak), branded as
+    UTI Group — instead of letting Supabase send it from
+    "Supabase Auth <noreply@mail.app.supabase.io>", which alarms users and
+    trips spam filters. Returns (success, error); never raises.
+    """
+    subject = "Réinitialisation de votre mot de passe — UTI Group"
+    html = f"""\
+<!DOCTYPE html>
+<html lang="fr">
+  <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">UTI Group</div>
+                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">Réinitialisation du mot de passe</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 24px;font-size:15px;line-height:1.55;color:#1d1d1f;">
+                Vous avez demandé à réinitialiser le mot de passe de votre compte sur la plateforme UTI Group.
+                Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe.
+                <p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 1 heure.</p>
+              </td>
+            </tr>
+            <tr>
+              <td align="center" style="padding:0 32px 32px;">
+                <a href="{reset_url}"
+                   style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;">
+                  Réinitialiser mon mot de passe
+                </a>
+                <p style="font-size:12px;color:#86868b;margin:20px 0 0;word-break:break-all;">
+                  Ou copiez ce lien :<br/>
+                  <span style="color:#1d1d1f;">{reset_url}</span>
+                </p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px;border-top:1px solid #e5e5e7;font-size:12px;color:#86868b;">
+                Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — votre mot de passe reste inchangé.
+              </td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>"""
+
+    text = (
+        "Réinitialisation du mot de passe — UTI Group\n\n"
+        "Vous avez demandé à réinitialiser le mot de passe de votre compte sur la "
+        "plateforme UTI Group. Ouvrez le lien ci-dessous (usage unique, expire dans 1 heure) "
+        "pour choisir un nouveau mot de passe :\n\n"
+        f"{reset_url}\n\n"
+        "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — "
+        "votre mot de passe reste inchangé."
+    )
+    return send_email(to_email, subject, html, text=text)
+
+
 @router.post("/forgot-password")
 async def forgot_password(body: ForgotPasswordRequest):
     """
-    Sends a Supabase password-reset email. Always returns 200 to avoid
-    leaking whether the email exists in the system.
+    Generates a Supabase recovery link (admin generate_link, which does NOT send
+    any email) and delivers it ourselves via Infomaniak SMTP — so the message
+    is branded "UTI Group" instead of "Supabase Auth <noreply@mail.app.supabase.io>".
+
+    Always returns 200 to avoid leaking whether the email exists in the system.
     """
     try:
         with httpx.Client(timeout=10) as client:
-            client.post(
-                f"{settings.supabase_url}/auth/v1/recover",
+            link_resp = client.post(
+                f"{settings.supabase_url}/auth/v1/admin/generate_link",
                 headers={
                     "apikey": settings.supabase_service_key,
+                    "Authorization": f"Bearer {settings.supabase_service_key}",
                     "Content-Type": "application/json",
                 },
                 json={
+                    "type": "recovery",
                     "email": body.email,
-                    "gotrue_meta_security": {},
+                    "redirect_to": f"{settings.frontend_url}/reset-password",
                 },
-                params={"redirect_to": f"{settings.frontend_url}/reset-password"},
             )
+        # 200 only when the user exists; otherwise stay silent (anti-enumeration).
+        if link_resp.status_code == 200:
+            action_link = link_resp.json().get("action_link")
+            if action_link:
+                sent, err = _send_reset_email(body.email, action_link)
+                if not sent:
+                    print(f"[AUTH] reset email not sent to {body.email}: {err}")
+            else:
+                print(f"[AUTH] generate_link returned no action_link for {body.email}")
+        else:
+            # Non-existent email, rate limit, etc. — log for ops, reveal nothing.
+            print(f"[AUTH] forgot-password generate_link HTTP {link_resp.status_code} (non-fatal)")
     except Exception as e:
         print(f"[AUTH] forgot-password error (non-fatal): {e}")
     return {"message": "Si un compte existe pour cet email, un lien de réinitialisation a été envoyé."}
