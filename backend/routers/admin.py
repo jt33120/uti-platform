@@ -64,6 +64,20 @@ async def overview(user: dict = Depends(require_admin)):
         except Exception:
             pass
 
+    # Coût IA cumulé — métrique sensible réservée aux admins (cet endpoint est
+    # require_admin). Elle n'apparaît volontairement pas sur le dashboard staff.
+    matchings_total = None
+    matching_cost_usd = None
+    try:
+        rows = supabase.table("matchings").select("cost_usd").execute().data or []
+        matchings_total = len(rows)
+        matching_cost_usd = round(sum(float(r.get("cost_usd") or 0) for r in rows), 2)
+    except Exception:
+        try:
+            matchings_total = len(supabase.table("matchings").select("id").execute().data or [])
+        except Exception:
+            pass
+
     return {
         "accounts_total": len(profiles),
         "accounts_by_role": by_role,
@@ -73,6 +87,8 @@ async def overview(user: dict = Depends(require_admin)):
         "aos_30d": _count_since("appels_offres", "created_at"),
         "submissions_30d": _count_since("submissions", "submitted_at"),
         "matchings_30d": _count_since("matchings", "created_at"),
+        "matchings_total": matchings_total,
+        "matching_cost_usd": matching_cost_usd,
         "tickets_open": tickets_open,
     }
 

@@ -61,7 +61,7 @@ export default function DashboardPage() {
   const [consultants, setConsultants] = useState([])
   const [aos, setAos] = useState([])
   const [clients, setClients] = useState([])
-  const [ai, setAi] = useState({ matchings: null, model: null, cost: null })
+  const [ai, setAi] = useState({ matchings: null, model: null })
   const [submissions, setSubmissions] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -79,7 +79,9 @@ export default function DashboardPage() {
       if (a.ok) setAos(a.data)
       if (cl.ok) setClients(cl.data)
       if (subs.ok) setSubmissions(subs.data.length)
-      if (m.ok) setAi({ matchings: m.data.total_matchings, model: m.data.model_used, cost: m.data.total_cost_usd })
+      // Le coût IA n'est volontairement pas exposé ici : ce n'est pas une
+      // métrique commerciale. Il est réservé aux admins (page /admin).
+      if (m.ok) setAi({ matchings: m.data.total_matchings, model: m.data.extraction_model })
       setLoading(false)
     }
     run()
@@ -147,7 +149,7 @@ export default function DashboardPage() {
           sub={!loading && d.sectors.length ? `${d.sectors.length} secteurs` : null} />
         {isStaff
           ? <Kpi icon={Sparkles} label="Matchings IA" value={loading ? <span className="uti-skel" /> : ai.matchings}
-              sub={!loading && ai.cost != null ? `${ai.model || '—'} · $${ai.cost}` : (!loading ? ai.model : null)} />
+              sub={!loading && ai.model ? ai.model : null} />
           : <Kpi icon={FileText} label="CVs soumis" value={loading ? <span className="uti-skel" /> : submissions} />}
       </div>
 
