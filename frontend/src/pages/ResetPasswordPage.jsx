@@ -27,11 +27,15 @@ export default function ResetPasswordPage() {
     const type = params.get('type')
     if (token && type === 'recovery') {
       setAccessToken(token)
-      // Fetch the email associated with this recovery token so Keychain
-      // can associate the new password with the correct account.
-      api.get('/auth/me', { headers: { Authorization: `Bearer ${token}` } })
-        .then(r => setEmail(r.data?.email || ''))
-        .catch(() => {})
+      // Pré-remplir l'email depuis le JWT de récupération (pour que le
+      // gestionnaire de mots de passe associe le nouveau mdp au bon compte).
+      // Décodé localement : le backend /auth/me ne peut pas valider un token
+      // Supabase (clé de signature différente), et le sonder renverrait un 401
+      // qui rebondirait l'utilisateur vers /login.
+      try {
+        const payload = JSON.parse(atob(token.split('.')[1]))
+        setEmail(payload.email || '')
+      } catch { /* pré-remplissage best-effort */ }
     } else {
       setError("Lien de réinitialisation invalide. Veuillez refaire une demande.")
     }
