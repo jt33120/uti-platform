@@ -37,6 +37,34 @@ def _s3():
     return _s3_client
 
 
+def ensure_bucket(bucket: str, public: bool = False) -> None:
+    """
+    Best-effort : garantit l'existence d'un bucket Supabase (no-op en S3, où les
+    « buckets » logiques ne sont que des préfixes dans l'unique bucket OVH).
+    """
+    if _use_s3():
+        return
+    try:
+        existing = supabase.storage.list_buckets() or []
+        names = {
+            (getattr(b, "name", None) or (b.get("name") if isinstance(b, dict) else None))
+            for b in existing
+        }
+        if bucket in names:
+            return
+    except Exception:
+        pass
+    for attempt in (
+        lambda: supabase.storage.create_bucket(bucket, options={"public": public}),
+        lambda: supabase.storage.create_bucket(bucket),
+    ):
+        try:
+            attempt()
+            return
+        except Exception:
+            continue
+
+
 def get_public_url(bucket: str, path: str) -> str:
     if _use_s3():
         base = (settings.s3_public_base_url or "").rstrip("/")
