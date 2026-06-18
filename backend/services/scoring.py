@@ -50,6 +50,56 @@ DEFAULTS = {
     "reco_moyen_min": RECO_MOYEN_MIN,
 }
 
+# ── Importance « en étoiles » (1-5) ────────────────────────────────────────
+# Forme pilotée par l'UI pour des utilisateurs non techniques : on note
+# l'importance RELATIVE de chaque critère (1★ = accessoire … 5★ = critique) et
+# les poids w_* (somme = 100) en sont DÉRIVÉS par normalisation. Cela supprime
+# la contrainte « la somme doit faire 100 » côté écran.
+#
+# Les étoiles par défaut reproduisent EXACTEMENT la grille historique
+# 40/20/20/20 : 4/2/2/2 → normalisé → 40/20/20/20.
+STAR_CRITERIA = ("competences", "seniorite", "contexte", "tjm")
+DEFAULT_STARS = {"competences": 4, "seniorite": 2, "contexte": 2, "tjm": 2}
+STAR_MIN, STAR_MAX = 1, 5
+
+
+def _clamp_star(v) -> Optional[int]:
+    try:
+        v = int(v)
+    except (TypeError, ValueError):
+        return None
+    return max(STAR_MIN, min(STAR_MAX, v))
+
+
+def normalize_stars(stars: dict | None) -> dict:
+    """Borne (1-5) et complète un dict d'étoiles sur les 4 critères."""
+    out = {}
+    for c in STAR_CRITERIA:
+        v = _clamp_star((stars or {}).get(c))
+        out[c] = v if v is not None else DEFAULT_STARS[c]
+    return out
+
+
+def stars_to_weights(stars: dict | None) -> dict:
+    """
+    Convertit des étoiles d'importance (1-5) en poids entiers dont la somme fait
+    EXACTEMENT 100. La méthode du plus fort reste absorbe les arrondis, de sorte
+    que le total est garanti à 100 et que le scoring reste déterministe.
+    """
+    s = normalize_stars(stars)
+    total = sum(s.values()) or 1
+    raw = {c: s[c] / total * 100 for c in STAR_CRITERIA}
+    floor = {c: int(raw[c]) for c in STAR_CRITERIA}
+    remainder = 100 - sum(floor.values())
+    for c in sorted(STAR_CRITERIA, key=lambda k: raw[k] - floor[k], reverse=True)[:remainder]:
+        floor[c] += 1
+    return {
+        "w_competences": floor["competences"],
+        "w_seniorite": floor["seniorite"],
+        "w_contexte": floor["contexte"],
+        "w_tjm": floor["tjm"],
+    }
+
 _SPLIT = re.compile(r"[,;/|\n]+")
 # Mots vides FR/EN les plus courants, écartés des signaux de contexte.
 _STOPWORDS = {
@@ -111,6 +161,11 @@ def score_consultant(features: dict, consultant: dict, ao: dict, config: dict | 
     """
     features = features or {}
     cfg = {**DEFAULTS, **{k: v for k, v in (config or {}).items() if v is not None}}
+    # Les étoiles d'importance (si fournies) sont la forme canonique pilotée par
+    # l'UI : elles priment sur d'éventuels poids w_* et sont normalisées à 100.
+    stars = (config or {}).get("stars")
+    if stars:
+        cfg.update(stars_to_weights(stars))
     w_comp = cfg["w_competences"]
     w_sen = cfg["w_seniorite"]
     w_ctx = cfg["w_contexte"]

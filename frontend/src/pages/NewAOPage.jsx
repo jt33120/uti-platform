@@ -4,8 +4,9 @@ import api from '../lib/api'
 import {
   ArrowLeft, FileText, Loader2, ChevronDown, Building2,
   Euro, MapPin, Clock, Zap, CheckCircle, CalendarClock,
-  Sparkles, UploadCloud, X
+  Sparkles, UploadCloud, X, Target
 } from 'lucide-react'
+import ScoringPriorities, { DEFAULT_STARS } from '../components/ScoringPriorities'
 
 export default function NewAOPage() {
   const navigate = useNavigate()
@@ -21,6 +22,12 @@ export default function NewAOPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const errorRef = useRef(null)
+
+  // Priorités de matching (étoiles 1-5). Pré-remplies par défaut, ajustables ;
+  // l'IA peut les suggérer depuis la source. On ne les envoie que si touchées.
+  const [stars, setStars] = useState(DEFAULT_STARS)
+  const [scoringTouched, setScoringTouched] = useState(false)
+  const onStars = (s) => { setStars(s); setScoringTouched(true) }
 
   // AI draft step
   const [aiText, setAiText] = useState('')
@@ -52,6 +59,10 @@ export default function NewAOPage() {
         deadline: data.deadline || p.deadline,
         context: data.context || p.context,
       }))
+      if (data.scoring_stars && Object.keys(data.scoring_stars).length) {
+        setStars(p => ({ ...p, ...data.scoring_stars }))
+        setScoringTouched(true)
+      }
       setAiDone(true)
     } catch (err) {
       setAiError(err.response?.data?.detail || 'Échec de la génération. Réessayez.')
@@ -90,6 +101,7 @@ export default function NewAOPage() {
       if (!payload.budget_max) delete payload.budget_max
       else payload.budget_max = parseInt(payload.budget_max)
       if (!payload.deadline) delete payload.deadline
+      if (scoringTouched) payload.scoring_overrides = { stars }
       const { data } = await api.post('/aos', payload)
       navigate(`/aos/${data.id}`)
     } catch (err) {
@@ -282,6 +294,20 @@ export default function NewAOPage() {
                 value={form.context} onChange={set('context')}
               />
               <p className="text-[11px] text-slate-600">Ce texte est transmis tel quel à l'IA pour affiner le scoring</p>
+            </div>
+
+            {/* Priorités de matching — étoiles d'importance par critère */}
+            <div className="card p-6 space-y-4">
+              <div>
+                <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest flex items-center gap-2">
+                  <Target size={13} className="text-brand-400" /> Priorités de matching
+                </h2>
+                <p className="text-[11px] text-slate-600 mt-1">
+                  Notez l'importance de chaque critère — les poids s'équilibrent tout seuls.
+                  {scoringTouched && aiDone ? ' Suggestion IA pré-remplie, ajustez si besoin.' : ''}
+                </p>
+              </div>
+              <ScoringPriorities stars={stars} onStarsChange={onStars} />
             </div>
           </div>
 

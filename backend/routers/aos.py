@@ -7,8 +7,22 @@ from services import ao_drafter
 from services.matching_runner import run_vivier_matching
 from services.ratelimit import rate_limit
 from routers.auth import get_current_user, require_staff, is_staff
+from routers.scoring_config import AOScoringOverrides
 
 router = APIRouter(prefix="/aos", tags=["appels_offres"])
+
+
+def _overrides_for_storage(ov: Optional[AOScoringOverrides]) -> Optional[dict]:
+    """Valide la cohérence des seuils d'un override d'AO et renvoie le dict à stocker."""
+    if ov is None:
+        return None
+    if ov.reco_fort_min is not None and ov.reco_moyen_min is not None \
+            and ov.reco_fort_min <= ov.reco_moyen_min:
+        raise HTTPException(
+            status_code=422,
+            detail="Le seuil FORT doit être strictement supérieur au seuil MOYEN.",
+        )
+    return ov.to_storage()
 
 
 AO_TYPES = [
@@ -34,6 +48,7 @@ class AOCreate(BaseModel):
     context: Optional[str] = None
     ao_type: Optional[str] = None
     deadline: Optional[str] = None  # date limite de réponse (YYYY-MM-DD)
+    scoring_overrides: Optional[AOScoringOverrides] = None  # priorités de matching propres à l'AO
 
 
 class AOUpdate(BaseModel):
@@ -48,6 +63,7 @@ class AOUpdate(BaseModel):
     ao_type: Optional[str] = None
     deadline: Optional[str] = None  # date limite de réponse (YYYY-MM-DD)
     status: Optional[str] = None
+    scoring_overrides: Optional[AOScoringOverrides] = None
 
 
 def _accessible_client_ids(user: dict) -> Optional[list[str]]:
@@ -123,7 +139,7 @@ async def draft_ao(
 @router.post("")
 async def create_ao(body: AOCreate, background_tasks: BackgroundTasks, user: dict = Depends(require_staff)):
     try:
-        response = supabase.table("appels_offres").insert({
+        record = {
             "client_id": body.client_id,
             "title": body.title,
             "description": body.description,
@@ -136,7 +152,15 @@ async def create_ao(body: AOCreate, background_tasks: BackgroundTasks, user: dic
             "deadline": body.deadline,
             "status": "open",
             "created_by": user["sub"],
-        }).execute()
+        }
+        overrides = _overrides_for_storage(body.scoring_overrides)
+        try:
+            response = supabase.table("appels_offres").insert(
+                {**record, "scoring_overrides": overrides}
+            ).execute()
+        except Exception:
+            # Colonne scoring_overrides pas encore migrée → on crée l'AO sans elle.
+            response = supabase.table("appels_offres").insert(record).execute()
         ao = response.data[0]
         # Kick off vivier recommendations right away — staff get suggested
         # consultants before any partner submits a CV.
@@ -292,8 +316,18 @@ async def get_ao_stats(ao_id: str, user: dict = Depends(require_staff)):
 async def update_ao(ao_id: str, body: AOUpdate, user: dict = Depends(require_staff)):
     try:
         update_data = body.model_dump(exclude_none=True)
-        response = supabase.table("appels_offres").update(update_data).eq("id", ao_id).execute()
+        if "scoring_overrides" in update_data:
+            # Revalide la cohérence des seuils et normalise pour le stockage.
+            update_data["scoring_overrides"] = _overrides_for_storage(body.scoring_overrides)
+        try:
+            response = supabase.table("appels_offres").update(update_data).eq("id", ao_id).execute()
+        except Exception:
+            # Colonne scoring_overrides pas encore migrée → on met à jour le reste.
+            update_data.pop("scoring_overrides", None)
+            response = supabase.table("appels_offres").update(update_data).eq("id", ao_id).execute()
         return response.data[0]
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

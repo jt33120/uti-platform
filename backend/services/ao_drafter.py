@@ -79,7 +79,25 @@ def _sanitize(d: dict, ao_types: list[str]) -> dict:
         "duration": text("duration"),
         "deadline": deadline,
         "context": text("context"),
+        # Suggestion (jamais imposée) des priorités de matching : l'admin garde
+        # la main et peut tout ajuster avant d'enregistrer l'AO.
+        "scoring_stars": _stars(d.get("importance")),
     }
+
+
+def _stars(imp) -> Optional[dict]:
+    """Normalise la suggestion d'importance (1-5 par critère) renvoyée par le LLM."""
+    if not isinstance(imp, dict):
+        return None
+    out = {}
+    for c in ("competences", "seniorite", "contexte", "tjm"):
+        v = imp.get(c)
+        try:
+            v = int(v)
+        except (TypeError, ValueError):
+            continue
+        out[c] = max(1, min(5, v))
+    return out or None
 
 
 async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
@@ -110,7 +128,12 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
         '- "location": localisation / télétravail\n'
         '- "duration": durée de la mission\n'
         '- "deadline": date limite de réponse au format "YYYY-MM-DD", sinon ""\n'
-        '- "context": éléments de contexte utiles (secteur, contraintes, urgence, environnement technique)\n\n'
+        '- "context": éléments de contexte utiles (secteur, contraintes, urgence, environnement technique)\n'
+        '- "importance": objet notant de 1 (accessoire) à 5 (critique) l\'importance '
+        'RELATIVE de chaque critère DÉDUITE du texte, avec les clés exactes '
+        '"competences", "seniorite", "contexte", "tjm". Ex. : un AO qui insiste sur '
+        'un "profil senior expert" met "seniorite" à 5 ; un AO très contraint en '
+        'budget met "tjm" haut. En l\'absence de signal clair, mets 3.\n\n'
         f'Contenu source :\n"""\n{source}\n"""'
     )
 
