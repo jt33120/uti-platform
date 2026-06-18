@@ -10,7 +10,7 @@ export default function NewConsultantPage() {
   const [form, setForm] = useState({
     name: '', tjm: '', skills: '', experience_years: '',
     availability: '', employment_type: 'independant',
-    email: '', phone: '',
+    email: '', phone: '', city: '',
     ...(state?.assistantPrefill || {}),  // assistant may pre-fill (never submits)
   })
   const [loading, setLoading] = useState(false)
@@ -27,7 +27,7 @@ export default function NewConsultantPage() {
       if (!payload.tjm) delete payload.tjm; else payload.tjm = parseInt(payload.tjm)
       if (!payload.experience_years) delete payload.experience_years
       else payload.experience_years = parseInt(payload.experience_years)
-      ;['email', 'phone', 'availability'].forEach(k => { if (!payload[k]) delete payload[k] })
+      ;['email', 'phone', 'availability', 'city'].forEach(k => { if (!payload[k]) delete payload[k] })
       await api.post('/consultants', payload)
       navigate('/consultants')
     } catch (err) {
@@ -105,6 +105,13 @@ export default function NewConsultantPage() {
               <label className="label">Disponibilité</label>
               <input type="text" className="input" placeholder="Immédiate, Janvier 2025..."
                 value={form.availability} onChange={set('availability')} />
+            </div>
+
+            <div>
+              <label className="label">Ville</label>
+              <input type="text" className="input" placeholder="Paris, Lyon, Nantes..."
+                value={form.city} onChange={set('city')} />
+              <p className="text-[11px] text-slate-600 mt-1">Sert à positionner le consultant sur la carte</p>
             </div>
 
             <div>

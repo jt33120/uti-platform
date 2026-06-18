@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
   Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
-  HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal
+  HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal, ChevronDown, Map
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
@@ -77,10 +77,46 @@ const NavButton = ({ onClick, icon: Icon, label, tour }) => (
   </button>
 )
 
-const SectionLabel = ({ children }) => (
-  <p className="text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--text-faint)] px-2.5 mt-5 mb-1.5">
-    {children}
-  </p>
+// Section repliable du menu, avec mémorisation de l'état (ouvert/fermé) par
+// utilisateur via localStorage.
+const NavSection = ({ id, label, children, defaultOpen = true }) => {
+  const key = `uti_nav_${id}`
+  const [open, setOpen] = useState(() => {
+    const v = localStorage.getItem(key)
+    return v === null ? defaultOpen : v === '1'
+  })
+  const toggle = () => setOpen(o => { localStorage.setItem(key, o ? '0' : '1'); return !o })
+  return (
+    <div className="mt-3">
+      <button
+        onClick={toggle}
+        className="flex items-center justify-between w-full px-2.5 py-1 group rounded-md hover:bg-[var(--surface-2)]"
+      >
+        <span className="text-[10px] uppercase tracking-[0.08em] font-semibold text-[var(--text-faint)] group-hover:text-[var(--text-muted)]">
+          {label}
+        </span>
+        <ChevronDown
+          size={13}
+          className="text-[var(--text-faint)] transition-transform"
+          style={{ transform: open ? 'none' : 'rotate(-90deg)' }}
+        />
+      </button>
+      {open && <div className="space-y-0.5 mt-0.5">{children}</div>}
+    </div>
+  )
+}
+
+// Bouton d'action « créer » (visuellement distinct des entrées de navigation).
+const ActionButton = ({ to, icon: Icon, label, tour }) => (
+  <NavLink
+    to={to}
+    data-tour={tour}
+    className="flex items-center justify-center gap-1.5 h-8 rounded-md text-[12px] font-medium transition-colors text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]"
+    style={{ border: '1px solid var(--border)' }}
+  >
+    <Icon size={13} strokeWidth={1.75} className="shrink-0" />
+    <span className="truncate">{label}</span>
+  </NavLink>
 )
 
 export default function Layout() {
@@ -163,38 +199,61 @@ export default function Layout() {
 
           {isAdmin && (
             <>
-              <SectionLabel>Raccourcis</SectionLabel>
-              <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
-              <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
-              <NavItem to="/clients/new" icon={Plus} label="Nouveau client" />
-              <NavItem to="/graph" icon={Compass} label="Cartographie" />
-              <NavItem to="/pacs" icon={Package} label="PACs" />
-              <NavItem to="/tickets" icon={Ticket} label="Tickets support" />
+              <div className="grid grid-cols-2 gap-1 mt-3">
+                <ActionButton to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
+                <ActionButton to="/clients/new" icon={Plus} label="Client" />
+              </div>
 
-              <SectionLabel>Administration</SectionLabel>
-              <NavItem to="/admin" icon={Gauge} label="Admin comptes Utilisateurs" />
-              <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
-              <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
-              <NavItem to="/admin/scoring" icon={SlidersHorizontal} label="Paramètres scoring" />
+              <NavSection id="partenaires" label="Partenaires">
+                <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
+                <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
+              </NavSection>
+
+              <NavSection id="outils" label="Outils">
+                <NavItem to="/carte" icon={Map} label="Carte" />
+                <NavItem to="/graph" icon={Compass} label="Cartographie" />
+                <NavItem to="/pacs" icon={Package} label="PACs" />
+              </NavSection>
+
+              <NavSection id="administration" label="Administration" defaultOpen={false}>
+                <NavItem to="/admin" icon={Gauge} label="Admin comptes" />
+                <NavItem to="/admin/scoring" icon={SlidersHorizontal} label="Paramètres scoring" />
+                <NavItem to="/tickets" icon={Ticket} label="Tickets support" />
+                <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
+              </NavSection>
             </>
           )}
 
           {isCommerce && (
             <>
-              <SectionLabel>Raccourcis</SectionLabel>
-              <NavItem to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
-              <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
-              <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
-              <NavItem to="/graph" icon={Compass} label="Cartographie" />
-              <NavButton onClick={() => openContact('question')} icon={Mail} label="Contacter l'équipe" tour="nav-contact" />
+              <div className="mt-3">
+                <ActionButton to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
+              </div>
+
+              <NavSection id="c_partenaires" label="Partenaires">
+                <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
+                <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
+              </NavSection>
+
+              <NavSection id="c_outils" label="Outils">
+                <NavItem to="/carte" icon={Map} label="Carte" />
+                <NavItem to="/graph" icon={Compass} label="Cartographie" />
+              </NavSection>
+
+              <div className="mt-3">
+                <NavButton onClick={() => openContact('question')} icon={Mail} label="Contacter l'équipe" tour="nav-contact" />
+              </div>
             </>
           )}
 
           {!isStaff && (
             <>
-              <SectionLabel>Raccourcis</SectionLabel>
-              <NavItem to="/consultants/new" icon={Plus} label="Ajouter consultant" tour="nav-add-consultant" />
-              <NavButton onClick={() => openContact('question')} icon={Mail} label="Contacter l'équipe" tour="nav-contact" />
+              <div className="mt-3">
+                <ActionButton to="/consultants/new" icon={Plus} label="Ajouter consultant" tour="nav-add-consultant" />
+              </div>
+              <div className="mt-1">
+                <NavButton onClick={() => openContact('question')} icon={Mail} label="Contacter l'équipe" tour="nav-contact" />
+              </div>
             </>
           )}
         </nav>

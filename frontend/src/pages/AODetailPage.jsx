@@ -569,6 +569,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
     ao_type: ao.ao_type || '',
     deadline: ao.deadline || '',
     status: ao.status || 'open',
+    work_mode: ao.work_mode || '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -658,6 +659,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
       if (!payload.budget_max) delete payload.budget_max
       else payload.budget_max = parseInt(payload.budget_max)
       if (!payload.deadline) delete payload.deadline
+      if (!payload.work_mode) delete payload.work_mode
       if (scoringTouched) payload.scoring_overrides = { stars }
       await api.patch(`/aos/${ao.id}`, payload)
       onSaved()
@@ -771,6 +773,18 @@ function AOEditModal({ ao, onClose, onSaved }) {
             <div>
               <label className="label">Localisation</label>
               <input className="input" value={form.location} onChange={set('location')} />
+            </div>
+            <div>
+              <label className="label">Mode de travail</label>
+              <div className="relative">
+                <select className="input appearance-none pr-9" value={form.work_mode} onChange={set('work_mode')}>
+                  <option value="" className="bg-navy-900">— Non précisé —</option>
+                  <option value="onsite" className="bg-navy-900">Sur site</option>
+                  <option value="hybrid" className="bg-navy-900">Hybride</option>
+                  <option value="remote" className="bg-navy-900">Remote</option>
+                </select>
+                <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+              </div>
             </div>
             <div>
               <label className="label">Durée</label>

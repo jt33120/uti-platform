@@ -4,6 +4,7 @@ from typing import Optional, Literal
 from services.supabase_client import supabase
 from services.email import send_email
 from services.ratelimit import rate_limit
+from services.geocoding import geocode
 from routers.auth import get_current_user, require_staff, is_staff
 
 router = APIRouter(prefix="/consultants", tags=["consultants"])
@@ -18,6 +19,7 @@ class ConsultantCreate(BaseModel):
     employment_type: Optional[Literal["independant", "salarie"]] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    city: Optional[str] = None  # ville de résidence (géocodée pour la carte)
 
 
 class ConsultantUpdate(BaseModel):
@@ -29,6 +31,24 @@ class ConsultantUpdate(BaseModel):
     employment_type: Optional[Literal["independant", "salarie"]] = None
     email: Optional[str] = None
     phone: Optional[str] = None
+    city: Optional[str] = None
+
+
+def _insert_with_geo_fallback(table: str, record: dict):
+    """Insert tolérant : retente sans les colonnes géo/ville si non migrées."""
+    try:
+        return supabase.table(table).insert(record).execute()
+    except Exception:
+        slim = {k: v for k, v in record.items() if k not in ("city", "latitude", "longitude")}
+        return supabase.table(table).insert(slim).execute()
+
+
+def _update_with_geo_fallback(table: str, data: dict, id_: str):
+    try:
+        return supabase.table(table).update(data).eq("id", id_).execute()
+    except Exception:
+        slim = {k: v for k, v in data.items() if k not in ("city", "latitude", "longitude")}
+        return supabase.table(table).update(slim).eq("id", id_).execute()
 
 
 @router.post("")
@@ -38,7 +58,7 @@ async def create_consultant(body: ConsultantCreate, user: dict = Depends(get_cur
     CV upload is no longer here — CVs are attached to specific AO submissions.
     """
     try:
-        response = supabase.table("consultants").insert({
+        record = {
             "name": body.name,
             "skills": body.skills,
             "tjm": body.tjm,
@@ -47,8 +67,14 @@ async def create_consultant(body: ConsultantCreate, user: dict = Depends(get_cur
             "employment_type": body.employment_type,
             "email": body.email,
             "phone": body.phone,
+            "city": body.city,
             "created_by": user["sub"],
-        }).execute()
+        }
+        geo = await geocode(body.city)
+        if geo:
+            record["latitude"] = geo["latitude"]
+            record["longitude"] = geo["longitude"]
+        response = _insert_with_geo_fallback("consultants", record)
         return response.data[0]
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -96,7 +122,13 @@ async def update_consultant(consultant_id: str, body: ConsultantUpdate, user: di
         if user["role"] != "admin" and consultant["created_by"] != user["sub"]:
             raise HTTPException(status_code=403, detail="Accès interdit")
         update_data = body.model_dump(exclude_none=True)
-        response = supabase.table("consultants").update(update_data).eq("id", consultant_id).execute()
+        # Ville modifiée → re-géocoder (best-effort).
+        if "city" in update_data:
+            geo = await geocode(update_data["city"])
+            if geo:
+                update_data["latitude"] = geo["latitude"]
+                update_data["longitude"] = geo["longitude"]
+        response = _update_with_geo_fallback("consultants", update_data, consultant_id)
         return response.data[0]
     except HTTPException:
         raise
