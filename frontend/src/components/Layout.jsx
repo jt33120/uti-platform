@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
   Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
-  HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal, ChevronDown
+  HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal, ChevronDown, Map
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
@@ -210,6 +210,7 @@ export default function Layout() {
               </NavSection>
 
               <NavSection id="outils" label="Outils">
+                <NavItem to="/carte" icon={Map} label="Carte" />
                 <NavItem to="/graph" icon={Compass} label="Cartographie" />
                 <NavItem to="/pacs" icon={Package} label="PACs" />
               </NavSection>
@@ -235,6 +236,7 @@ export default function Layout() {
               </NavSection>
 
               <NavSection id="c_outils" label="Outils">
+                <NavItem to="/carte" icon={Map} label="Carte" />
                 <NavItem to="/graph" icon={Compass} label="Cartographie" />
               </NavSection>
 

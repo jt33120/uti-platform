@@ -45,6 +45,25 @@ async def _generate_and_store_summary(ao_id: str):
         print(f"[AO] résumé IA échoué pour {ao_id}: {e}")
 
 
+async def _geocode_and_store_ao(ao_id: str, location: Optional[str], work_mode: Optional[str]):
+    """Tâche de fond : géocode la localisation d'un AO (sauf full remote) et la stocke."""
+    if work_mode == "remote" or not location:
+        return
+    try:
+        from services.geocoding import geocode
+        geo = await geocode(location)
+        if not geo:
+            return
+        try:
+            supabase.table("appels_offres").update(
+                {"latitude": geo["latitude"], "longitude": geo["longitude"]}
+            ).eq("id", ao_id).execute()
+        except Exception:
+            pass  # colonnes géo pas encore migrées
+    except Exception as e:
+        print(f"[AO] géocodage échoué pour {ao_id}: {e}")
+
+
 def _overrides_for_storage(ov: Optional[AOScoringOverrides]) -> Optional[dict]:
     """Valide la cohérence des seuils d'un override d'AO et renvoie le dict à stocker."""
     if ov is None:
@@ -81,6 +100,7 @@ class AOCreate(BaseModel):
     context: Optional[str] = None
     ao_type: Optional[str] = None
     deadline: Optional[str] = None  # date limite de réponse (YYYY-MM-DD)
+    work_mode: Optional[str] = None  # onsite | hybrid | remote
     scoring_overrides: Optional[AOScoringOverrides] = None  # priorités de matching propres à l'AO
 
 
@@ -96,6 +116,7 @@ class AOUpdate(BaseModel):
     ao_type: Optional[str] = None
     deadline: Optional[str] = None  # date limite de réponse (YYYY-MM-DD)
     status: Optional[str] = None
+    work_mode: Optional[str] = None
     scoring_overrides: Optional[AOScoringOverrides] = None
 
 
@@ -183,6 +204,7 @@ async def create_ao(body: AOCreate, background_tasks: BackgroundTasks, user: dic
             "context": body.context,
             "ao_type": body.ao_type,
             "deadline": body.deadline,
+            "work_mode": body.work_mode,
             "status": "open",
             "created_by": user["sub"],
         }
@@ -192,14 +214,17 @@ async def create_ao(body: AOCreate, background_tasks: BackgroundTasks, user: dic
                 {**record, "scoring_overrides": overrides}
             ).execute()
         except Exception:
-            # Colonne scoring_overrides pas encore migrée → on crée l'AO sans elle.
-            response = supabase.table("appels_offres").insert(record).execute()
+            # Colonnes récentes (scoring_overrides / work_mode) pas encore migrées.
+            slim = {k: v for k, v in record.items() if k != "work_mode"}
+            response = supabase.table("appels_offres").insert(slim).execute()
         ao = response.data[0]
         # Kick off vivier recommendations right away — staff get suggested
         # consultants before any partner submits a CV.
         background_tasks.add_task(run_vivier_matching, ao["id"], user["sub"])
         # Résumé IA en 1 phrase (accroche de la fiche AO), généré en fond.
         background_tasks.add_task(_generate_and_store_summary, ao["id"])
+        # Géocodage de la localisation pour la carte (sauf full remote).
+        background_tasks.add_task(_geocode_and_store_ao, ao["id"], body.location, body.work_mode)
         return ao
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -432,7 +457,7 @@ async def get_ao_stats(ao_id: str, user: dict = Depends(require_staff)):
 
 
 @router.patch("/{ao_id}")
-async def update_ao(ao_id: str, body: AOUpdate, user: dict = Depends(require_staff)):
+async def update_ao(ao_id: str, body: AOUpdate, background_tasks: BackgroundTasks, user: dict = Depends(require_staff)):
     try:
         update_data = body.model_dump(exclude_none=True)
         if "scoring_overrides" in update_data:
@@ -441,9 +466,18 @@ async def update_ao(ao_id: str, body: AOUpdate, user: dict = Depends(require_sta
         try:
             response = supabase.table("appels_offres").update(update_data).eq("id", ao_id).execute()
         except Exception:
-            # Colonne scoring_overrides pas encore migrée → on met à jour le reste.
-            update_data.pop("scoring_overrides", None)
+            # Colonnes récentes pas encore migrées → on met à jour le reste.
+            for k in ("scoring_overrides", "work_mode"):
+                update_data.pop(k, None)
             response = supabase.table("appels_offres").update(update_data).eq("id", ao_id).execute()
+        # Localisation ou mode de travail modifié → re-géocoder pour la carte.
+        if "location" in update_data or "work_mode" in update_data:
+            ao = response.data[0] if response.data else {}
+            background_tasks.add_task(
+                _geocode_and_store_ao, ao_id,
+                update_data.get("location", ao.get("location")),
+                update_data.get("work_mode", ao.get("work_mode")),
+            )
         return response.data[0]
     except HTTPException:
         raise

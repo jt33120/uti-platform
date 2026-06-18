@@ -16,7 +16,7 @@ export default function NewAOPage() {
 
   const [form, setForm] = useState({
     client_id: '', title: '', description: '', skills_required: '',
-    budget_max: '', location: '', duration: '', context: '', ao_type: '', deadline: '',
+    budget_max: '', location: '', duration: '', context: '', ao_type: '', deadline: '', work_mode: '',
     ...(state?.assistantPrefill || {}),  // assistant may pre-fill (never submits)
   })
   const [loading, setLoading] = useState(false)
@@ -101,6 +101,7 @@ export default function NewAOPage() {
       if (!payload.budget_max) delete payload.budget_max
       else payload.budget_max = parseInt(payload.budget_max)
       if (!payload.deadline) delete payload.deadline
+      if (!payload.work_mode) delete payload.work_mode
       if (scoringTouched) payload.scoring_overrides = { stars }
       const { data } = await api.post('/aos', payload)
       // Persiste les pièces jointes d'origine pour les retrouver à l'édition.
@@ -354,8 +355,21 @@ export default function NewAOPage() {
                 <label className="label flex items-center gap-1.5">
                   <MapPin size={12} className="text-brand-400" /> Localisation
                 </label>
-                <input type="text" className="input" placeholder="Paris 8e / Remote 3j/sem"
+                <input type="text" className="input" placeholder="Paris 8e, Lyon, Nantes..."
                   value={form.location} onChange={set('location')} />
+              </div>
+
+              <div>
+                <label className="label">Mode de travail</label>
+                <div className="relative">
+                  <select className="input appearance-none pr-9" value={form.work_mode} onChange={set('work_mode')}>
+                    <option value="" className="bg-navy-900">— Non précisé —</option>
+                    <option value="onsite" className="bg-navy-900">Sur site</option>
+                    <option value="hybrid" className="bg-navy-900">Hybride</option>
+                    <option value="remote" className="bg-navy-900">Remote</option>
+                  </select>
+                  <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+                </div>
               </div>
             </div>
 

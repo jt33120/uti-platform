@@ -25,6 +25,7 @@ import { MentionsLegales, Confidentialite, CGU } from './pages/LegalPages'
 
 // Lazy — keeps the graph library out of the main bundle
 const GraphPage = lazy(() => import('./pages/GraphPage'))
+const CartePage = lazy(() => import('./pages/CartePage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const TicketsPage = lazy(() => import('./pages/TicketsPage'))
 const ScoringSettingsPage = lazy(() => import('./pages/ScoringSettingsPage'))
@@ -79,6 +80,13 @@ export default function App() {
             <ProtectedRoute roles={STAFF}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement de la cartographie…</div>}>
                 <GraphPage />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/carte" element={
+            <ProtectedRoute roles={STAFF}>
+              <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement de la carte…</div>}>
+                <CartePage />
               </Suspense>
             </ProtectedRoute>
           } />
