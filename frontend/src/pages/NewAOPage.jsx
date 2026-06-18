@@ -103,6 +103,14 @@ export default function NewAOPage() {
       if (!payload.deadline) delete payload.deadline
       if (scoringTouched) payload.scoring_overrides = { stars }
       const { data } = await api.post('/aos', payload)
+      // Persiste les pièces jointes d'origine pour les retrouver à l'édition.
+      if (aiFiles.length) {
+        try {
+          const fd = new FormData()
+          aiFiles.forEach(f => fd.append('files', f))
+          await api.post(`/aos/${data.id}/sources`, fd)
+        } catch { /* non bloquant */ }
+      }
       navigate(`/aos/${data.id}`)
     } catch (err) {
       setError(err.response?.data?.detail || 'Erreur lors de la création')

@@ -8,8 +8,10 @@ import {
   AlertCircle, TrendingUp, Award, ChevronDown, ChevronUp,
   Loader2, FileText, Trash2, RotateCcw, Building2, Plus,
   Upload, X, UserCircle2, Briefcase, Calendar, Pencil,
-  CalendarClock, AlertTriangle, BarChart3, Sparkles
+  CalendarClock, AlertTriangle, BarChart3, Sparkles,
+  UploadCloud, Download, Target
 } from 'lucide-react'
+import ScoringPriorities, { DEFAULT_STARS } from '../components/ScoringPriorities'
 
 // Parse date-only strings ("YYYY-MM-DD") as *local* dates to avoid the UTC
 // off-by-one; full timestamps fall back to native parsing.
@@ -571,11 +573,82 @@ function AOEditModal({ ao, onClose, onSaved }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
+  // Priorités de matching (mêmes étoiles qu'à la création).
+  const [stars, setStars] = useState(ao.scoring_overrides?.stars || DEFAULT_STARS)
+  const [scoringTouched, setScoringTouched] = useState(false)
+  const onStars = (s) => { setStars(s); setScoringTouched(true) }
+
+  // Pièces jointes d'origine — retrouvées depuis le stockage.
+  const [sources, setSources] = useState([])
+  const [sourcesBusy, setSourcesBusy] = useState(false)
+
+  // Panneau de régénération IA (identique à la création).
+  const [aiText, setAiText] = useState('')
+  const [aiFiles, setAiFiles] = useState([])
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiError, setAiError] = useState('')
+  const [aiDone, setAiDone] = useState(false)
+
   useEffect(() => {
     api.get('/clients').then(r => setClients(r.data)).catch(() => {})
-  }, [])
+    api.get(`/aos/${ao.id}/sources`).then(r => setSources(r.data.source_files || [])).catch(() => {})
+  }, [ao.id])
 
   const set = (k) => (e) => setForm(p => ({ ...p, [k]: e.target.value }))
+
+  const generateFromSource = async () => {
+    setAiError(''); setAiDone(false)
+    if (!aiText.trim() && aiFiles.length === 0) {
+      setAiError("Collez un email ou ajoutez un fichier (PDF, DOCX)."); return
+    }
+    setAiLoading(true)
+    try {
+      const fd = new FormData()
+      fd.append('pasted_text', aiText)
+      aiFiles.forEach(f => fd.append('files', f))
+      const { data } = await api.post('/aos/draft', fd)
+      setForm(p => ({
+        ...p,
+        title: data.title || p.title,
+        description: data.description || p.description,
+        skills_required: data.skills_required || p.skills_required,
+        ao_type: data.ao_type || p.ao_type,
+        budget_max: data.budget_max != null ? String(data.budget_max) : p.budget_max,
+        location: data.location || p.location,
+        duration: data.duration || p.duration,
+        deadline: data.deadline || p.deadline,
+        context: data.context || p.context,
+      }))
+      if (data.scoring_stars && Object.keys(data.scoring_stars).length) {
+        setStars(p => ({ ...p, ...data.scoring_stars })); setScoringTouched(true)
+      }
+      // Persiste les fichiers ré-uploadés comme nouvelles pièces jointes.
+      if (aiFiles.length) {
+        try {
+          const sfd = new FormData()
+          aiFiles.forEach(f => sfd.append('files', f))
+          const sres = await api.post(`/aos/${ao.id}/sources`, sfd)
+          setSources(sres.data.source_files || [])
+        } catch { /* non bloquant */ }
+      }
+      setAiFiles([])
+      setAiDone(true)
+    } catch (err) {
+      setAiError(err.response?.data?.detail || 'Échec de la génération. Réessayez.')
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  const removeSource = async (path) => {
+    setSourcesBusy(true)
+    try {
+      const { data } = await api.post(`/aos/${ao.id}/sources/delete`, { path })
+      setSources(data.source_files || [])
+    } catch { /* ignore */ } finally {
+      setSourcesBusy(false)
+    }
+  }
 
   const submit = async (e) => {
     e.preventDefault()
@@ -585,6 +658,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
       if (!payload.budget_max) delete payload.budget_max
       else payload.budget_max = parseInt(payload.budget_max)
       if (!payload.deadline) delete payload.deadline
+      if (scoringTouched) payload.scoring_overrides = { stars }
       await api.patch(`/aos/${ao.id}`, payload)
       onSaved()
     } catch (err) {
@@ -602,6 +676,51 @@ function AOEditModal({ ao, onClose, onSaved }) {
             <Pencil size={14} className="text-brand-400" /> Modifier l'AO
           </h2>
           <button onClick={onClose} className="btn-ghost p-1.5"><X size={14} /></button>
+        </div>
+
+        {/* Pièces jointes d'origine + régénération IA (reprend la création) */}
+        <div className="card p-4 mb-4 border border-violet-500/20 bg-violet-500/[0.04]">
+          <h3 className="text-xs font-semibold text-white flex items-center gap-1.5 mb-2">
+            <Sparkles size={13} className="text-violet-300" /> Source & régénération IA
+          </h3>
+
+          {sources.length > 0 && (
+            <div className="flex flex-wrap gap-2 mb-3">
+              {sources.map((s) => (
+                <span key={s.path} className="badge bg-white/5 border border-white/10 text-slate-300 text-xs inline-flex items-center gap-1.5">
+                  <FileText size={11} />
+                  {s.url
+                    ? <a href={s.url} target="_blank" rel="noreferrer" className="hover:text-white inline-flex items-center gap-1">{s.name}<Download size={10} /></a>
+                    : <span>{s.name}</span>}
+                  <button type="button" onClick={() => removeSource(s.path)} disabled={sourcesBusy} className="ml-0.5 text-slate-500 hover:text-red-400"><X size={11} /></button>
+                </span>
+              ))}
+            </div>
+          )}
+
+          <textarea
+            className="input h-20 resize-none text-sm"
+            placeholder="Collez un nouvel email / contexte pour régénérer les champs…"
+            value={aiText} onChange={e => setAiText(e.target.value)}
+          />
+          <div className="flex flex-wrap items-center gap-2 mt-2">
+            <label className="btn-ghost cursor-pointer text-xs">
+              <UploadCloud size={14} /> Ajouter un fichier
+              <input type="file" multiple accept=".pdf,.docx,.txt" className="hidden"
+                onChange={e => { setAiFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = '' }} />
+            </label>
+            {aiFiles.map((f, i) => (
+              <span key={i} className="badge bg-white/5 border border-white/10 text-slate-300 text-xs">
+                <FileText size={11} className="inline mr-1" />{f.name}
+                <button type="button" onClick={() => setAiFiles(prev => prev.filter((_, j) => j !== i))} className="ml-1.5 text-slate-500 hover:text-red-400"><X size={11} /></button>
+              </span>
+            ))}
+            <button type="button" onClick={generateFromSource} disabled={aiLoading} className="btn-primary text-xs ml-auto">
+              {aiLoading ? <><Loader2 size={13} className="animate-spin" />Génération…</> : <><Sparkles size={13} />Régénérer</>}
+            </button>
+          </div>
+          {aiError && <p className="text-xs text-red-400 mt-2">{aiError}</p>}
+          {aiDone && !aiError && <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1.5"><CheckCircle size={12} /> Champs régénérés — vérifiez avant d'enregistrer.</p>}
         </div>
 
         <form onSubmit={submit} className="space-y-4">
@@ -666,6 +785,15 @@ function AOEditModal({ ao, onClose, onSaved }) {
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
               </div>
+            </div>
+          </div>
+
+          <div>
+            <label className="label flex items-center gap-1.5">
+              <Target size={12} className="text-brand-400" /> Priorités de matching
+            </label>
+            <div className="rounded-lg border border-white/10 p-3 mt-1">
+              <ScoringPriorities stars={stars} onStarsChange={onStars} />
             </div>
           </div>
 

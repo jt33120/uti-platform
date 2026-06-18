@@ -1,15 +1,31 @@
+import secrets
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from services.supabase_client import supabase
 from services.cv_parser import extract_text_from_pdf, extract_text_from_docx
-from services import ao_drafter
+from services import ao_drafter, storage
 from services.matching_runner import run_vivier_matching
 from services.ratelimit import rate_limit
 from routers.auth import get_current_user, require_staff, is_staff
 from routers.scoring_config import AOScoringOverrides
 
 router = APIRouter(prefix="/aos", tags=["appels_offres"])
+
+AO_SOURCES_BUCKET = "ao-sources"  # pièces jointes d'origine d'un AO (privé)
+
+
+def _sources_with_urls(items: Optional[list]) -> list:
+    """Ajoute une URL signée (temporaire) à chaque pièce jointe stockée."""
+    out = []
+    for it in items or []:
+        url = None
+        try:
+            url = storage.signed_url(AO_SOURCES_BUCKET, it.get("path"), 3600)
+        except Exception:
+            pass
+        out.append({**it, "url": url})
+    return out
 
 
 async def _generate_and_store_summary(ao_id: str):
@@ -264,6 +280,73 @@ async def get_ao(ao_id: str, user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=404, detail="AO introuvable")
 
 
+@router.post("/{ao_id}/sources")
+async def add_ao_sources(
+    ao_id: str,
+    files: list[UploadFile] = File(default=[]),
+    user: dict = Depends(require_staff),
+):
+    """Stocke les pièces jointes d'origine d'un AO (email/PDF/DOCX) pour pouvoir
+    les retrouver à l'édition. Best-effort : ne casse pas si le stockage échoue."""
+    try:
+        ao = supabase.table("appels_offres").select("id, source_files").eq("id", ao_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="AO introuvable")
+
+    storage.ensure_bucket(AO_SOURCES_BUCKET, public=False)
+    current = list(ao.get("source_files") or [])
+    for f in files:
+        data = await f.read()
+        if not data:
+            continue
+        name = f.filename or "fichier"
+        path = f"{ao_id}/{secrets.token_hex(8)}-{name}"
+        try:
+            storage.upload(AO_SOURCES_BUCKET, path, data, f.content_type or "application/octet-stream")
+        except Exception as e:
+            raise HTTPException(status_code=502, detail=f"Échec d'upload de la pièce jointe : {e}")
+        current.append({"name": name, "path": path, "content_type": f.content_type, "size": len(data)})
+
+    try:
+        supabase.table("appels_offres").update({"source_files": current}).eq("id", ao_id).execute()
+    except Exception:
+        pass  # colonne source_files pas encore migrée
+    return {"source_files": _sources_with_urls(current)}
+
+
+@router.get("/{ao_id}/sources")
+async def list_ao_sources(ao_id: str, user: dict = Depends(require_staff)):
+    """Pièces jointes d'origine d'un AO, avec URLs signées temporaires."""
+    try:
+        ao = supabase.table("appels_offres").select("source_files").eq("id", ao_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="AO introuvable")
+    return {"source_files": _sources_with_urls(ao.get("source_files") or [])}
+
+
+class DeleteSourceRequest(BaseModel):
+    path: str
+
+
+@router.post("/{ao_id}/sources/delete")
+async def delete_ao_source(ao_id: str, body: DeleteSourceRequest, user: dict = Depends(require_staff)):
+    """Supprime une pièce jointe source (objet stocké + métadonnée)."""
+    try:
+        ao = supabase.table("appels_offres").select("source_files").eq("id", ao_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="AO introuvable")
+    remaining = [f for f in (ao.get("source_files") or []) if f.get("path") != body.path]
+    try:
+        storage.remove(AO_SOURCES_BUCKET, [body.path])
+    except Exception:
+        pass
+    try:
+        supabase.table("appels_offres").update({"source_files": remaining}).eq("id", ao_id).execute()
+    except Exception:
+        pass
+    return {"source_files": _sources_with_urls(remaining)}
+
+
 @router.post("/{ao_id}/summary")
 async def regenerate_summary(ao_id: str, user: dict = Depends(require_staff)):
     """(Re)génère le résumé IA d'un AO et le renvoie. Best-effort de persistance."""
@@ -387,6 +470,14 @@ async def bulk_delete_aos(body: BulkDeleteRequest, user: dict = Depends(require_
 @router.delete("/{ao_id}")
 async def delete_ao(ao_id: str, user: dict = Depends(require_staff)):
     try:
+        # Nettoyage best-effort des pièces jointes sources stockées.
+        try:
+            ao = supabase.table("appels_offres").select("source_files").eq("id", ao_id).single().execute().data
+            paths = [f["path"] for f in (ao.get("source_files") or []) if f.get("path")]
+            if paths:
+                storage.remove(AO_SOURCES_BUCKET, paths)
+        except Exception:
+            pass
         supabase.table("appels_offres").delete().eq("id", ao_id).execute()
         return {"message": "AO supprimé"}
     except Exception as e:
