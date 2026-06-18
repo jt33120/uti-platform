@@ -51,11 +51,30 @@ def _persist(ao_id: str, results: list[dict], cost_usd: float, ran_by: Optional[
         }).execute()
 
 
+def _effective_config(ao: dict) -> dict:
+    """
+    Config de scoring effective pour un AO : la grille globale (pilotée par
+    l'admin), surchargée par les priorités propres à l'AO (`scoring_overrides`).
+    Les étoiles sont fusionnées critère par critère pour qu'un override partiel
+    n'efface pas les autres axes.
+    """
+    config = get_config()  # best-effort : {} si la table n'existe pas
+    overrides = ao.get("scoring_overrides") or {}
+    if not isinstance(overrides, dict) or not overrides:
+        return config
+    merged = {**config, **{k: v for k, v in overrides.items() if v is not None and k != "stars"}}
+    g_stars = config.get("stars") or {}
+    a_stars = overrides.get("stars") or {}
+    if g_stars or a_stars:
+        merged["stars"] = {**g_stars, **a_stars}
+    return merged
+
+
 async def _score_all(
     ao: dict, items: list[dict], run_id: str, ran_by: Optional[str]
 ) -> tuple[list[dict], float]:
     """Extrait (concurremment) puis score chaque candidat ; journalise chaque score."""
-    config = get_config()  # surcharges de grille pilotées par l'admin (best-effort)
+    config = _effective_config(ao)  # grille globale + priorités propres à l'AO
     extracted = await asyncio.gather(*[_features_for(it) for it in items])
     total_cost = 0.0
     results: list[dict] = []

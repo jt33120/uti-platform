@@ -1,5 +1,10 @@
 """
-Paramètres de scoring pilotables par l'admin (poids de la grille + seuils).
+Paramètres de scoring pilotables par l'admin.
+
+L'importance des critères est exprimée en **étoiles (1-5)** — forme pensée pour
+des utilisateurs non techniques. Les poids w_* (somme = 100) en sont dérivés par
+normalisation (`services.scoring.stars_to_weights`). Les seuils de recommandation
+et la séniorité cible restent réglables.
 
 Lecture : staff UTI. Écriture : admin uniquement. Toute modification est
 journalisée (audit_log, Art. 12) et impacte les scorings suivants.
@@ -7,74 +12,148 @@ journalisée (audit_log, Art. 12) et impacte les scorings suivants.
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, Field
 from typing import Optional
+
 from services.supabase_client import supabase
-from services.scoring import DEFAULTS, GRID_VERSION
+from services.scoring import (
+    DEFAULTS, DEFAULT_STARS, GRID_VERSION, STAR_CRITERIA, stars_to_weights,
+)
 from services import audit
 from routers.auth import require_staff, require_admin
 
 router = APIRouter(prefix="/scoring-config", tags=["scoring-config"])
 
 
+class StarConfig(BaseModel):
+    """Importance relative de chaque critère, notée de 1 à 5 étoiles."""
+    competences: int = Field(ge=1, le=5)
+    seniorite: int = Field(ge=1, le=5)
+    contexte: int = Field(ge=1, le=5)
+    tjm: int = Field(ge=1, le=5)
+
+
+class AOScoringOverrides(BaseModel):
+    """
+    Surcharge de la grille pour un AO donné. Tous les champs sont optionnels :
+    ceux laissés vides retombent sur la config globale (puis sur les défauts).
+    """
+    stars: Optional[StarConfig] = None
+    seniority_full_years: Optional[int] = Field(default=None, ge=1, le=40)
+    reco_fort_min: Optional[int] = Field(default=None, ge=0, le=100)
+    reco_moyen_min: Optional[int] = Field(default=None, ge=0, le=100)
+
+    def to_storage(self) -> Optional[dict]:
+        """Dict prêt à stocker (None si aucune surcharge réelle)."""
+        data = self.model_dump(exclude_none=True)
+        return data or None
+
+
 class ScoringConfig(BaseModel):
-    w_competences: int = Field(ge=0, le=100)
-    w_seniorite: int = Field(ge=0, le=100)
-    w_contexte: int = Field(ge=0, le=100)
-    w_tjm: int = Field(ge=0, le=100)
+    stars: StarConfig
     seniority_full_years: int = Field(ge=1, le=40)
     reco_fort_min: int = Field(ge=0, le=100)
     reco_moyen_min: int = Field(ge=0, le=100)
 
 
-@router.get("")
-async def get_scoring_config(user: dict = Depends(require_staff)):
-    """Config effective (défauts + surcharges stockées) + métadonnées."""
-    stored = {}
+def _validate_thresholds(fort: Optional[int], moyen: Optional[int]):
+    if fort is not None and moyen is not None and fort <= moyen:
+        raise HTTPException(
+            status_code=422,
+            detail="Le seuil FORT doit être strictement supérieur au seuil MOYEN.",
+        )
+
+
+def _stored_row() -> dict:
+    """Ligne de config stockée, ou {} (best-effort si la table n'existe pas)."""
     try:
         rows = supabase.table("scoring_config").select("*").limit(1).execute().data or []
-        if rows:
-            stored = {k: rows[0][k] for k in DEFAULTS if rows[0].get(k) is not None}
-    except Exception as e:
-        # Table peut ne pas exister encore — on renvoie les défauts.
+        return rows[0] if rows else {}
+    except Exception as e:  # noqa: BLE001
         print(f"[SCORING] lecture config: {e}")
-    effective = {**DEFAULTS, **stored}
+        return {}
+
+
+@router.get("")
+async def get_scoring_config(user: dict = Depends(require_staff)):
+    """Config effective (étoiles + poids dérivés + seuils) et métadonnées."""
+    row = _stored_row()
+
+    stars = {c: row[f"s_{c}"] for c in STAR_CRITERIA if row.get(f"s_{c}") is not None}
+    is_custom_stars = len(stars) == len(STAR_CRITERIA)
+    effective_stars = stars if is_custom_stars else dict(DEFAULT_STARS)
+
+    def _eff(key: str):
+        return row[key] if row.get(key) is not None else DEFAULTS[key]
+
+    seniority = _eff("seniority_full_years")
+    fort = _eff("reco_fort_min")
+    moyen = _eff("reco_moyen_min")
+    is_custom = is_custom_stars or any(
+        row.get(k) is not None for k in ("seniority_full_years", "reco_fort_min", "reco_moyen_min")
+    )
+
     return {
-        "config": effective,
-        "defaults": DEFAULTS,
+        "stars": effective_stars,
+        "weights": stars_to_weights(effective_stars),  # %, pour l'affichage
+        "seniority_full_years": seniority,
+        "reco_fort_min": fort,
+        "reco_moyen_min": moyen,
+        "defaults": {
+            "stars": DEFAULT_STARS,
+            "seniority_full_years": DEFAULTS["seniority_full_years"],
+            "reco_fort_min": DEFAULTS["reco_fort_min"],
+            "reco_moyen_min": DEFAULTS["reco_moyen_min"],
+        },
         "grid_version": GRID_VERSION,
-        "is_custom": stored != {},
+        "is_custom": is_custom,
     }
 
 
 @router.put("")
 async def update_scoring_config(body: ScoringConfig, user: dict = Depends(require_admin)):
-    """Met à jour la grille (admin). Valide la cohérence des seuils et des poids."""
-    if body.reco_fort_min <= body.reco_moyen_min:
-        raise HTTPException(
-            status_code=422,
-            detail="Le seuil FORT doit être strictement supérieur au seuil MOYEN.",
-        )
-    total_weights = body.w_competences + body.w_seniorite + body.w_contexte + body.w_tjm
-    if total_weights != 100:
-        raise HTTPException(
-            status_code=422,
-            detail=f"La somme des poids doit faire 100 (actuellement {total_weights}).",
-        )
+    """Met à jour la grille (admin). Valide la cohérence des seuils."""
+    _validate_thresholds(body.reco_fort_min, body.reco_moyen_min)
 
-    payload = body.model_dump()
-    payload["updated_by"] = user["sub"]
+    weights = stars_to_weights(body.stars.model_dump())
+    payload = {
+        "s_competences": body.stars.competences,
+        "s_seniorite": body.stars.seniorite,
+        "s_contexte": body.stars.contexte,
+        "s_tjm": body.stars.tjm,
+        **weights,  # poids dérivés stockés aussi (back-compat + lisibilité audit)
+        "seniority_full_years": body.seniority_full_years,
+        "reco_fort_min": body.reco_fort_min,
+        "reco_moyen_min": body.reco_moyen_min,
+        "updated_by": user["sub"],
+    }
 
-    try:
+    def _write(data: dict):
         existing = supabase.table("scoring_config").select("id").limit(1).execute().data or []
         if existing:
-            supabase.table("scoring_config").update(payload).eq("id", existing[0]["id"]).execute()
+            supabase.table("scoring_config").update(data).eq("id", existing[0]["id"]).execute()
         else:
-            supabase.table("scoring_config").insert(payload).execute()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur enregistrement config: {e}")
+            supabase.table("scoring_config").insert(data).execute()
+
+    try:
+        _write(payload)
+    except Exception:
+        # Colonnes étoiles (s_*) pas encore migrées → on stocke au moins les
+        # poids dérivés + seuils, sans casser l'enregistrement.
+        fallback = {k: v for k, v in payload.items() if not k.startswith("s_")}
+        try:
+            _write(fallback)
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erreur enregistrement config: {e}")
 
     audit.log_event(
         "config_change", audit.new_run_id(),
         actor_id=user["sub"], grid_version=GRID_VERSION,
-        payload=body.model_dump(),
+        payload={**body.model_dump(), "weights": weights},
     )
-    return {"config": body.model_dump(), "message": "Grille de scoring mise à jour."}
+    return {
+        "stars": body.stars.model_dump(),
+        "weights": weights,
+        "seniority_full_years": body.seniority_full_years,
+        "reco_fort_min": body.reco_fort_min,
+        "reco_moyen_min": body.reco_moyen_min,
+        "message": "Grille de scoring mise à jour.",
+    }
