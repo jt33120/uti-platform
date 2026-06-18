@@ -150,3 +150,34 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
     if data is None:
         return None
     return _sanitize(data, ao_types)
+
+
+async def summarize_ao(ao: dict) -> Optional[str]:
+    """
+    Résume un AO en UNE phrase courte (petit modèle, peu coûteux). Pensé pour
+    servir de sous-titre/accroche sur la fiche AO. Best-effort : None si le
+    client LLM n'est pas configuré ou si la source est vide.
+    """
+    if not _client:
+        return None
+    fields = ("title", "ao_type", "skills_required", "description",
+              "context", "location", "duration", "budget_max")
+    bits = [f"{k}: {ao.get(k)}" for k in fields if ao.get(k)]
+    source = "\n".join(bits)[:4000]
+    if not source.strip():
+        return None
+    resp = await _client.chat.completions.create(
+        model=MODEL,
+        messages=[
+            {"role": "system", "content": (
+                "Tu résumes un appel d'offres en UNE seule phrase courte (20 mots "
+                "maximum), en français, claire et parlante. Réponds uniquement par "
+                "la phrase, sans préfixe, sans guillemets."
+            )},
+            {"role": "user", "content": source},
+        ],
+        temperature=0.3,
+        max_tokens=80,
+    )
+    txt = (resp.choices[0].message.content or "").strip().strip('"').strip()
+    return txt[:240] or None

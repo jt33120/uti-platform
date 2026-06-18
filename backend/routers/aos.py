@@ -12,6 +12,23 @@ from routers.scoring_config import AOScoringOverrides
 router = APIRouter(prefix="/aos", tags=["appels_offres"])
 
 
+async def _generate_and_store_summary(ao_id: str):
+    """Tâche de fond : génère le résumé IA d'un AO et le stocke (best-effort)."""
+    try:
+        ao = supabase.table("appels_offres").select("*").eq("id", ao_id).single().execute().data
+        if not ao:
+            return
+        summary = await ao_drafter.summarize_ao(ao)
+        if not summary:
+            return
+        try:
+            supabase.table("appels_offres").update({"ai_summary": summary}).eq("id", ao_id).execute()
+        except Exception:
+            pass  # colonne ai_summary pas encore migrée
+    except Exception as e:
+        print(f"[AO] résumé IA échoué pour {ao_id}: {e}")
+
+
 def _overrides_for_storage(ov: Optional[AOScoringOverrides]) -> Optional[dict]:
     """Valide la cohérence des seuils d'un override d'AO et renvoie le dict à stocker."""
     if ov is None:
@@ -165,6 +182,8 @@ async def create_ao(body: AOCreate, background_tasks: BackgroundTasks, user: dic
         # Kick off vivier recommendations right away — staff get suggested
         # consultants before any partner submits a CV.
         background_tasks.add_task(run_vivier_matching, ao["id"], user["sub"])
+        # Résumé IA en 1 phrase (accroche de la fiche AO), généré en fond.
+        background_tasks.add_task(_generate_and_store_summary, ao["id"])
         return ao
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -243,6 +262,23 @@ async def get_ao(ao_id: str, user: dict = Depends(get_current_user)):
         raise
     except Exception:
         raise HTTPException(status_code=404, detail="AO introuvable")
+
+
+@router.post("/{ao_id}/summary")
+async def regenerate_summary(ao_id: str, user: dict = Depends(require_staff)):
+    """(Re)génère le résumé IA d'un AO et le renvoie. Best-effort de persistance."""
+    try:
+        ao = supabase.table("appels_offres").select("*").eq("id", ao_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="AO introuvable")
+    summary = await ao_drafter.summarize_ao(ao)
+    if not summary:
+        raise HTTPException(status_code=503, detail="Résumé indisponible (IA non configurée ou contenu insuffisant).")
+    try:
+        supabase.table("appels_offres").update({"ai_summary": summary}).eq("id", ao_id).execute()
+    except Exception:
+        pass  # colonne pas encore migrée — on renvoie quand même le résumé
+    return {"ai_summary": summary}
 
 
 @router.get("/{ao_id}/stats")

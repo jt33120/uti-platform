@@ -8,7 +8,7 @@ import {
   AlertCircle, TrendingUp, Award, ChevronDown, ChevronUp,
   Loader2, FileText, Trash2, RotateCcw, Building2, Plus,
   Upload, X, UserCircle2, Briefcase, Calendar, Pencil,
-  CalendarClock, AlertTriangle, BarChart3
+  CalendarClock, AlertTriangle, BarChart3, Sparkles
 } from 'lucide-react'
 
 // Parse date-only strings ("YYYY-MM-DD") as *local* dates to avoid the UTC
@@ -856,6 +856,8 @@ export default function AODetailPage() {
   const location = useLocation()
 
   const [ao, setAo] = useState(null)
+  const [summary, setSummary] = useState('')
+  const [descOpen, setDescOpen] = useState(false)
   const [submissions, setSubmissions] = useState([])
   const [vivier, setVivier] = useState([])
   const [matchResults, setMatchResults] = useState(null)
@@ -871,6 +873,7 @@ export default function AODetailPage() {
   const fetchAo = async () => {
     const r = await api.get(`/aos/${id}`)
     setAo(r.data)
+    if (r.data.ai_summary) setSummary(r.data.ai_summary)
     return r.data
   }
   const fetchSubmissions = async () => {
@@ -949,6 +952,18 @@ export default function AODetailPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isAdmin])
 
+  // Résumé IA en 1 phrase : si l'AO n'en a pas encore (créé avant la feature),
+  // on le génère à la volée côté staff. Best-effort, non bloquant.
+  useEffect(() => {
+    if (!ao || !isAdmin || ao.ai_summary || summary) return
+    let cancelled = false
+    api.post(`/aos/${id}/summary`)
+      .then(r => { if (!cancelled) setSummary(r.data.ai_summary || '') })
+      .catch(() => {})
+    return () => { cancelled = true }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ao, isAdmin])
+
   const handleRerunMatch = () => runMatching()
 
   const handleDelete = async () => {
@@ -1013,6 +1028,12 @@ export default function AODetailPage() {
               </span>
             )}
           </div>
+          {summary && (
+            <p className="text-sm text-slate-400 mt-1.5 flex items-start gap-1.5">
+              <Sparkles size={13} className="text-violet-400 shrink-0 mt-0.5" />
+              <span className="italic">{summary}</span>
+            </p>
+          )}
         </div>
         {isAdmin && (
           <div className="flex items-center gap-1">
@@ -1029,8 +1050,8 @@ export default function AODetailPage() {
       {/* Deadline — big & red */}
       <DeadlineBanner deadline={ao.deadline} />
 
-      {/* Key info cards */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+      {/* Key info cards — tiennent sur une seule ligne en grand écran */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
         {ao.budget_max && (
           <div className="card p-4 flex flex-col gap-1">
             <span className="text-xs text-slate-500 flex items-center gap-1"><Euro size={11} className="text-emerald-400" />Budget max</span>
@@ -1064,36 +1085,8 @@ export default function AODetailPage() {
         )}
       </div>
 
-      {/* Description */}
-      <div className="card p-4 mb-5">
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Description</p>
-        <p className="text-sm text-slate-300 leading-relaxed">{ao.description}</p>
-      </div>
-
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-        {/* Left: AO meta */}
-        <div className="lg:col-span-1 space-y-4">
-          {isAdmin && <AOInsightsChart aoId={id} />}
-          <div className="card p-4">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Compétences requises</p>
-            <div className="flex flex-wrap gap-1.5">
-              {ao.skills_required?.split(',').map((s, i) => (
-                <span key={i} className="badge bg-brand-600/10 text-brand-300 border border-brand-500/15 text-[10px]">
-                  {s.trim()}
-                </span>
-              ))}
-            </div>
-          </div>
-          {ao.context && (
-            <div className="card p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Contexte additionnel</p>
-              <p className="text-xs text-slate-400 leading-relaxed">{ao.context}</p>
-            </div>
-          )}
-        </div>
-
-        {/* Right: AI Matching (admin) OR Submission flow (partner) */}
-        <div className="lg:col-span-2 space-y-4">
+      {/* ── Matching / soumissions — remontés en tête, c'est l'essentiel ── */}
+      <div className="space-y-4 mb-5">
           {/* Partner view: submit a CV */}
           {!isAdmin && (
             <div className="card p-4">
@@ -1217,6 +1210,41 @@ export default function AODetailPage() {
               ) : null}
             </>
           )}
+      </div>
+
+      {/* ── Détails de l'AO (secondaire) ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 space-y-4">
+          {/* Description repliable */}
+          <div className="card p-4">
+            <button type="button" onClick={() => setDescOpen(o => !o)}
+              className="w-full flex items-center justify-between text-left">
+              <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Description</span>
+              {descOpen ? <ChevronUp size={15} className="text-slate-500" /> : <ChevronDown size={15} className="text-slate-500" />}
+            </button>
+            {descOpen
+              ? <p className="text-sm text-slate-300 leading-relaxed mt-2 whitespace-pre-line">{ao.description}</p>
+              : <p className="text-xs text-slate-500 mt-1 truncate">{ao.description}</p>}
+          </div>
+          {ao.context && (
+            <div className="card p-4">
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Contexte additionnel</p>
+              <p className="text-xs text-slate-400 leading-relaxed whitespace-pre-line">{ao.context}</p>
+            </div>
+          )}
+        </div>
+        <div className="space-y-4">
+          {isAdmin && <AOInsightsChart aoId={id} />}
+          <div className="card p-4">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Compétences requises</p>
+            <div className="flex flex-wrap gap-1.5">
+              {ao.skills_required?.split(',').map((s, i) => (
+                <span key={i} className="badge bg-brand-600/10 text-brand-300 border border-brand-500/15 text-[10px]">
+                  {s.trim()}
+                </span>
+              ))}
+            </div>
+          </div>
         </div>
       </div>
 
