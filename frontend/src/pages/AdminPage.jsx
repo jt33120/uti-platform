@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useConfirm } from '../contexts/ConfirmContext'
 import {
   Gauge, Users, FileText, Sparkles, UserPlus, X, Loader2,
-  Shield, Briefcase, BadgePercent,
+  Shield, Briefcase, BadgePercent, Coins,
 } from 'lucide-react'
 import InviteModal from '../components/InviteModal'
 
@@ -118,7 +118,7 @@ export default function AdminPage() {
 
       {/* KPIs */}
       {overview && (
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-y-6 pb-8">
+        <div className="grid grid-cols-2 lg:grid-cols-5 gap-y-6 pb-8">
           <Kpi icon={Users} label="Comptes" value={overview.accounts_total}
             sub={Object.entries(overview.accounts_by_role || {})
               .map(([r, n]) => `${n} ${ROLE_META[r]?.label?.toLowerCase() || r}${n > 1 ? 's' : ''}`)
@@ -129,6 +129,8 @@ export default function AdminPage() {
             sub={`${overview.aos_open ?? 0} ouverts · ${overview.aos_30d ?? 0} créés / 30 j`} />
           <Kpi icon={Sparkles} label="Activité 30 j" value={overview.submissions_30d}
             sub={`CVs soumis · ${overview.matchings_30d ?? 0} matchings`} />
+          <Kpi icon={Coins} label="Coût IA" value={overview.matching_cost_usd != null ? `$${overview.matching_cost_usd}` : '—'}
+            sub={`cumulé · ${overview.matchings_total ?? 0} matchings`} />
         </div>
       )}
 
