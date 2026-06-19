@@ -46,7 +46,7 @@ export default function RegisterPage() {
     <div className="min-h-screen flex items-center justify-center p-4" style={{ background: 'var(--bg)' }}>
       <div className="w-full max-w-[380px]">
         <div className="flex items-center gap-2.5 mb-8">
-          <img src="/logo.jpeg" alt="GROUPEMENT-IT" className="h-8 w-8 rounded object-cover" />
+          <img src="/logo.png" alt="GROUPEMENT-IT" className="h-8 w-8 rounded object-cover" onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.jpeg' }} />
           <div className="leading-tight">
             <div className="text-[14px] font-semibold tracking-tightest text-[var(--text)]">GROUPEMENT-IT</div>
             <div className="text-[11px] text-[var(--text-faint)]">Plateforme Partenaires</div>
