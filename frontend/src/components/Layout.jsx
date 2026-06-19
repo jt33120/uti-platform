@@ -17,7 +17,7 @@ import Footer from './Footer'
 const TOUR_KEY = 'uti_tour_v1' // bump suffix to re-show the tour to everyone
 
 const ADMIN_STEPS = [
-  { selector: '[data-tour="brand"]', title: 'Bienvenue 👋', text: "Voici un tour rapide de la plateforme UTI Group. Vous pouvez le passer à tout moment." },
+  { selector: '[data-tour="brand"]', title: 'Bienvenue 👋', text: "Voici un tour rapide de la plateforme Groupement-IT. Vous pouvez le passer à tout moment." },
   { selector: '[data-tour="nav-aos"]', title: "Appels d'offres", text: "Créez et suivez vos AOs. En ouvrant un AO, le matching IA se lance automatiquement et vous visualisez la couverture (partenaires & consultants) ainsi que la date limite." },
   { selector: '[data-tour="nav-clients"]', title: 'Clients', text: 'Gérez vos comptes clients — chaque appel d’offres est rattaché à un client.' },
   { selector: '[data-tour="nav-consultants"]', title: 'Vivier de consultants', text: 'Retrouvez tous les consultants proposés par les partenaires.' },
@@ -183,9 +183,9 @@ export default function Layout() {
       >
         {/* Brand */}
         <div data-tour="brand" className="px-4 h-14 flex items-center gap-2.5" style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}>
-          <img src="/logo.png" alt="UTI Group" className="h-7 w-7 object-contain" />
+          <img src="/logo.png" alt="Groupement-IT" className="h-7 w-7 object-contain" />
           <div className="leading-tight">
-            <div className="text-[13px] font-semibold tracking-tightest text-[var(--text)]">UTI Group</div>
+            <div className="text-[13px] font-semibold tracking-tightest text-[var(--text)]">Groupement-IT</div>
             <div className="text-[10px] text-[var(--text-faint)]">Plateforme Partenaires</div>
           </div>
         </div>
@@ -309,7 +309,11 @@ export default function Layout() {
             <div className="flex-1 min-w-0 text-left">
               <div className="text-[12px] font-medium truncate text-[var(--text)]">{user?.name}</div>
               <div className="text-[10px] uppercase tracking-wider text-[var(--text-faint)] font-medium">
-                {user?.role === 'admin' ? 'Administrateur' : user?.role === 'commerce' ? 'Commercial UTI' : 'Partenaire'}
+                {user?.role === 'admin'
+                  ? 'Administrateur'
+                  : user?.role === 'commerce'
+                    ? (user?.org === 'groupement-it' ? 'Commercial Groupement-IT' : 'Commercial UTI')
+                    : 'Partenaire'}
               </div>
             </div>
           </button>

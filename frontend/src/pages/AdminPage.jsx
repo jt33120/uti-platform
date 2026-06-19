@@ -4,14 +4,26 @@ import { useAuth } from '../contexts/AuthContext'
 import { useConfirm } from '../contexts/ConfirmContext'
 import {
   Gauge, Users, FileText, Sparkles, UserPlus, X, Loader2,
-  Shield, Briefcase, BadgePercent, Coins,
+  Shield, Briefcase, BadgePercent, Coins, Pencil, PauseCircle, Ban,
 } from 'lucide-react'
 import InviteModal from '../components/InviteModal'
+import AccountEditModal from '../components/AccountEditModal'
 
 const ROLE_META = {
   admin: { label: 'Administrateur', icon: Shield },
   commerce: { label: 'Commercial UTI', icon: BadgePercent },
   ao: { label: 'Partenaire', icon: Briefcase },
+}
+
+// Role label that accounts for the commercial entity (UTI vs Groupement-IT).
+const roleLabel = (item) =>
+  item.role === 'commerce'
+    ? (item.org === 'groupement-it' ? 'Commercial Groupement-IT' : 'Commercial UTI')
+    : (ROLE_META[item.role]?.label || item.role)
+
+const STATUS_META = {
+  suspended: { label: 'Suspendu', icon: PauseCircle, color: 'var(--warning, #b45309)' },
+  disabled: { label: 'Désactivé', icon: Ban, color: 'var(--danger)' },
 }
 
 const fmtDate = (iso) => iso
@@ -34,14 +46,25 @@ function Kpi({ icon: Icon, label, value, sub }) {
   )
 }
 
-function RoleBadge({ role }) {
-  const meta = ROLE_META[role] || { label: role, icon: Users }
+function RoleBadge({ item }) {
+  const meta = ROLE_META[item.role] || { label: item.role, icon: Users }
   const Icon = meta.icon
   return (
     <span className="badge" style={{
-      background: role === 'ao' ? 'var(--surface-2)' : 'var(--accent-soft)',
-      color: role === 'ao' ? 'var(--text-muted)' : 'var(--accent-text)',
+      background: item.role === 'ao' ? 'var(--surface-2)' : 'var(--accent-soft)',
+      color: item.role === 'ao' ? 'var(--text-muted)' : 'var(--accent-text)',
     }}>
+      <Icon size={10} strokeWidth={2} /> {roleLabel(item)}
+    </span>
+  )
+}
+
+function StatusBadge({ status }) {
+  const meta = STATUS_META[status]
+  if (!meta) return null
+  const Icon = meta.icon
+  return (
+    <span className="badge ml-1.5" style={{ background: 'var(--surface-2)', color: meta.color }}>
       <Icon size={10} strokeWidth={2} /> {meta.label}
     </span>
   )
@@ -56,6 +79,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [editing, setEditing] = useState(null)
 
   const load = async () => {
     const settle = (p) => p.then(r => ({ ok: true, data: r.data })).catch(() => ({ ok: false }))
@@ -91,6 +115,11 @@ export default function AdminPage() {
     } finally {
       setDeletingId(null)
     }
+  }
+
+  const onAccountSaved = (updated) => {
+    setAccounts(p => p.map(a => (a.id === updated.id ? { ...a, ...updated } : a)))
+    setEditing(null)
   }
 
   const hairline = { borderTop: '1px solid var(--border)' }
@@ -157,17 +186,25 @@ export default function AdminPage() {
                   <td className="px-4 py-2.5 font-medium" style={{ color: 'var(--text)' }}>
                     {acc.name}
                     {acc.id === user?.id && <span className="ml-1.5 text-[10px]" style={{ color: 'var(--text-faint)' }}>(vous)</span>}
+                    <StatusBadge status={acc.status} />
                   </td>
                   <td className="px-4 py-2.5 hidden md:table-cell" style={{ color: 'var(--text-muted)' }}>{acc.email}</td>
-                  <td className="px-4 py-2.5"><RoleBadge role={acc.role} /></td>
+                  <td className="px-4 py-2.5"><RoleBadge item={acc} /></td>
                   <td className="px-4 py-2.5 hidden md:table-cell tabular" style={{ color: 'var(--text-muted)' }}>{fmtDateTime(acc.last_login_at)}</td>
                   <td className="px-4 py-2.5 hidden xl:table-cell tabular" style={{ color: 'var(--text-faint)' }}>{fmtDate(acc.created_at)}</td>
-                  <td className="px-4 py-2.5 text-right">
+                  <td className="px-4 py-2.5 text-right whitespace-nowrap">
+                    <button
+                      onClick={() => setEditing(acc)}
+                      className="p-1 rounded transition-colors text-[var(--text-faint)] hover:text-[var(--text)]"
+                      title="Modifier le compte"
+                    >
+                      <Pencil size={14} />
+                    </button>
                     {acc.id !== user?.id && (
                       <button
                         onClick={() => deleteAccount(acc)}
                         disabled={deletingId === acc.id}
-                        className="p-1 rounded transition-colors text-[var(--text-faint)] hover:text-[var(--danger)]"
+                        className="p-1 rounded transition-colors text-[var(--text-faint)] hover:text-[var(--danger)] ml-0.5"
                         title="Supprimer le compte"
                       >
                         {deletingId === acc.id ? <Loader2 size={13} className="animate-spin" /> : <X size={14} />}
@@ -188,7 +225,7 @@ export default function AdminPage() {
             <div className="flex flex-wrap gap-2">
               {pending.map(inv => (
                 <span key={inv.id} className="badge" style={{ background: 'var(--surface-2)', color: 'var(--text-muted)', border: '1px solid var(--border)' }}>
-                  {inv.name || inv.email} · {ROLE_META[inv.role]?.label || inv.role} · expire le {fmtDate(inv.expires_at)}
+                  {inv.name || inv.email} · {roleLabel(inv)} · expire le {fmtDate(inv.expires_at)}
                 </span>
               ))}
             </div>
@@ -197,6 +234,14 @@ export default function AdminPage() {
       </div>
 
       {inviteOpen && <InviteModal onClose={() => { setInviteOpen(false); load() }} />}
+      {editing && (
+        <AccountEditModal
+          account={editing}
+          isSelf={editing.id === user?.id}
+          onClose={() => setEditing(null)}
+          onSaved={onAccountSaved}
+        />
+      )}
     </div>
   )
 }

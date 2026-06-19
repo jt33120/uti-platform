@@ -61,8 +61,8 @@ export default function RegisterPage() {
             </h1>
             <p className="text-[13px] text-[var(--text-muted)] leading-relaxed">
               La création de compte se fait uniquement via un lien d'invitation
-              envoyé par l'équipe UTI Group. Vérifiez votre boîte mail, ou
-              contactez votre interlocuteur UTI.
+              envoyé par l'équipe Groupement-IT. Vérifiez votre boîte mail, ou
+              contactez votre interlocuteur Groupement-IT.
             </p>
           </div>
         ) : (

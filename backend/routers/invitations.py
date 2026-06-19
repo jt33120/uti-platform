@@ -1,3 +1,4 @@
+import re
 import secrets
 from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, HTTPException, Depends
@@ -14,7 +15,10 @@ router = APIRouter(prefix="/invitations", tags=["invitations"])
 class CreateInviteRequest(BaseModel):
     email: EmailStr
     name: str  # Display name set by admin
-    role: Literal["ao", "commerce"] = "ao"  # partner (default) or UTI sales
+    role: Literal["ao", "commerce"] = "ao"  # partner (default) or sales
+    # Commercial entity (only meaningful when role == 'commerce').
+    # None / 'uti' → Commercial UTI ; 'groupement-it' → Commercial Groupement-IT.
+    org: Optional[Literal["uti", "groupement-it"]] = None
 
 
 def _is_expired(expires_at: str) -> bool:
@@ -22,13 +26,28 @@ def _is_expired(expires_at: str) -> bool:
     return dt < datetime.now(timezone.utc)
 
 
+def _greeting_name(name: str) -> str:
+    """
+    Friendly first name for the email greeting. If the admin accidentally typed
+    an email address as the display name (e.g. 'christelle.pelouin@grp-it.com'),
+    derive a capitalised first name ('Christelle') instead of greeting an address.
+    """
+    n = (name or "").strip()
+    if "@" in n:
+        first = re.split(r"[._\-+]", n.split("@", 1)[0])[0]
+        return first.capitalize() if first else n
+    return n
+
+
 def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: str = "ao") -> tuple[bool, Optional[str]]:
     """
     Send the invitation email via SMTP.
     Returns (success, error_message). Never raises — caller decides what to do.
     """
-    role_label = "l'équipe commerciale UTI Group" if role == "commerce" else "la plateforme partenaires UTI Group"
-    subject = "Invitation — UTI Group Plateforme"
+    greeting = _greeting_name(partner_name)
+    logo_url = f"{settings.frontend_url.rstrip('/')}/logo.png"
+    role_label = "l'équipe commerciale Groupement IT" if role == "commerce" else "la plateforme partenaires Groupement-IT"
+    subject = "Invitation — GROUPEMENT-IT Plateforme"
     html = f"""\
 <!DOCTYPE html>
 <html lang="fr">
@@ -39,8 +58,9 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
           <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
             <tr>
               <td style="padding:32px 32px 8px;">
-                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">UTI Group</div>
-                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">Bonjour {partner_name},</h1>
+                <img src="{logo_url}" alt="Groupement-IT" height="40" style="height:40px;width:auto;display:block;margin:0 0 12px;" />
+                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">Groupement-IT</div>
+                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">Bonjour {greeting},</h1>
               </td>
             </tr>
             <tr>
@@ -75,7 +95,7 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
 </html>"""
 
     text = (
-        f"Bonjour {partner_name},\n\n"
+        f"Bonjour {greeting},\n\n"
         f"Vous êtes invité(e) à rejoindre {role_label}.\n"
         "Créez votre compte en ouvrant le lien ci-dessous (usage unique, expire dans 7 jours) :\n\n"
         f"{invite_url}\n\n"
@@ -102,14 +122,23 @@ async def create_invitation(body: CreateInviteRequest, user: dict = Depends(requ
     token = secrets.token_urlsafe(32)
     expires_at = (datetime.now(timezone.utc) + timedelta(days=7)).isoformat()
 
-    supabase.table("invitations").insert({
+    # Only carry an org for sales accounts; normalise UTI → None.
+    org = body.org if (body.role == "commerce" and body.org == "groupement-it") else None
+    record = {
         "token": token,
         "email": body.email,
         "name": name,
         "role": body.role,
         "invited_by": user["sub"],
         "expires_at": expires_at,
-    }).execute()
+        "org": org,
+    }
+    try:
+        supabase.table("invitations").insert(record).execute()
+    except Exception:
+        # 'org' column not migrated yet — degrade gracefully.
+        record.pop("org", None)
+        supabase.table("invitations").insert(record).execute()
 
     invite_url = f"{settings.frontend_url}/register?invite={token}"
 

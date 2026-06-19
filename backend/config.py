@@ -21,7 +21,7 @@ class Settings(BaseSettings):
     smtp_user: Optional[str] = None
     smtp_password: Optional[str] = None
     smtp_from: Optional[str] = None  # defaults to smtp_user when unset
-    smtp_from_name: str = "UTI Group"
+    smtp_from_name: str = "Plateforme GRP-IT"
 
     # File storage backend: "supabase" (default) or "s3" (OVH Object Storage)
     storage_backend: str = "supabase"

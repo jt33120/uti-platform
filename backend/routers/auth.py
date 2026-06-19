@@ -215,13 +215,22 @@ async def register(body: RegisterRequest):
         )
 
     # ── Step 2: Insert profile row ────────────────────────────────
+    # Carry the commercial entity from the invitation (UTI vs Groupement-IT).
+    org = invitation.get("org") if invitation else None
+    profile_row = {
+        "id": user_id,
+        "email": body.email,
+        "name": body.name.strip(),
+        "role": body.role,
+        "org": org,
+    }
     try:
-        profile_resp = supabase.table("profiles").insert({
-            "id": user_id,
-            "email": body.email,
-            "name": body.name.strip(),
-            "role": body.role,
-        }).execute()
+        try:
+            profile_resp = supabase.table("profiles").insert(profile_row).execute()
+        except Exception:
+            # 'org' column not migrated yet — retry without it.
+            profile_row.pop("org", None)
+            profile_resp = supabase.table("profiles").insert(profile_row).execute()
     except Exception as e:
         tb = traceback.format_exc()
         print(f"[AUTH] profiles insert failed for user {user_id}:\n{tb}")
@@ -264,6 +273,7 @@ async def register(body: RegisterRequest):
             "email": body.email,
             "name": body.name.strip(),
             "role": body.role,
+            "org": org,
         }
     }
 
@@ -339,6 +349,13 @@ async def login(body: LoginRequest):
             detail="Profil utilisateur introuvable. Votre compte est peut-être incomplet — réinscrivez-vous."
         )
 
+    # Block suspended / disabled accounts (admin-managed status).
+    status = profile.get("status") or "active"
+    if status == "suspended":
+        raise HTTPException(status_code=403, detail="Votre compte est suspendu. Contactez un administrateur.")
+    if status == "disabled":
+        raise HTTPException(status_code=403, detail="Votre compte a été désactivé. Contactez un administrateur.")
+
     # Track last connection (powers the admin supervision page) — best-effort
     try:
         supabase.table("profiles").update({
@@ -356,6 +373,7 @@ async def login(body: LoginRequest):
             "email": body.email,
             "name": profile["name"],
             "role": profile["role"],
+            "org": profile.get("org"),
             "avatar_url": profile.get("avatar_url"),
         }
     }
@@ -386,7 +404,7 @@ def _send_reset_email(to_email: str, reset_url: str) -> tuple[bool, Optional[str
     "Supabase Auth <noreply@mail.app.supabase.io>", which alarms users and
     trips spam filters. Returns (success, error); never raises.
     """
-    subject = "Réinitialisation de votre mot de passe — UTI Group"
+    subject = "Réinitialisation de votre mot de passe — Groupement-IT"
     html = f"""\
 <!DOCTYPE html>
 <html lang="fr">
@@ -397,13 +415,13 @@ def _send_reset_email(to_email: str, reset_url: str) -> tuple[bool, Optional[str
           <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
             <tr>
               <td style="padding:32px 32px 8px;">
-                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">UTI Group</div>
+                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">Groupement-IT</div>
                 <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">Réinitialisation du mot de passe</h1>
               </td>
             </tr>
             <tr>
               <td style="padding:16px 32px 24px;font-size:15px;line-height:1.55;color:#1d1d1f;">
-                Vous avez demandé à réinitialiser le mot de passe de votre compte sur la plateforme UTI Group.
+                Vous avez demandé à réinitialiser le mot de passe de votre compte sur la plateforme Groupement-IT.
                 Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe.
                 <p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 1 heure.</p>
               </td>
@@ -433,9 +451,9 @@ def _send_reset_email(to_email: str, reset_url: str) -> tuple[bool, Optional[str
 </html>"""
 
     text = (
-        "Réinitialisation du mot de passe — UTI Group\n\n"
+        "Réinitialisation du mot de passe — Groupement-IT\n\n"
         "Vous avez demandé à réinitialiser le mot de passe de votre compte sur la "
-        "plateforme UTI Group. Ouvrez le lien ci-dessous (usage unique, expire dans 1 heure) "
+        "plateforme Groupement-IT. Ouvrez le lien ci-dessous (usage unique, expire dans 1 heure) "
         "pour choisir un nouveau mot de passe :\n\n"
         f"{reset_url}\n\n"
         "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — "
