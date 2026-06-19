@@ -26,16 +26,28 @@ def _is_expired(expires_at: str) -> bool:
     return dt < datetime.now(timezone.utc)
 
 
+_GENERIC_MAILBOX = {
+    "contact", "info", "hello", "bonjour", "admin", "rh", "hr",
+    "team", "support", "sales", "commercial", "noreply", "no-reply",
+}
+
+
 def _greeting_name(name: str) -> str:
     """
-    Friendly first name for the email greeting. If the admin accidentally typed
-    an email address as the display name (e.g. 'christelle.pelouin@grp-it.com'),
-    derive a capitalised first name ('Christelle') instead of greeting an address.
+    Confident first name for the greeting / register prefill. If the admin typed
+    an email as the display name (e.g. 'christelle.pelouin@grp-it.com'), derive a
+    capitalised first name ('Christelle'). Returns '' when we CAN'T be confident
+    (generic mailbox like contact@, non-alphabetic or too-short local part) —
+    callers then fall back to a plain 'Bonjour,' rather than greeting garbage.
     """
     n = (name or "").strip()
+    if not n:
+        return ""
     if "@" in n:
-        first = re.split(r"[._\-+]", n.split("@", 1)[0])[0]
-        return first.capitalize() if first else n
+        candidate = re.split(r"[._\-+]", n.split("@", 1)[0])[0]
+        if len(candidate) < 2 or not candidate.isalpha() or candidate.lower() in _GENERIC_MAILBOX:
+            return ""
+        return candidate.capitalize()
     return n
 
 
@@ -44,7 +56,8 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
     Send the invitation email via SMTP.
     Returns (success, error_message). Never raises — caller decides what to do.
     """
-    greeting = _greeting_name(partner_name)
+    first = _greeting_name(partner_name)
+    salutation = f"Bonjour {first}" if first else "Bonjour"  # plain "Bonjour," when unsure
     logo_url = f"{settings.frontend_url.rstrip('/')}/logo.png"
     role_label = "l'équipe commerciale Groupement IT" if role == "commerce" else "la plateforme partenaires Groupement-IT"
     subject = "Invitation — GROUPEMENT-IT Plateforme"
@@ -60,7 +73,7 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
               <td style="padding:32px 32px 8px;">
                 <img src="{logo_url}" alt="Groupement-IT" height="40" style="height:40px;width:auto;display:block;margin:0 0 12px;" />
                 <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">Groupement-IT</div>
-                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">Bonjour {greeting},</h1>
+                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">{salutation},</h1>
               </td>
             </tr>
             <tr>
@@ -95,7 +108,7 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
 </html>"""
 
     text = (
-        f"Bonjour {greeting},\n\n"
+        f"{salutation},\n\n"
         f"Vous êtes invité(e) à rejoindre {role_label}.\n"
         "Créez votre compte en ouvrant le lien ci-dessous (usage unique, expire dans 7 jours) :\n\n"
         f"{invite_url}\n\n"
@@ -116,8 +129,9 @@ async def create_invitation(body: CreateInviteRequest, user: dict = Depends(requ
         raise HTTPException(status_code=422, detail="Le nom doit contenir au moins 2 caractères.")
     # Normalise an email accidentally typed as the display name into a clean
     # first name, so it shows correctly everywhere (email greeting, the register
-    # prefill, and the admin "pending invitations" chip) — not just in the email.
-    name = _greeting_name(name)
+    # prefill, and the admin "pending invitations" chip). Keep the original input
+    # when we can't confidently extract a name (helper returns '').
+    name = _greeting_name(name) or name
 
     # Revoke any existing unused invites for this email
     supabase.table("invitations").delete() \
