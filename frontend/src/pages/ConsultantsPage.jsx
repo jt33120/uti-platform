@@ -30,7 +30,7 @@ function EmploymentBadge({ type }) {
 // Email the partner who carries this consultant — pre-filled, sent via the
 // backend SMTP (Reply-To = the staff member writing it).
 function ContactPartnerModal({ consultant, onClose }) {
-  const [subject, setSubject] = useState(`[UTI Group] Au sujet de votre consultant ${consultant.name}`)
+  const [subject, setSubject] = useState(`[Groupement-IT] Au sujet de votre consultant ${consultant.name}`)
   const [message, setMessage] = useState(
     `Bonjour ${consultant.owner?.name || ''},\n\n`
     + `Je vous contacte au sujet de votre consultant ${consultant.name}`

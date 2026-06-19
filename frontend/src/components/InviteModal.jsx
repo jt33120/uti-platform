@@ -2,15 +2,21 @@ import { useState, useEffect } from 'react'
 import { X, Copy, Check, Mail, AlertTriangle, Send, Loader2, Briefcase, BadgePercent } from 'lucide-react'
 import api from '../lib/api'
 
+// Each tile maps to a (role, org) pair. The two "Commercial" tiles share the
+// exact same role ('commerce') — and therefore identical rights — and only
+// differ by their commercial entity (org), which drives the displayed label.
 const INVITE_ROLES = [
-  { value: 'ao', label: 'Partenaire', desc: 'Propose des consultants sur vos AOs', icon: Briefcase },
-  { value: 'commerce', label: 'Commercial UTI', desc: 'Crée les besoins, lance le matching', icon: BadgePercent },
+  { key: 'ao', role: 'ao', org: null, label: 'Partenaire', desc: 'Propose des consultants sur vos AOs', icon: Briefcase },
+  { key: 'commerce_uti', role: 'commerce', org: 'uti', label: 'Commercial UTI', desc: 'Crée les besoins, lance le matching', icon: BadgePercent },
+  { key: 'commerce_grpit', role: 'commerce', org: 'groupement-it', label: 'Commercial Groupement-IT', desc: 'Mêmes droits que Commercial UTI', icon: BadgePercent },
 ]
 
 export default function InviteModal({ onClose, defaultRole = 'ao' }) {
   const [name, setName] = useState('')
   const [email, setEmail] = useState('')
-  const [role, setRole] = useState(defaultRole)
+  const [sel, setSel] = useState(defaultRole === 'commerce' ? 'commerce_uti' : 'ao')
+  const selected = INVITE_ROLES.find(r => r.key === sel) || INVITE_ROLES[0]
+  const isCommerce = selected.role === 'commerce'
   const [inviteUrl, setInviteUrl] = useState(null)
   const [inviteToken, setInviteToken] = useState(null)
   const [emailSent, setEmailSent] = useState(false)
@@ -31,7 +37,7 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
     setError('')
     setLoading(true)
     try {
-      const res = await api.post('/invitations', { name, email, role })
+      const res = await api.post('/invitations', { name, email, role: selected.role, org: selected.org })
       setInviteUrl(res.data.url)
       // Extract token from the returned URL so we can re-send if needed
       try {
@@ -68,8 +74,8 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
   }
 
   const mailtoHref = inviteUrl
-    ? `mailto:${email}?subject=${encodeURIComponent('Invitation — UTI Group Plateforme Partenaires')}&body=${encodeURIComponent(
-        `Bonjour ${name},\n\nVous êtes invité(e) à rejoindre la plateforme partenaires UTI Group.\n\nCliquez ici pour créer votre compte (lien valable 7 jours) :\n${inviteUrl}\n\nÀ bientôt.`
+    ? `mailto:${email}?subject=${encodeURIComponent('Invitation — GROUPEMENT-IT Plateforme')}&body=${encodeURIComponent(
+        `Bonjour ${name},\n\nVous êtes invité(e) à rejoindre la plateforme partenaires Groupement-IT.\n\nCliquez ici pour créer votre compte (lien valable 7 jours) :\n${inviteUrl}\n\nÀ bientôt.`
       )}`
     : '#'
 
@@ -105,24 +111,26 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
           <form onSubmit={handleSubmit} className="space-y-3.5">
             <div>
               <label className="label">Type de compte</label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="flex flex-col gap-2">
                 {INVITE_ROLES.map(r => {
                   const Icon = r.icon
-                  const selected = role === r.value
+                  const active = sel === r.key
                   return (
                     <button
-                      key={r.value}
+                      key={r.key}
                       type="button"
-                      onClick={() => setRole(r.value)}
-                      className="flex flex-col items-start gap-1 p-2.5 rounded-md text-left transition-colors"
+                      onClick={() => setSel(r.key)}
+                      className="flex items-center gap-2.5 p-2.5 rounded-md text-left transition-colors"
                       style={{
-                        background: selected ? 'var(--surface-2)' : 'var(--surface)',
-                        border: `1px solid ${selected ? 'var(--text)' : 'var(--border)'}`,
+                        background: active ? 'var(--surface-2)' : 'var(--surface)',
+                        border: `1px solid ${active ? 'var(--text)' : 'var(--border)'}`,
                       }}
                     >
-                      <Icon size={14} strokeWidth={1.75} className="text-[var(--text)]" />
-                      <span className="text-[12px] font-semibold text-[var(--text)]">{r.label}</span>
-                      <span className="text-[10.5px] text-[var(--text-faint)] leading-tight">{r.desc}</span>
+                      <Icon size={15} strokeWidth={1.75} className="text-[var(--text)] shrink-0" />
+                      <span className="min-w-0">
+                        <span className="block text-[12px] font-semibold text-[var(--text)]">{r.label}</span>
+                        <span className="block text-[10.5px] text-[var(--text-faint)] leading-tight">{r.desc}</span>
+                      </span>
                     </button>
                   )
                 })}
@@ -134,7 +142,7 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
               <input
                 type="text"
                 className="input"
-                placeholder={role === 'commerce' ? 'ex: Jean Dupont' : 'ex: Partenaire Île-de-France'}
+                placeholder={isCommerce ? 'ex: Jean Dupont' : 'ex: Partenaire Île-de-France'}
                 value={name}
                 onChange={e => setName(e.target.value)}
                 required
@@ -142,7 +150,7 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
                 minLength={2}
               />
               <p className="text-[11px] text-[var(--text-faint)] mt-1">
-                Ce nom sera fixé sur le compte — l'invité ne pourra pas le modifier.
+                Utilisé tel quel dans l'email (« Bonjour … ») — un prénom suffit. Modifiable ensuite côté admin.
               </p>
             </div>
 
@@ -151,7 +159,7 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
               <input
                 type="email"
                 className="input"
-                placeholder={role === 'commerce' ? 'prenom.nom@uti-group.com' : 'partenaire@exemple.com'}
+                placeholder={isCommerce ? 'prenom.nom@groupement-it.com' : 'partenaire@exemple.com'}
                 value={email}
                 onChange={e => setEmail(e.target.value)}
                 required
