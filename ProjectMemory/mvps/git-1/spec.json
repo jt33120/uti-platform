@@ -1,308 +1,288 @@
 {
   "mvp_id": "git-1",
   "name": "G-IT Plateforme Partenaires",
-  "goal": "Faire évoluer UTI d'un outil de matching générique vers une plateforme structurée AO → CV → partenaire, avec contrôle d'accès par client et reporting partenaire dédié.",
-  "created_at": "2026-05-15T09:37:00Z",
-  "last_updated": "2026-05-15T09:37:00Z",
+  "goal": "Plateforme de matching CV ↔ Appel d'Offre pour les partenaires UTI avec gestion clients et partenaires",
+  "last_updated": "2026-06-11",
+  "last_payload_captured_at": "2026-06-09T06:55:00+00:00",
   "status": "in_progress",
   "open_tasks_high": [
     {
       "id": "task-001",
-      "title": "Régénérer OPENAI_API_KEY, SUPABASE_SERVICE_KEY, JWT_SECRET — keys were previously committed to GitHub",
-      "priority": "high",
-      "actionable": true,
-      "source": "file:UTI Group/Code/UTI/bfg-1.14.0.jar + backup-git.git",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-04T21:30:00Z",
-      "updated_at": "2026-05-04T21:30:00Z"
-    },
-    {
-      "id": "task-002",
-      "title": "Créer backend/.env avec SUPABASE_URL, SUPABASE_SERVICE_KEY, OPENAI_API_KEY, JWT_SECRET pour débloquer local run",
-      "priority": "high",
-      "actionable": true,
-      "source": "file:UTI Group/Code/UTI/backend/config.py",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-04T21:30:00Z",
-      "updated_at": "2026-05-04T21:30:00Z"
-    },
-    {
-      "id": "task-003",
-      "title": "Proposer 2-3 créneaux de 30 min à 1 h à Romain et Benoît AUMARD pour la session feedback POC",
-      "priority": "high",
-      "actionable": true,
-      "source": "Mail Romain AUMARD 2026-05-06 09:43",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-06T07:43:20Z",
-      "updated_at": "2026-05-06T07:43:20Z"
-    },
-    {
-      "id": "task-004",
-      "title": "Rejoindre la réunion Teams UTI 'Pltfm GIT' (lien fourni par Romain AUMARD)",
-      "priority": "high",
-      "actionable": true,
-      "source": "Mail Romain AUMARD 2026-05-07 09:15 — Pltfm GIT",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-07T07:15:19Z",
-      "updated_at": "2026-05-07T07:15:19Z"
-    },
-    {
-      "id": "task-005",
-      "title": "Préparer une démo / talking points axés Git platform (workflow, repo layout, CI, intégration POC) avant l'appel",
-      "priority": "high",
-      "actionable": true,
-      "source": "Mail Romain AUMARD 2026-05-07 09:15 — Pltfm GIT",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-07T07:15:19Z",
-      "updated_at": "2026-05-07T07:15:19Z"
-    },
-    {
-      "id": "task-006",
       "title": "Modéliser la relation CV ↔ Appel d'Offre (un CV est rattaché à un AO, formalisme typé AO type Groupama, fournir les skills)",
       "priority": "high",
       "actionable": true,
       "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "spec_status": "spec-complete",
+      "elaborated_at": "2026-06-11T07:25:00Z"
     },
     {
-      "id": "task-007",
+      "id": "task-002",
       "title": "Implémenter l'écran de création d'AO incluant le choix du client",
       "priority": "high",
       "actionable": true,
       "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "spec_status": "spec-complete",
+      "elaborated_at": "2026-06-11T07:25:00Z"
     },
     {
-      "id": "task-008",
+      "id": "task-003",
       "title": "Ajouter une entité Client (nom, description, contact) et un mécanisme de sélection des partenaires ayant accès au client (liste 1 / liste 2 par client)",
       "priority": "high",
       "actionable": true,
       "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "spec_status": "spec-complete",
+      "elaborated_at": "2026-06-11T07:25:00Z"
     },
     {
-      "id": "task-009",
+      "id": "task-004",
       "title": "Dashboard partenaire : afficher uniquement les stats du partenaire connecté (vs admin qui voit toutes les réponses)",
       "priority": "high",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-010",
+      "id": "task-005",
       "title": "Préparer une confrontation/audit RGPD du modèle (partenaires, CV, clients)",
       "priority": "high",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
+    },
+    {
+      "id": "task-006",
+      "title": "Regenerate OPENAI_API_KEY, SUPABASE_SERVICE_KEY, JWT_SECRET — keys were previously committed to GitHub",
+      "priority": "high",
+      "actionable": false,
+      "source": "Security audit 04/05/2026",
+      "blocked_note": "Requires Julian/admin confirmation of key rotation; do not run autonomous loop until confirmed."
+    },
+    {
+      "id": "task-021",
+      "title": "Confirmer fin de migration backend OVH (messagerie + BDD)",
+      "priority": "high",
+      "actionable": false,
+      "source": "cowork-uti-20260609T080000 (Julian email 08/06)",
+      "blocked_note": "Awaiting Julian confirmation of migration completion."
     }
   ],
   "open_tasks_medium": [
     {
-      "id": "task-011",
-      "title": "Préparer le partage d'écran live du POC (vidéo + site) avant la session",
-      "priority": "medium",
-      "actionable": true,
-      "source": "Mail Romain AUMARD 2026-05-06 09:43",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-06T07:43:20Z",
-      "updated_at": "2026-05-06T07:43:20Z"
-    },
-    {
-      "id": "task-012",
-      "title": "Capturer les retours Romain/Benoît AUMARD pendant la session et créer un follow-up structuré post-meeting",
-      "priority": "medium",
-      "actionable": true,
-      "source": "Mail Romain AUMARD 2026-05-07 09:15 — Pltfm GIT",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-07T07:15:19Z",
-      "updated_at": "2026-05-07T07:15:19Z"
-    },
-    {
-      "id": "task-013",
+      "id": "task-008",
       "title": "Ajouter un filtre par client en haut de la liste des appels d'offres",
       "priority": "medium",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-014",
+      "id": "task-009",
       "title": "Mettre en avant le temps de réponse et les matchings directement associés à chaque AO",
       "priority": "medium",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-015",
+      "id": "task-010",
       "title": "Vue card : afficher le nombre de réponses des partenaires",
       "priority": "medium",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-016",
+      "id": "task-011",
       "title": "Humaniser les prompts utilisés dans l'outil",
       "priority": "medium",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-017",
+      "id": "task-012",
       "title": "Ajouter la fonctionnalité de suspension d'un partenaire (modification client + modifier partenaire)",
       "priority": "medium",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-018",
+      "id": "task-013",
       "title": "Dissocier les partenaires salariés des indépendants dans le modèle de données",
       "priority": "medium",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-019",
+      "id": "task-014",
       "title": "Explorer une automatisation pour que le partenaire n'ait pas à répondre/maintenir manuellement",
       "priority": "medium",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-020",
+      "id": "task-015",
       "title": "Écrire un script de nettoyage des données existantes",
       "priority": "medium",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
+    },
+    {
+      "id": "task-018",
+      "title": "Review and merge PR #18 (.gitignore hardening + untrack .DS_Store) on jt33120/uti-platform",
+      "priority": "medium",
+      "actionable": true,
+      "source": "cowork-session gitignore-pr18"
+    },
+    {
+      "id": "task-019",
+      "title": "Decide fate of tracked ProjectMemory/{spec,state}.json",
+      "priority": "medium",
+      "actionable": true,
+      "source": "cowork-session gitignore-pr18"
+    },
+    {
+      "id": "task-020",
+      "title": "Confirmer feature email dans interface partenaires/admins (SMTP Infomaniak opérationnel)",
+      "priority": "medium",
+      "actionable": true,
+      "source": "cowork-uti-20260609T080000 (SMTP unblock)"
+    },
+    {
+      "id": "task-022",
+      "title": "Décision CNAME : basculer front sur OVH ou maintenir séparation",
+      "priority": "medium",
+      "actionable": false,
+      "source": "cowork-uti-20260609T080000 (Sullyvan discussion)"
     }
   ],
   "open_tasks_low": [
     {
-      "id": "task-021",
+      "id": "task-016",
       "title": "UI : passer la description sur toute la largeur (au lieu d'être à gauche)",
       "priority": "low",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
     },
     {
-      "id": "task-022",
+      "id": "task-017",
       "title": "Cadrer le périmètre partenaires : 30 partenaires actuels, préciser le volume cible",
       "priority": "low",
       "actionable": true,
-      "source": "Notion UTI 12/05/2026",
-      "status": "open",
-      "assigned_to": null,
-      "created_at": "2026-05-12T09:28:00Z",
-      "updated_at": "2026-05-12T09:28:00Z"
+      "source": "Notion UTI 12/05/2026"
+    }
+  ],
+  "completed_tasks": [
+    {
+      "id": "task-007",
+      "title": "Create backend/.env with SUPABASE_URL, SUPABASE_SERVICE_KEY, OPENAI_API_KEY, JWT_SECRET to unblock local run",
+      "priority": "high",
+      "actionable": true,
+      "source": "Security audit 04/05/2026",
+      "completed_at": "2026-05-21T09:49:00+02:00",
+      "completion_note": "backend/.env exists and required variable names are set (values not inspected/logged)."
     }
   ],
   "decisions": [
     {
-      "id": "decision-001",
-      "text": "Le feedback UTI sur le POC se fera en live (visio) plutôt qu'en écrit.",
-      "source": "Romain AUMARD 2026-05-06",
-      "created_at": "2026-05-06T07:43:20Z"
-    },
-    {
-      "id": "decision-002",
-      "text": "La session de feedback POC UTI se tiendra sur Microsoft Teams via le lien envoyé par Romain AUMARD.",
-      "source": "Mail Romain AUMARD 2026-05-07",
-      "created_at": "2026-05-07T07:15:19Z"
-    },
-    {
-      "id": "decision-003",
-      "text": "Focus de la session orienté 'Pltfm GIT' (sujet du mail) — la plateforme Git est le sujet principal.",
-      "source": "Mail Romain AUMARD 2026-05-07 — subject 'Pltfm GIT'",
-      "created_at": "2026-05-07T07:15:19Z"
-    },
-    {
-      "id": "decision-004",
+      "id": "dec-001",
       "text": "Le modèle pivot devient AO → CV → partenaire, avec le client comme dimension de cloisonnement d'accès.",
       "source": "Notion UTI 12/05/2026",
-      "created_at": "2026-05-12T09:28:00Z"
+      "timestamp": "2026-05-12T09:28:00Z"
     },
     {
-      "id": "decision-005",
+      "id": "dec-002",
       "text": "Séparation stricte admin / partenaire sur la visibilité des réponses et des stats.",
       "source": "Notion UTI 12/05/2026",
-      "created_at": "2026-05-12T09:28:00Z"
+      "timestamp": "2026-05-12T09:28:00Z"
+    },
+    {
+      "id": "dec-003",
+      "text": "Le feedback UTI sur le POC se fera en live (visio) plutôt qu'en écrit.",
+      "source": "Romain AUMARD 2026-05-06",
+      "timestamp": "2026-05-06T07:43:20Z"
+    },
+    {
+      "id": "dec-004",
+      "text": "La session de feedback live UTI cible 'Pltfm GIT' — orientation sur la plateforme Git.",
+      "source": "Mail Romain AUMARD 2026-05-07",
+      "timestamp": "2026-05-07T07:15:19Z"
+    },
+    {
+      "id": "dec-005",
+      "text": "UTI ouvre l acces code source production a Julian via l organisation GitHub Admin-GRP-IT.",
+      "source": "Email noreply@github.com 2026-05-27 10:08",
+      "timestamp": "2026-05-27T08:08:00Z"
+    },
+    {
+      "id": "dec-006",
+      "text": "UTI updater fonctionne en PR-only, sans merge automatique; review gate obligatoire.",
+      "source": "cowork-session uti-mvp-updater-creation",
+      "timestamp": "2026-06-01T08:00:00Z"
+    },
+    {
+      "id": "dec-007",
+      "text": "Les donnees CV/candidats sont utilisees uniquement comme contexte de lecture pour l updater, jamais copiees dans le repo ou une PR.",
+      "source": "cowork-session uti-mvp-updater-creation",
+      "timestamp": "2026-06-01T08:00:00Z"
+    },
+    {
+      "id": "dec-008",
+      "text": "Intake unifie UTI: details email/inbox vers memory/email/YYYY-MM-DD.md; MEMORY.md ne recoit que les changements d etat.",
+      "source": "context-engineering-course",
+      "timestamp": "2026-06-06T10:00:00Z"
+    },
+    {
+      "id": "dec-009",
+      "text": "Les notifications Telegram UTI utilisent le bot dedie UTI_JTA_bot (id 8722584995) au lieu du bot James.",
+      "source": "cowork-session uti-bot-routing-fix",
+      "timestamp": "2026-06-01T12:00:00Z"
+    },
+    {
+      "id": "dec-010",
+      "text": "Repo cible confirme: jt33120/git a ete renomme jt33120/uti-platform; branche par defaut master (pas main).",
+      "source": "cowork-session uti-updater-gitignore-pr18",
+      "timestamp": "2026-06-06T08:30:00Z"
+    },
+    {
+      "id": "dec-011",
+      "text": "ProjectMemory/{spec,state}.json deja trackes restent en place; pas de git rm --cached pour l instant.",
+      "source": "cowork-session uti-updater-gitignore-pr18",
+      "timestamp": "2026-06-06T08:30:00Z"
+    },
+    {
+      "id": "dec-012",
+      "text": "SMTP Infomaniak (mail.infomaniak.com:587 STARTTLS) confirme comme solution email de la plateforme — teste et operationnel depuis 08/06.",
+      "source": "cowork-uti-20260609T080000",
+      "timestamp": "2026-06-08T12:30:00Z"
+    },
+    {
+      "id": "dec-013",
+      "text": "Architecture split: front sur Vercel/serveur Julian (CNAME plateforme.groupement-it.com inchange), backend migre sur OVH (messagerie + BDD). Decision CNAME front reportee.",
+      "source": "cowork-uti-20260609T080000",
+      "timestamp": "2026-06-08T12:45:00Z"
     }
   ],
   "blocker": {
-    "text": "No .env in backend/ — local and CI startup blocked",
+    "text": "Human validation required: confirm exposed OpenAI/Supabase/JWT credentials have been regenerated. backend/.env exists locally, but key rotation cannot be verified autonomously.",
     "active": true,
     "severity": "block",
-    "source": "2026-05-04T23:30:00+02:00--UTI--poc-security-missing-env.json",
-    "created_at": "2026-05-04T21:30:00Z"
+    "source": "Security audit 04/05/2026; env presence check 21/05/2026"
   },
   "acceptance_criteria": [
-    "Backend démarrable avec .env configuré et clés sécurisées",
-    "Session feedback POC UTI effectuée et retours capturés",
-    "Modèle de données AO ↔ CV ↔ partenaire ↔ client implémenté",
-    "Système de contrôle d'accès par client opérationnel",
-    "Dashboard partenaire affichant uniquement les stats du partenaire connecté"
+    "CV upload et parsing fonctionnel",
+    "Création d'appels d'offres avec sélection client",
+    "Matching IA entre CV et AO avec scoring",
+    "Gestion des accès partenaires par client",
+    "Dashboard partenaire avec stats restreintes",
+    "Notifications email via SMTP Infomaniak",
+    "Conformité RGPD vérifiée"
   ],
-  "ingested_payloads": [
-    "2026-05-04T23:30:00+02:00--UTI--poc-security-missing-env.json",
-    "2026-05-06T09:43:20+02:00--UTI--poc-feedback-meeting-request.json",
-    "2026-05-07T09:15:19+02:00--UTI--pltfm-git-meeting-link.json",
-    "2026-05-12T11:28:00+02:00--UTI--spec-update-ao-cv-partner-client-management.json"
+  "current_status": "blocked_pending_secret_rotation_confirmation",
+  "context_updates": [
+    "GitHub PROD invitation Admin-GRP-IT/PLATEFORME-GRP-IT-PROD captured; acceptation remains a business action.",
+    "Cowork MVP updater signals are tracked outside build queue until repo/connector blockers are resolved.",
+    "Unified intake rule active: detailed inbox/email intelligence goes to memory/email/YYYY-MM-DD.md.",
+    "PR #18 opened on jt33120/uti-platform: .gitignore hardening (ProjectMemory/ + .DS_Store). Awaiting review.",
+    "Repo name finalized: jt33120/git renamed to jt33120/uti-platform; default branch is master.",
+    "Decision: tracked ProjectMemory files left in place; no git rm --cached for now.",
+    "[09/06] SMTP Infomaniak confirmed operational — email feature unblocked (dec-012).",
+    "[09/06] Backend migration to OVH in progress (Julian 08/06). CNAME front unchanged — split architecture (dec-013).",
+    "[09/06] Sullyvan BIJON reactivated after 13 days silence.",
+    "[09/06] SMTP blocker (Reschedule call Sullyvan) resolved — no longer needed."
   ]
 }

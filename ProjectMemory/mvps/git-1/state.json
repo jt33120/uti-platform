@@ -1,9 +1,18 @@
 {
   "mvp_id": "git-1",
   "loop_enabled": false,
+  "last_loop_run": "2026-05-17T20:45:18+02:00",
   "consecutive_failures": 0,
-  "last_loop_run": null,
   "gatekeeper_feedback": null,
-  "current_builder_prompt": null,
-  "last_updated": "2026-05-15T09:37:00Z"
+  "status_summary": "Context intake updated through 2026-06-09 08:55; SMTP Infomaniak confirmed operational (email feature unblocked); backend migration to OVH in progress (CNAME front unchanged); Sullyvan BIJON reactivated. Build loop retired/disabled, blocked pending secret rotation confirmation. Task queue: 22 tasks (7 high, 11 medium, 2 low, 1 done). PR #18 still open.",
+  "last_build": "2026-05-17T20:45:18+02:00",
+  "last_test_run": "2026-05-17T20:45:18+02:00",
+  "last_gatekeeper_decision": {
+    "decision": "accept",
+    "reason": "clean_pass",
+    "iteration_count": 0,
+    "confidence": "high"
+  },
+  "updated_at": "2026-06-09T06:55:00+00:00",
+  "loop_blocked_reason": "Human validation required: confirm exposed OpenAI/Supabase/JWT credentials have been regenerated; single-brain rule also prevents OpenClaw build loop execution."
 }

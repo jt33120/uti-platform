@@ -183,12 +183,7 @@ export default function Layout() {
       >
         {/* Brand */}
         <div data-tour="brand" className="px-4 h-14 flex items-center gap-2.5" style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}>
-          <img
-            src="/logo.png"
-            alt="Groupement-IT"
-            className="h-7 w-7 rounded object-cover"
-            onError={(e) => { e.currentTarget.onerror = null; e.currentTarget.src = '/logo.jpeg' }}
-          />
+          <img src="/logo.png" alt="Groupement-IT" className="h-7 w-7 object-contain" />
           <div className="leading-tight">
             <div className="text-[13px] font-semibold tracking-tightest text-[var(--text)]">Groupement-IT</div>
             <div className="text-[10px] text-[var(--text-faint)]">Plateforme Partenaires</div>
