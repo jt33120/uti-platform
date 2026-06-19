@@ -180,7 +180,7 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
                 Annuler
               </button>
               <button type="submit" disabled={loading} className="btn-primary flex-1 justify-center">
-                {loading ? 'Génération...' : 'Générer le lien'}
+                {loading ? 'Envoi...' : "Envoyer l'invitation"}
               </button>
             </div>
           </form>

@@ -109,11 +109,19 @@ async def list_accounts(user: dict = Depends(require_admin)):
     pending = []
     try:
         now = datetime.now(timezone.utc).isoformat()
-        pending = supabase.table("invitations").select(
-            "id, email, name, role, expires_at, created_at"
-        ).is_("used_at", "null").gte("expires_at", now).order(
-            "created_at", desc=True
-        ).execute().data or []
+        try:
+            pending = supabase.table("invitations").select(
+                "id, email, name, role, org, expires_at, created_at"
+            ).is_("used_at", "null").gte("expires_at", now).order(
+                "created_at", desc=True
+            ).execute().data or []
+        except Exception:
+            # 'org' column not migrated yet — degrade gracefully.
+            pending = supabase.table("invitations").select(
+                "id, email, name, role, expires_at, created_at"
+            ).is_("used_at", "null").gte("expires_at", now).order(
+                "created_at", desc=True
+            ).execute().data or []
     except Exception:
         pass
 

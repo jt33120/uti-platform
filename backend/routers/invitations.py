@@ -114,6 +114,10 @@ async def create_invitation(body: CreateInviteRequest, user: dict = Depends(requ
     name = body.name.strip()
     if len(name) < 2:
         raise HTTPException(status_code=422, detail="Le nom doit contenir au moins 2 caractères.")
+    # Normalise an email accidentally typed as the display name into a clean
+    # first name, so it shows correctly everywhere (email greeting, the register
+    # prefill, and the admin "pending invitations" chip) — not just in the email.
+    name = _greeting_name(name)
 
     # Revoke any existing unused invites for this email
     supabase.table("invitations").delete() \
