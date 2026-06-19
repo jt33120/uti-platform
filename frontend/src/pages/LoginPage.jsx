@@ -26,9 +26,9 @@ export default function LoginPage() {
       <div className="w-full max-w-[360px]">
         {/* Brand */}
         <div className="flex items-center gap-2.5 mb-8">
-          <img src="/logo.png" alt="GROUPEMENT-IT" className="h-8 w-8 object-contain" />
+          <img src="/logo.png" alt="Groupement-IT" className="h-8 w-8 object-contain" />
           <div className="leading-tight">
-            <div className="text-[14px] font-semibold tracking-tightest text-[var(--text)]">GROUPEMENT-IT</div>
+            <div className="text-[14px] font-semibold tracking-tightest text-[var(--text)]">Groupement-IT</div>
             <div className="text-[11px] text-[var(--text-faint)]">Plateforme Partenaires</div>
           </div>
         </div>
