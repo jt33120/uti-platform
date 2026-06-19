@@ -7,7 +7,7 @@ vides plutôt que d'échouer.
 """
 from fastapi import APIRouter, Depends
 from services.supabase_client import supabase
-from routers.auth import require_staff
+from routers.auth import require_staff, require_admin
 
 router = APIRouter(prefix="/map", tags=["cartography"])
 
@@ -33,3 +33,61 @@ async def map_points(user: dict = Depends(require_staff)):
         pass
 
     return {"consultants": consultants, "aos": aos}
+
+
+@router.post("/backfill")
+async def backfill_geocoding(user: dict = Depends(require_admin)):
+    """
+    Géocode (a posteriori) les fiches qui ont une localisation mais pas encore de
+    coordonnées — typiquement les AO/consultants créés avant l'ajout de la carte.
+    Idempotent : ne retouche que les fiches sans coordonnées. Best-effort par fiche.
+    """
+    from services.geocoding import geocode
+
+    ao_done = 0
+    try:
+        aos = supabase.table("appels_offres").select(
+            "id, location, work_mode, latitude, longitude"
+        ).execute().data or []
+        for a in aos:
+            if a.get("latitude") is not None and a.get("longitude") is not None:
+                continue
+            if not a.get("location") or a.get("work_mode") == "remote":
+                continue
+            geo = await geocode(a["location"])
+            if not geo:
+                continue
+            try:
+                supabase.table("appels_offres").update(
+                    {"latitude": geo["latitude"], "longitude": geo["longitude"]}
+                ).eq("id", a["id"]).execute()
+                ao_done += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    co_done = 0
+    try:
+        cons = supabase.table("consultants").select(
+            "id, city, latitude, longitude"
+        ).execute().data or []
+        for c in cons:
+            if c.get("latitude") is not None and c.get("longitude") is not None:
+                continue
+            if not c.get("city"):
+                continue
+            geo = await geocode(c["city"])
+            if not geo:
+                continue
+            try:
+                supabase.table("consultants").update(
+                    {"latitude": geo["latitude"], "longitude": geo["longitude"]}
+                ).eq("id", c["id"]).execute()
+                co_done += 1
+            except Exception:
+                pass
+    except Exception:
+        pass
+
+    return {"aos_geocoded": ao_done, "consultants_geocoded": co_done}
