@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from typing import Optional, Literal
 from services.supabase_client import supabase
-from services.email import send_email
+from services.email import send_email, render_email_html
 from services.ratelimit import rate_limit
 from services.geocoding import geocode
 from routers.auth import get_current_user, require_staff, is_staff
@@ -174,30 +174,18 @@ async def contact_partner(consultant_id: str, body: ContactPartnerRequest, user:
     except Exception:
         sender_name = sender_email
 
-    html = f"""\
-<!DOCTYPE html>
-<html lang="fr">
-  <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
-      <tr><td align="center">
-        <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
-          <tr><td style="padding:32px 32px 8px;">
-            <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">UTI Group</div>
-            <h1 style="font-size:20px;margin:8px 0 0;font-weight:600;">À propos de votre consultant {consultant['name']}</h1>
-          </td></tr>
-          <tr><td style="padding:16px 32px 32px;">
-            <div style="background:#f5f5f7;border-radius:8px;padding:16px;font-size:14px;line-height:1.6;color:#1d1d1f;white-space:pre-wrap;">{body.message.strip()}</div>
-            <p style="font-size:12px;color:#86868b;margin:20px 0 0;">Message envoyé par {sender_name} ({sender_email}) — répondez directement à cet email.</p>
-          </td></tr>
-        </table>
-      </td></tr>
-    </table>
-  </body>
-</html>"""
+    html = render_email_html(
+        title=f"À propos de votre consultant {consultant['name']}",
+        body_html=(
+            f'<div style="background:#f5f5f7;border-radius:8px;padding:16px;font-size:14px;'
+            f'line-height:1.6;color:#1d1d1f;white-space:pre-wrap;">{body.message.strip()}</div>'
+        ),
+        footer_note=f"Message envoyé par {sender_name} ({sender_email}) — répondez directement à cet email.",
+    )
     text = (
         f"À propos de votre consultant {consultant['name']}\n\n"
         f"{body.message.strip()}\n\n"
-        f"— {sender_name} ({sender_email}), UTI Group. Répondez directement à cet email."
+        f"— {sender_name} ({sender_email}), Groupement-IT. Répondez directement à cet email."
     )
 
     ok, err = send_email(owner["email"], body.subject.strip(), html, text=text, reply_to=sender_email)

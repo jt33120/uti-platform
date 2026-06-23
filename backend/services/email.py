@@ -14,6 +14,86 @@ from typing import Optional
 from config import settings
 
 
+# ── Shared branded email template ──────────────────────────────────
+# Every transactional email is rendered through render_email_html() so they
+# all share the same shell: logo, "Groupement-IT" wordmark, card layout and
+# footer. Callers only provide the inner content (title + body + optional CTA).
+BRAND = "Groupement-IT"
+
+
+def _logo_url() -> str:
+    return f"{settings.frontend_url.rstrip('/')}/logo.png"
+
+
+def render_email_html(
+    *,
+    title: str,
+    body_html: str,
+    cta: Optional[dict] = None,
+    footer_note: Optional[str] = None,
+) -> str:
+    """
+    Render a branded HTML email.
+
+    - ``title``       : H1 shown under the logo (e.g. "Bonjour Jean,").
+    - ``body_html``   : inner HTML of the main block (paragraphs, tables…).
+    - ``cta``         : optional ``{"label", "url"}`` → black button + copyable link.
+    - ``footer_note`` : optional small grey note in the bottom (bordered) row.
+    """
+    cta_html = ""
+    if cta:
+        cta_html = f"""
+            <tr>
+              <td align="center" style="padding:0 32px 32px;">
+                <a href="{cta['url']}"
+                   style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;">
+                  {cta['label']}
+                </a>
+                <p style="font-size:12px;color:#86868b;margin:20px 0 0;word-break:break-all;">
+                  Ou copiez ce lien :<br/>
+                  <span style="color:#1d1d1f;">{cta['url']}</span>
+                </p>
+              </td>
+            </tr>"""
+
+    footer_html = ""
+    if footer_note:
+        footer_html = f"""
+            <tr>
+              <td style="padding:16px 32px;border-top:1px solid #e5e5e7;font-size:12px;color:#86868b;">
+                {footer_note}
+              </td>
+            </tr>"""
+
+    return f"""\
+<!DOCTYPE html>
+<html lang="fr">
+  <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+      <tr>
+        <td align="center">
+          <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
+            <tr>
+              <td style="padding:32px 32px 8px;">
+                <img src="{_logo_url()}" alt="{BRAND}" height="36" style="height:36px;width:auto;display:block;margin:0 0 12px;" />
+                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">{BRAND}</div>
+                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">{title}</h1>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:16px 32px 24px;font-size:15px;line-height:1.55;color:#1d1d1f;">
+                {body_html}
+              </td>
+            </tr>{cta_html}{footer_html}
+          </table>
+        </td>
+      </tr>
+    </table>
+  </body>
+</html>"""
+
+
+
 def send_email(
     to_email: str,
     subject: str,

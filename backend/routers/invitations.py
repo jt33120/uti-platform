@@ -5,7 +5,7 @@ from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Optional, Literal
 from services.supabase_client import supabase
-from services.email import send_email
+from services.email import send_email, render_email_html
 from routers.auth import require_admin
 from config import settings
 
@@ -58,54 +58,19 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
     """
     first = _greeting_name(partner_name)
     salutation = f"Bonjour {first}" if first else "Bonjour"  # plain "Bonjour," when unsure
-    logo_url = f"{settings.frontend_url.rstrip('/')}/logo.png"
-    role_label = "l'équipe commerciale Groupement IT" if role == "commerce" else "la plateforme partenaires Groupement-IT"
+    role_label = "l'équipe commerciale Groupement-IT" if role == "commerce" else "la plateforme partenaires Groupement-IT"
     subject = "Invitation — GROUPEMENT-IT Plateforme"
-    html = f"""\
-<!DOCTYPE html>
-<html lang="fr">
-  <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
-      <tr>
-        <td align="center">
-          <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
-            <tr>
-              <td style="padding:32px 32px 8px;">
-                <img src="{logo_url}" alt="Groupement-IT" height="40" style="height:40px;width:auto;display:block;margin:0 0 12px;" />
-                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">Groupement-IT</div>
-                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">{salutation},</h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:16px 32px 24px;font-size:15px;line-height:1.55;color:#1d1d1f;">
-                Vous êtes invité(e) à rejoindre <strong>{role_label}</strong>.
-                Créez votre compte en cliquant sur le bouton ci-dessous.
-                <p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 7 jours.</p>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="padding:0 32px 32px;">
-                <a href="{invite_url}"
-                   style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;">
-                  Créer mon compte
-                </a>
-                <p style="font-size:12px;color:#86868b;margin:20px 0 0;word-break:break-all;">
-                  Ou copiez ce lien :<br/>
-                  <span style="color:#1d1d1f;">{invite_url}</span>
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:16px 32px;border-top:1px solid #e5e5e7;font-size:12px;color:#86868b;">
-                Si vous n'attendiez pas cette invitation, ignorez simplement cet email.
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>"""
+    body_html = (
+        f"Vous êtes invité(e) à rejoindre <strong>{role_label}</strong>. "
+        "Créez votre compte en cliquant sur le bouton ci-dessous."
+        '<p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 7 jours.</p>'
+    )
+    html = render_email_html(
+        title=f"{salutation},",
+        body_html=body_html,
+        cta={"label": "Créer mon compte", "url": invite_url},
+        footer_note="Si vous n'attendiez pas cette invitation, ignorez simplement cet email.",
+    )
 
     text = (
         f"{salutation},\n\n"
