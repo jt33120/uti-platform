@@ -20,7 +20,7 @@ _client: Optional[AsyncOpenAI] = (
     if settings.openrouter_key
     else None
 )
-MODEL = "anthropic/claude-3.5-haiku"
+MODEL = "anthropic/claude-haiku-4.5"
 MAX_SOURCE_CHARS = 24000
 
 
