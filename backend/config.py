@@ -32,10 +32,19 @@ class Settings(BaseSettings):
     s3_bucket: Optional[str] = None  # single OVH bucket; "cvs"/"avatars" become key prefixes
     s3_public_base_url: Optional[str] = None  # public base URL for stored objects
 
+    # ── Modèles LLM (tous via OpenRouter) — dimensionnés par usage ──
+    # Configurables par .env pour qu'un retrait de modèle upstream soit une
+    # simple variable d'env, pas un redéploiement de code.
+    #   * extraction : gros volume, structuré → Haiku (rapide + économique)
+    #   * summary    : une phrase, trivial    → Haiku
+    #   * draft      : génération de fiche AO  → Sonnet (qualité rédactionnelle)
+    #   * assistant  : conversationnel         → Sonnet
+    extraction_model: str = "anthropic/claude-haiku-4.5"   # ai_matching (features CV)
+    summary_model: str = "anthropic/claude-haiku-4.5"      # résumé d'AO 1 phrase
+    draft_model: str = "anthropic/claude-sonnet-4.5"       # génération de fiche AO
+
     # In-app AI assistant — optional dedicated OpenRouter key + model
     # (falls back to openrouter_key when unset)
-    # NB: claude-3.5-sonnet was retired upstream (Oct 2025) — requests to it
-    # error out and the assistant silently degrades to its keyword fallback.
     assistant_openrouter_key: Optional[str] = None
     assistant_model: str = "anthropic/claude-sonnet-4.5"
 

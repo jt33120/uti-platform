@@ -20,7 +20,10 @@ _client: Optional[AsyncOpenAI] = (
     if settings.openrouter_key
     else None
 )
-MODEL = "anthropic/claude-haiku-4.5"
+# Génération de fiche AO : qualité rédactionnelle → Sonnet.
+# Résumé en une phrase : trivial → Haiku (économique). Tous deux via .env.
+DRAFT_MODEL = settings.draft_model
+SUMMARY_MODEL = settings.summary_model
 MAX_SOURCE_CHARS = 24000
 
 
@@ -138,7 +141,7 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
     )
 
     resp = await _client.chat.completions.create(
-        model=MODEL,
+        model=DRAFT_MODEL,
         messages=[
             {"role": "system", "content": system},
             {"role": "user", "content": user},
@@ -167,7 +170,7 @@ async def summarize_ao(ao: dict) -> Optional[str]:
     if not source.strip():
         return None
     resp = await _client.chat.completions.create(
-        model=MODEL,
+        model=SUMMARY_MODEL,
         messages=[
             {"role": "system", "content": (
                 "Tu résumes un appel d'offres en UNE seule phrase courte (20 mots "
