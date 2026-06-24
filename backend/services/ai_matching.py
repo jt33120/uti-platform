@@ -19,15 +19,15 @@ client = AsyncOpenAI(
 
 # Modèle d'extraction figé et versionné (Art. 12 — traçabilité ; Art. 17 — gestion
 # des modifications : tout changement déclenche tests + MAJ doc technique).
-EXTRACTION_MODEL = "anthropic/claude-3.5-haiku"
+EXTRACTION_MODEL = "anthropic/claude-haiku-4.5"
 
-# Claude 3.5 Haiku pricing via OpenRouter
-HAIKU_INPUT_COST_PER_MILLION = 0.80   # $0.80 / 1M input tokens
-HAIKU_OUTPUT_COST_PER_MILLION = 4.00  # $4.00 / 1M output tokens
+# Claude Haiku 4.5 pricing via OpenRouter
+HAIKU_INPUT_COST_PER_MILLION = 1.00   # $1.00 / 1M input tokens
+HAIKU_OUTPUT_COST_PER_MILLION = 5.00  # $5.00 / 1M output tokens
 
 
 def calculate_cost(input_tokens: int, output_tokens: int) -> float:
-    """Coût en USD d'un appel d'extraction Claude 3.5 Haiku."""
+    """Coût en USD d'un appel d'extraction Claude Haiku 4.5."""
     return (input_tokens / 1_000_000) * HAIKU_INPUT_COST_PER_MILLION + (
         output_tokens / 1_000_000
     ) * HAIKU_OUTPUT_COST_PER_MILLION

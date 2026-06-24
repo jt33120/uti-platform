@@ -6,7 +6,7 @@ from jose import jwt, JWTError
 from datetime import datetime, timedelta, timezone
 from services.supabase_client import supabase
 from services import storage
-from services.email import send_email
+from services.email import send_email, render_email_html
 from config import settings
 import traceback
 import httpx
@@ -400,55 +400,22 @@ class ResetPasswordRequest(BaseModel):
 def _send_reset_email(to_email: str, reset_url: str) -> tuple[bool, Optional[str]]:
     """
     Send the password-reset email via our own SMTP (Infomaniak), branded as
-    UTI Group — instead of letting Supabase send it from
+    Groupement-IT — instead of letting Supabase send it from
     "Supabase Auth <noreply@mail.app.supabase.io>", which alarms users and
     trips spam filters. Returns (success, error); never raises.
     """
     subject = "Réinitialisation de votre mot de passe — Groupement-IT"
-    html = f"""\
-<!DOCTYPE html>
-<html lang="fr">
-  <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
-      <tr>
-        <td align="center">
-          <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
-            <tr>
-              <td style="padding:32px 32px 8px;">
-                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">Groupement-IT</div>
-                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">Réinitialisation du mot de passe</h1>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:16px 32px 24px;font-size:15px;line-height:1.55;color:#1d1d1f;">
-                Vous avez demandé à réinitialiser le mot de passe de votre compte sur la plateforme Groupement-IT.
-                Cliquez sur le bouton ci-dessous pour choisir un nouveau mot de passe.
-                <p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 1 heure.</p>
-              </td>
-            </tr>
-            <tr>
-              <td align="center" style="padding:0 32px 32px;">
-                <a href="{reset_url}"
-                   style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;">
-                  Réinitialiser mon mot de passe
-                </a>
-                <p style="font-size:12px;color:#86868b;margin:20px 0 0;word-break:break-all;">
-                  Ou copiez ce lien :<br/>
-                  <span style="color:#1d1d1f;">{reset_url}</span>
-                </p>
-              </td>
-            </tr>
-            <tr>
-              <td style="padding:16px 32px;border-top:1px solid #e5e5e7;font-size:12px;color:#86868b;">
-                Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — votre mot de passe reste inchangé.
-              </td>
-            </tr>
-          </table>
-        </td>
-      </tr>
-    </table>
-  </body>
-</html>"""
+    html = render_email_html(
+        title="Réinitialisation du mot de passe",
+        body_html=(
+            "Vous avez demandé à réinitialiser le mot de passe de votre compte sur la "
+            "plateforme Groupement-IT. Cliquez sur le bouton ci-dessous pour choisir un "
+            "nouveau mot de passe."
+            '<p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 1 heure.</p>'
+        ),
+        cta={"label": "Réinitialiser mon mot de passe", "url": reset_url},
+        footer_note="Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — votre mot de passe reste inchangé.",
+    )
 
     text = (
         "Réinitialisation du mot de passe — Groupement-IT\n\n"
@@ -467,7 +434,7 @@ async def forgot_password(body: ForgotPasswordRequest):
     """
     Generates a Supabase recovery link (admin generate_link, which does NOT send
     any email) and delivers it ourselves via Infomaniak SMTP — so the message
-    is branded "UTI Group" instead of "Supabase Auth <noreply@mail.app.supabase.io>".
+    is branded "Groupement-IT" instead of "Supabase Auth <noreply@mail.app.supabase.io>".
 
     Always returns 200 to avoid leaking whether the email exists in the system.
     """

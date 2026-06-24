@@ -1,9 +1,10 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../lib/api'
-import { Map as MapIcon, Users, FileText, Loader2, Wifi } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { Map as MapIcon, Loader2, Wifi, MapPinOff, LocateFixed } from 'lucide-react'
 
 const FRANCE_CENTER = [46.6, 2.45]
 const FRANCE_ZOOM = 6
@@ -21,28 +22,52 @@ function LegendDot({ color }) {
 }
 
 export default function CartePage() {
+  const { isAdmin } = useAuth()
   const [data, setData] = useState({ consultants: [], aos: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showConsultants, setShowConsultants] = useState(true)
   const [showAos, setShowAos] = useState(true)
+  const [backfilling, setBackfilling] = useState(false)
 
-  useEffect(() => {
-    api.get('/map/points')
+  const load = useCallback(() => {
+    setLoading(true)
+    return api.get('/map/points')
       .then(r => setData(r.data))
       .catch(e => setError(e.response?.data?.detail || 'Erreur de chargement de la carte'))
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => { load() }, [load])
+
   const placedAos = useMemo(
     () => (data.aos || []).filter(a => a.latitude != null && a.longitude != null),
     [data.aos]
   )
-  // Remote (ou non géolocalisés) : affichés à part, pas d'ancrage sur la carte.
-  const remoteAos = useMemo(
+  // Hors carte = sans coordonnées. On distingue le vrai remote des fiches
+  // simplement pas encore géocodées (qui ont une localisation).
+  const offMapAos = useMemo(
     () => (data.aos || []).filter(a => a.latitude == null || a.longitude == null),
     [data.aos]
   )
+  // Fiches géocodables a posteriori (localisation connue, pas remote, pas placées).
+  const geocodableCount = useMemo(
+    () => offMapAos.filter(a => a.work_mode !== 'remote' && a.location).length,
+    [offMapAos]
+  )
+
+  const runBackfill = async () => {
+    setBackfilling(true)
+    setError('')
+    try {
+      await api.post('/map/backfill')
+      await load()
+    } catch (e) {
+      setError(e.response?.data?.detail || 'Échec du géocodage des fiches manquantes')
+    } finally {
+      setBackfilling(false)
+    }
+  }
 
   if (loading) {
     return <div className="flex items-center justify-center h-64"><Loader2 size={22} className="animate-spin" style={{ color: 'var(--text-faint)' }} /></div>
@@ -113,25 +138,46 @@ export default function CartePage() {
           </MapContainer>
         </div>
 
-        {/* AO en télétravail / non géolocalisés */}
+        {/* AO hors carte : vrais remote + fiches pas encore géocodées */}
         <div className="card p-4">
           <h2 className="text-xs font-semibold uppercase tracking-wide mb-3 flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }}>
-            <Wifi size={13} /> Remote / non placés ({remoteAos.length})
+            <Wifi size={13} /> Hors carte ({offMapAos.length})
           </h2>
-          {remoteAos.length === 0 ? (
+
+          {isAdmin && geocodableCount > 0 && (
+            <button
+              onClick={runBackfill}
+              disabled={backfilling}
+              className="w-full mb-3 flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 text-[12px] font-medium transition-colors"
+              style={{ border: '1px solid var(--border)', color: 'var(--text-muted)' }}
+              title="Géocoder les fiches qui ont une localisation mais pas encore de point sur la carte"
+            >
+              {backfilling
+                ? <><Loader2 size={13} className="animate-spin" /> Géolocalisation…</>
+                : <><LocateFixed size={13} /> Géolocaliser {geocodableCount} fiche{geocodableCount > 1 ? 's' : ''}</>}
+            </button>
+          )}
+
+          {offMapAos.length === 0 ? (
             <p className="text-[12px]" style={{ color: 'var(--text-faint)' }}>Aucun.</p>
           ) : (
             <ul className="space-y-2">
-              {remoteAos.map(a => (
-                <li key={a.id}>
-                  <Link to={`/aos/${a.id}`} className="block rounded-md px-2 py-1.5 hover:bg-[var(--surface-2)]">
-                    <div className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>{a.title}</div>
-                    <div className="text-[11px]" style={{ color: 'var(--text-faint)' }}>
-                      {a.clients?.name ? `${a.clients.name} · ` : ''}{WORK_MODE_LABEL[a.work_mode] || a.location || '—'}
-                    </div>
-                  </Link>
-                </li>
-              ))}
+              {offMapAos.map(a => {
+                const remote = a.work_mode === 'remote'
+                return (
+                  <li key={a.id}>
+                    <Link to={`/aos/${a.id}`} className="block rounded-md px-2 py-1.5 hover:bg-[var(--surface-2)]">
+                      <div className="text-[13px] font-medium truncate" style={{ color: 'var(--text)' }}>{a.title}</div>
+                      <div className="text-[11px] flex items-center gap-1" style={{ color: 'var(--text-faint)' }}>
+                        {a.clients?.name ? `${a.clients.name} · ` : ''}
+                        {remote
+                          ? <><Wifi size={10} /> Remote</>
+                          : <><MapPinOff size={10} /> Non géolocalisé{a.location ? ` · ${a.location}` : ''}</>}
+                      </div>
+                    </Link>
+                  </li>
+                )
+              })}
             </ul>
           )}
         </div>
