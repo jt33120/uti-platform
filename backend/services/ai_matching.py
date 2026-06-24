@@ -19,7 +19,7 @@ client = AsyncOpenAI(
 
 # Modèle d'extraction figé et versionné (Art. 12 — traçabilité ; Art. 17 — gestion
 # des modifications : tout changement déclenche tests + MAJ doc technique).
-EXTRACTION_MODEL = "anthropic/claude-haiku-4.5"
+EXTRACTION_MODEL = settings.extraction_model
 
 # Claude Haiku 4.5 pricing via OpenRouter
 HAIKU_INPUT_COST_PER_MILLION = 1.00   # $1.00 / 1M input tokens
