@@ -54,6 +54,31 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
     return clean_text("\n".join(parts))
 
 
+def extract_text_from_xlsx(file_bytes: bytes) -> str:
+    """
+    Extract text from a .xlsx workbook: every sheet, each non-empty row rendered
+    as ' | '-joined cells. Useful for AO specs delivered as a spreadsheet
+    (cahier des charges Excel). Lazy import so openpyxl is only needed on use.
+    """
+    from openpyxl import load_workbook
+
+    wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
+    parts: list[str] = []
+    try:
+        for ws in wb.worksheets:
+            parts.append(f"[Feuille : {ws.title}]")
+            for row in ws.iter_rows(values_only=True):
+                cells = [str(c).strip() for c in row if c is not None and str(c).strip()]
+                if cells:
+                    parts.append(" | ".join(cells))
+    finally:
+        try:
+            wb.close()
+        except Exception:
+            pass
+    return clean_text("\n".join(parts))
+
+
 def clean_text(text: str) -> str:
     """Clean and normalize extracted text."""
     # Remove excessive whitespace while preserving structure
