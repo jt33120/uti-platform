@@ -517,7 +517,7 @@ async def notify_partners(ao_id: str, user: dict = Depends(require_staff)):
     ao = _fetch_ao_for_notify(ao_id)
 
     now = datetime.now(timezone.utc)
-    sent_1 = notifications.notify_tier(ao, "list_1")
+    sent_1 = notifications.notify_tier(ao, "list_1", user["sub"])
 
     delay = cfg["list2_delay_days"]
     list2_at = now + timedelta(days=delay)
@@ -531,7 +531,7 @@ async def notify_partners(ao_id: str, user: dict = Depends(require_staff)):
     }
     if delay <= 0:
         # Pas de délai → liste 2 tout de suite, sans attendre le planificateur.
-        sent_2 = notifications.notify_tier(ao, "list_2")
+        sent_2 = notifications.notify_tier(ao, "list_2", user["sub"])
         update["list2_notified_at"] = now.isoformat()
 
     try:
@@ -555,7 +555,7 @@ async def relance_partners(ao_id: str, user: dict = Depends(require_staff)):
     """Relance MANUELLE des partenaires n'ayant pas encore proposé de CV."""
     ao = _fetch_ao_for_notify(ao_id)
     now = datetime.now(timezone.utc)
-    sent = notifications.relance(ao, only_pending=True)
+    sent = notifications.relance(ao, only_pending=True, actor_id=user["sub"])
     try:
         supabase.table("appels_offres").update({
             "last_relance_at": now.isoformat(),
@@ -564,6 +564,27 @@ async def relance_partners(ao_id: str, user: dict = Depends(require_staff)):
     except Exception as e:
         print(f"[AO] maj relance {ao_id} échouée (migration ?): {e}")
     return {"relance_sent": sent}
+
+
+@router.get("/{ao_id}/eligible-partners")
+async def ao_eligible_partners(ao_id: str, user: dict = Depends(require_staff)):
+    """Partenaires (liste 1/2) du client de l'AO, pour le renvoi ciblé."""
+    ao = _fetch_ao_for_notify(ao_id)
+    return {"partners": notifications.eligible_partners(ao)}
+
+
+class NotifySelectedRequest(BaseModel):
+    partner_ids: list[str]
+
+
+@router.post("/{ao_id}/notify-partners", dependencies=[Depends(rate_limit(30, 60))])
+async def notify_selected_partners(ao_id: str, body: NotifySelectedRequest, user: dict = Depends(require_staff)):
+    """Renvoi MANUEL ciblé d'un AO à des partenaires précis (sans toucher les autres)."""
+    if not body.partner_ids:
+        raise HTTPException(status_code=422, detail="Aucun partenaire sélectionné.")
+    ao = _fetch_ao_for_notify(ao_id)
+    sent = notifications.notify_selected(ao, body.partner_ids, user["sub"])
+    return {"sent": sent}
 
 
 class BulkDeleteRequest(BaseModel):

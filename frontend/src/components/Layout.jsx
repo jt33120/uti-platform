@@ -5,7 +5,7 @@ import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
   Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
   HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal, ChevronDown, Map,
-  Menu, X
+  Menu, X, Bell
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
@@ -237,6 +237,7 @@ export default function Layout() {
               <NavSection id="outils" label="Outils">
                 <NavItem to="/carte" icon={Map} label="Carte" />
                 <NavItem to="/graph" icon={Compass} label="Cartographie" />
+                <NavItem to="/notifications" icon={Bell} label="Notifications mail" />
                 <NavItem to="/pacs" icon={Package} label="PACs" />
               </NavSection>
 
@@ -263,6 +264,7 @@ export default function Layout() {
               <NavSection id="c_outils" label="Outils">
                 <NavItem to="/carte" icon={Map} label="Carte" />
                 <NavItem to="/graph" icon={Compass} label="Cartographie" />
+                <NavItem to="/notifications" icon={Bell} label="Notifications mail" />
               </NavSection>
 
               <div className="mt-3">

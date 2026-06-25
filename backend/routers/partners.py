@@ -23,9 +23,15 @@ class PartnerUpdate(BaseModel):
 async def list_partners(user: dict = Depends(require_staff)):
     """List all users with role='ao' (partners)."""
     try:
-        response = supabase.table("profiles").select(
-            "id, email, name, role, created_at"
-        ).eq("role", "ao").order("name").execute()
+        try:
+            response = supabase.table("profiles").select(
+                "id, email, name, role, status, created_at"
+            ).eq("role", "ao").order("name").execute()
+        except Exception:
+            # 'status' column not migrated yet — degrade gracefully.
+            response = supabase.table("profiles").select(
+                "id, email, name, role, created_at"
+            ).eq("role", "ao").order("name").execute()
         return response.data
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
@@ -50,9 +56,14 @@ async def list_clients_for_partner(partner_id: str, user: dict = Depends(require
     """
     try:
         # Verify partner exists
-        partner = supabase.table("profiles").select("id, email, name, created_at").eq(
-            "id", partner_id
-        ).eq("role", "ao").single().execute()
+        try:
+            partner = supabase.table("profiles").select("id, email, name, status, created_at").eq(
+                "id", partner_id
+            ).eq("role", "ao").single().execute()
+        except Exception:
+            partner = supabase.table("profiles").select("id, email, name, created_at").eq(
+                "id", partner_id
+            ).eq("role", "ao").single().execute()
         if not partner.data:
             raise HTTPException(status_code=404, detail="Partenaire introuvable")
 

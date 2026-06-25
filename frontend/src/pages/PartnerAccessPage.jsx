@@ -161,9 +161,9 @@ export default function PartnerAccessPage() {
 
   const handleSuspendGlobally = async (partnerId) => {
     if (!(await confirm({
-      title: 'Suspendre ce partenaire ?',
-      message: 'Le partenaire sera suspendu sur TOUS les clients.',
-      confirmLabel: 'Suspendre',
+      title: "Suspendre l'accès de ce partenaire ?",
+      message: "L'accès du partenaire sera suspendu sur tous les clients qui lui sont attribués. (Ceci ne bloque pas la connexion — pour cela, suspendez le compte depuis Admin → Comptes.)",
+      confirmLabel: "Suspendre l'accès",
     }))) return
     setSuspending(partnerId)
     try {
@@ -286,14 +286,14 @@ export default function PartnerAccessPage() {
                       <div className="text-[10px] truncate" style={{ color: 'var(--text-faint)' }}>{p.email}</div>
                     </div>
                     {suspendedEverywhere ? (
-                      <span className="badge" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
-                        <AlertCircle size={10} /> Suspendu partout
+                      <span className="badge" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }} title="Accès suspendu sur tous les clients attribués (ne bloque pas la connexion).">
+                        <AlertCircle size={10} /> Accès suspendu
                       </span>
                     ) : hasAnyAccess ? (
-                      <button onClick={() => handleSuspendGlobally(p.id)} disabled={suspending === p.id} className="btn-danger text-xs px-3 h-8">
+                      <button onClick={() => handleSuspendGlobally(p.id)} disabled={suspending === p.id} className="btn-danger text-xs px-3 h-8" title="Suspendre l'accès à tous ses clients (ne bloque pas la connexion)">
                         {suspending === p.id
                           ? <><Loader2 size={12} className="animate-spin" />Suspension…</>
-                          : <><ShieldOff size={12} />Suspendre partout</>}
+                          : <><ShieldOff size={12} />Suspendre l'accès</>}
                       </button>
                     ) : (
                       <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>Aucun accès actif</span>
