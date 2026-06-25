@@ -1,10 +1,12 @@
 import secrets
+from datetime import datetime, timezone, timedelta
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, BackgroundTasks
 from pydantic import BaseModel
 from typing import Optional
 from services.supabase_client import supabase
 from services.cv_parser import extract_text_from_pdf, extract_text_from_docx, extract_text_from_xlsx
-from services import ao_drafter, storage
+from services import ao_drafter, storage, notifications
+from services.app_settings import get_notification_settings
 from services.matching_runner import run_vivier_matching
 from services.ratelimit import rate_limit
 from routers.auth import get_current_user, require_staff, is_staff
@@ -488,6 +490,80 @@ async def update_ao(ao_id: str, body: AOUpdate, background_tasks: BackgroundTask
         raise
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+def _fetch_ao_for_notify(ao_id: str) -> dict:
+    try:
+        ao = supabase.table("appels_offres").select(
+            "*, clients(name)"
+        ).eq("id", ao_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="AO introuvable")
+    if not ao:
+        raise HTTPException(status_code=404, detail="AO introuvable")
+    return ao
+
+
+@router.post("/{ao_id}/notify", dependencies=[Depends(rate_limit(20, 60))])
+async def notify_partners(ao_id: str, user: dict = Depends(require_staff)):
+    """
+    Envoi MANUEL (commercial) de la notification d'ouverture aux partenaires :
+    liste 1 immédiatement, liste 2 planifiée selon le délai configuré (réglages
+    admin). Relance le compteur — chaque clic relance une campagne propre.
+    """
+    cfg = get_notification_settings()
+    if not cfg.get("enabled"):
+        raise HTTPException(status_code=400, detail="Les notifications sont désactivées dans les réglages admin.")
+    ao = _fetch_ao_for_notify(ao_id)
+
+    now = datetime.now(timezone.utc)
+    sent_1 = notifications.notify_tier(ao, "list_1")
+
+    delay = cfg["list2_delay_days"]
+    list2_at = now + timedelta(days=delay)
+    sent_2 = 0
+    update = {
+        "notified_at": now.isoformat(),
+        "list2_scheduled_at": list2_at.isoformat(),
+        "list2_notified_at": None,
+        "relance_count": 0,
+        "last_relance_at": None,
+    }
+    if delay <= 0:
+        # Pas de délai → liste 2 tout de suite, sans attendre le planificateur.
+        sent_2 = notifications.notify_tier(ao, "list_2")
+        update["list2_notified_at"] = now.isoformat()
+
+    try:
+        supabase.table("appels_offres").update(update).eq("id", ao_id).execute()
+    except Exception as e:
+        # Colonnes de notification pas encore migrées : l'envoi liste 1 a tout de
+        # même eu lieu, on signale sans planifier la liste 2.
+        print(f"[AO] maj notification {ao_id} échouée (migration ?): {e}")
+        return {"sent_list_1": sent_1, "sent_list_2": sent_2, "list2_scheduled_at": None, "delay_days": delay}
+
+    return {
+        "sent_list_1": sent_1,
+        "sent_list_2": sent_2,
+        "list2_scheduled_at": None if delay <= 0 else list2_at.isoformat(),
+        "delay_days": delay,
+    }
+
+
+@router.post("/{ao_id}/relance", dependencies=[Depends(rate_limit(20, 60))])
+async def relance_partners(ao_id: str, user: dict = Depends(require_staff)):
+    """Relance MANUELLE des partenaires n'ayant pas encore proposé de CV."""
+    ao = _fetch_ao_for_notify(ao_id)
+    now = datetime.now(timezone.utc)
+    sent = notifications.relance(ao, only_pending=True)
+    try:
+        supabase.table("appels_offres").update({
+            "last_relance_at": now.isoformat(),
+            "relance_count": (ao.get("relance_count") or 0) + 1,
+        }).eq("id", ao_id).execute()
+    except Exception as e:
+        print(f"[AO] maj relance {ao_id} échouée (migration ?): {e}")
+    return {"relance_sent": sent}
 
 
 class BulkDeleteRequest(BaseModel):

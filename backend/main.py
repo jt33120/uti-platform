@@ -134,3 +134,11 @@ def root():
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+# ── Planificateur de notifications (mono-worker uvicorn) ──────────
+@app.on_event("startup")
+async def _start_scheduler():
+    import asyncio
+    from services.scheduler import run_scheduler
+    asyncio.create_task(run_scheduler())

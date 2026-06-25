@@ -9,7 +9,7 @@ import {
   Loader2, FileText, Trash2, RotateCcw, Building2, Plus,
   Upload, X, UserCircle2, Briefcase, Calendar, Pencil,
   CalendarClock, AlertTriangle, BarChart3, Sparkles,
-  UploadCloud, Download, Target, Hash
+  UploadCloud, Download, Target, Hash, Send, Bell
 } from 'lucide-react'
 import ScoringPriorities, { DEFAULT_STARS } from '../components/ScoringPriorities'
 
@@ -1017,6 +1017,8 @@ export default function AODetailPage() {
   // Assistant can deep-link here to open the "propose consultant" flow,
   // optionally pre-filling the new-consultant fields. It never submits.
   const [submitPrefill, setSubmitPrefill] = useState(location.state?.assistantPrefill || null)
+  const [notifBusy, setNotifBusy] = useState('')   // '' | 'notify' | 'relance'
+  const [notifMsg, setNotifMsg] = useState('')
 
   const fetchAo = async () => {
     const r = await api.get(`/aos/${id}`)
@@ -1043,15 +1045,53 @@ export default function AODetailPage() {
     }
   }
 
+  const handleNotify = async () => {
+    if (!(await confirm({
+      title: 'Envoyer aux partenaires ?',
+      message: 'La liste 1 est notifiée immédiatement ; la liste 2 le sera après le délai configuré dans les réglages admin.',
+      confirmLabel: 'Envoyer',
+    }))) return
+    setNotifBusy('notify'); setNotifMsg('')
+    try {
+      const { data } = await api.post(`/aos/${id}/notify`)
+      const l2 = data.list2_scheduled_at
+        ? `liste 2 prévue le ${formatDate(data.list2_scheduled_at)}`
+        : (data.sent_list_2 ? `liste 2 envoyée (${data.sent_list_2})` : 'liste 2 non planifiée')
+      setNotifMsg(`Liste 1 : ${data.sent_list_1} partenaire(s) notifié(s) · ${l2}.`)
+      await fetchAo()
+    } catch (e) {
+      setNotifMsg(e.response?.data?.detail || "Échec de l'envoi")
+    } finally {
+      setNotifBusy('')
+    }
+  }
+
+  const handleRelance = async () => {
+    setNotifBusy('relance'); setNotifMsg('')
+    try {
+      const { data } = await api.post(`/aos/${id}/relance`)
+      setNotifMsg(`Relance envoyée à ${data.relance_sent} partenaire(s) sans réponse.`)
+      await fetchAo()
+    } catch (e) {
+      setNotifMsg(e.response?.data?.detail || 'Échec de la relance')
+    } finally {
+      setNotifBusy('')
+    }
+  }
+
   useEffect(() => {
     const init = async () => {
       try {
         const [aoData, subs] = await Promise.all([fetchAo(), fetchSubmissions()])
 
-        if (!isAdmin) {
+        // Vivier chargé pour tous : les partenaires le proposent, le staff
+        // peut aussi ajouter un CV manuellement à l'AO.
+        try {
           const vivierRes = await api.get('/consultants')
           setVivier(vivierRes.data)
+        } catch { /* non bloquant */ }
 
+        if (!isAdmin) {
           if (subs.length > 0) {
             try {
               const cached = await api.get(`/matching/results/${id}`)
@@ -1259,6 +1299,46 @@ export default function AODetailPage() {
                 <button onClick={() => setShowSubmitModal(true)} className="btn-primary">
                   <Plus size={15} /> Soumettre un CV
                 </button>
+              </div>
+            </div>
+          )}
+
+          {/* Staff view: ajout manuel d'un CV + diffusion aux partenaires */}
+          {isAdmin && (
+            <div className="card p-4">
+              <div className="flex items-center justify-between flex-wrap gap-3">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-white flex items-center gap-2">
+                    <Send size={15} className="text-brand-400" /> Diffusion & CV
+                  </p>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    {ao.notified_at
+                      ? <>Partenaires notifiés le {formatDate(ao.notified_at)}
+                          {ao.list2_notified_at
+                            ? ` · liste 2 envoyée le ${formatDate(ao.list2_notified_at)}`
+                            : ao.list2_scheduled_at
+                              ? ` · liste 2 prévue le ${formatDate(ao.list2_scheduled_at)}`
+                              : ''}
+                          {ao.relance_count ? ` · ${ao.relance_count} relance${ao.relance_count > 1 ? 's' : ''}` : ''}.</>
+                      : "Aucune notification envoyée aux partenaires pour le moment."}
+                  </p>
+                  {notifMsg && <p className="text-xs text-brand-300 mt-1">{notifMsg}</p>}
+                </div>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button onClick={() => setShowSubmitModal(true)} className="btn-ghost">
+                    <Plus size={14} /> Ajouter un CV
+                  </button>
+                  <button onClick={handleNotify} disabled={notifBusy !== ''} className="btn-ghost">
+                    {notifBusy === 'notify' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                    {ao.notified_at ? 'Renvoyer' : 'Envoyer aux partenaires'}
+                  </button>
+                  {ao.notified_at && (
+                    <button onClick={handleRelance} disabled={notifBusy !== ''} className="btn-primary">
+                      {notifBusy === 'relance' ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
+                      Relancer
+                    </button>
+                  )}
+                </div>
               </div>
             </div>
           )}
