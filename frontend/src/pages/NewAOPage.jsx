@@ -39,7 +39,7 @@ export default function NewAOPage() {
   const generateFromSource = async () => {
     setAiError(''); setAiDone(false)
     if (!aiText.trim() && aiFiles.length === 0) {
-      setAiError("Collez le texte d'un email ou ajoutez un fichier (PDF, DOCX)."); return
+      setAiError("Collez le texte d'un email ou ajoutez un fichier (PDF, DOCX, XLSX)."); return
     }
     setAiLoading(true)
     try {
@@ -148,7 +148,7 @@ export default function NewAOPage() {
           <div>
             <h2 className="text-sm font-semibold text-white">Générer l'AO avec l'IA</h2>
             <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Collez l'email reçu et/ou ajoutez la pièce jointe (PDF, DOCX). L'IA pré-remplit le formulaire ci-dessous —
+              Collez l'email reçu et/ou ajoutez la pièce jointe (PDF, DOCX, XLSX). L'IA pré-remplit le formulaire ci-dessous —
               vous vérifiez et ajustez avant d'enregistrer.
             </p>
           </div>
@@ -164,7 +164,7 @@ export default function NewAOPage() {
           <label className="btn-ghost cursor-pointer text-sm">
             <UploadCloud size={15} /> Ajouter un fichier
             <input
-              type="file" multiple accept=".pdf,.docx,.txt" className="hidden"
+              type="file" multiple accept=".pdf,.docx,.xlsx,.txt,.csv" className="hidden"
               onChange={e => { setAiFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = '' }}
             />
           </label>

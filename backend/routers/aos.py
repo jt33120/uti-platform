@@ -3,7 +3,7 @@ from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Form, B
 from pydantic import BaseModel
 from typing import Optional
 from services.supabase_client import supabase
-from services.cv_parser import extract_text_from_pdf, extract_text_from_docx
+from services.cv_parser import extract_text_from_pdf, extract_text_from_docx, extract_text_from_xlsx
 from services import ao_drafter, storage
 from services.matching_runner import run_vivier_matching
 from services.ratelimit import rate_limit
@@ -166,7 +166,9 @@ async def draft_ao(
                 parts.append(extract_text_from_pdf(data))
             elif name.endswith(".docx"):
                 parts.append(extract_text_from_docx(data))
-            elif name.endswith(".txt"):
+            elif name.endswith(".xlsx"):
+                parts.append(extract_text_from_xlsx(data))
+            elif name.endswith((".txt", ".csv")):
                 parts.append(data.decode("utf-8", errors="ignore"))
             # other formats are silently skipped
         except Exception:
@@ -177,7 +179,7 @@ async def draft_ao(
     if not source.strip():
         raise HTTPException(
             status_code=422,
-            detail="Aucun contenu exploitable. Collez le texte de l'email ou ajoutez un PDF/DOCX.",
+            detail="Aucun contenu exploitable. Collez le texte de l'email ou ajoutez un PDF, DOCX ou XLSX.",
         )
 
     try:

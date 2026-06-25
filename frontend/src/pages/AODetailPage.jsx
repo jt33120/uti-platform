@@ -600,7 +600,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
   const generateFromSource = async () => {
     setAiError(''); setAiDone(false)
     if (!aiText.trim() && aiFiles.length === 0) {
-      setAiError("Collez un email ou ajoutez un fichier (PDF, DOCX)."); return
+      setAiError("Collez un email ou ajoutez un fichier (PDF, DOCX, XLSX)."); return
     }
     setAiLoading(true)
     try {
@@ -708,7 +708,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
           <div className="flex flex-wrap items-center gap-2 mt-2">
             <label className="btn-ghost cursor-pointer text-xs">
               <UploadCloud size={14} /> Ajouter un fichier
-              <input type="file" multiple accept=".pdf,.docx,.txt" className="hidden"
+              <input type="file" multiple accept=".pdf,.docx,.xlsx,.txt,.csv" className="hidden"
                 onChange={e => { setAiFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = '' }} />
             </label>
             {aiFiles.map((f, i) => (
