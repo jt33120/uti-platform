@@ -356,13 +356,10 @@ export default function Layout() {
           className="h-14 flex items-center justify-between gap-1 px-4 sm:px-6"
           style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}
         >
-          <button
-            onClick={() => setMobileNavOpen(true)}
-            className="md:hidden h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
-            aria-label="Ouvrir le menu"
-          >
-            <Menu size={18} strokeWidth={1.75} />
-          </button>
+          <div className="md:hidden flex items-center gap-2 min-w-0">
+            <img src="/logo.png" alt="Groupement-IT" className="h-6 w-6 object-contain shrink-0" />
+            <span className="text-[13px] font-semibold tracking-tightest text-[var(--text)] truncate">Groupement-IT</span>
+          </div>
           <div className="flex items-center gap-1 ml-auto">
           <button
             onClick={() => openContact('bug')}
@@ -381,11 +378,45 @@ export default function Layout() {
           </button>
           </div>
         </div>
-        <div className="px-4 sm:px-6 py-5 sm:py-6 max-w-6xl mx-auto">
+        <div className="px-4 sm:px-6 py-5 sm:py-6 pb-24 md:pb-6 max-w-6xl mx-auto">
           <Outlet />
           <Footer />
         </div>
       </main>
+
+      {/* Barre de navigation mobile (onglets) — 4 destinations + Menu */}
+      <nav
+        className="md:hidden fixed bottom-0 inset-x-0 z-40 flex items-stretch"
+        style={{ background: 'var(--chrome)', borderTop: '1px solid var(--border)', paddingBottom: 'env(safe-area-inset-bottom)' }}
+      >
+        {[
+          { to: '/dashboard', icon: LayoutDashboard, label: 'Accueil', end: true },
+          { to: '/aos', icon: FileText, label: isStaff ? 'AOs' : 'Mes AOs' },
+          { to: '/consultants', icon: Users, label: 'Vivier' },
+          { to: '/clients', icon: Building2, label: 'Clients' },
+        ].map(t => (
+          <NavLink
+            key={t.to}
+            to={t.to}
+            end={t.end}
+            className={({ isActive }) => clsx(
+              'flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium transition-colors',
+              isActive ? 'text-[var(--accent-text)]' : 'text-[var(--text-muted)]'
+            )}
+          >
+            <t.icon size={20} strokeWidth={1.75} />
+            <span>{t.label}</span>
+          </NavLink>
+        ))}
+        <button
+          onClick={() => setMobileNavOpen(true)}
+          className="flex-1 flex flex-col items-center justify-center gap-0.5 py-2 text-[10px] font-medium text-[var(--text-muted)] hover:text-[var(--text)] transition-colors"
+          aria-label="Ouvrir le menu complet"
+        >
+          <Menu size={20} strokeWidth={1.75} />
+          <span>Menu</span>
+        </button>
+      </nav>
 
       {/* Floating AI assistant — routes & pre-fills, never submits */}
       <AssistantWidget />

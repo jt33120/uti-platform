@@ -177,7 +177,7 @@ export default function AssistantWidget() {
           onClick={() => setOpen(true)}
           aria-label="Ouvrir l'assistant"
           data-tour="assistant"
-          className="fixed bottom-6 right-6 z-40 flex items-center gap-2 h-12 px-4 rounded-full transition-transform hover:scale-[1.03]"
+          className="fixed bottom-20 right-5 md:bottom-6 md:right-6 z-40 flex items-center gap-2 h-12 px-4 rounded-full transition-transform hover:scale-[1.03]"
           style={{
             backgroundColor: 'var(--action-bg)',
             backgroundImage: 'var(--btn-sheen)',
@@ -193,10 +193,10 @@ export default function AssistantWidget() {
       {/* Panel */}
       {open && (
         <div
-          className="fixed bottom-6 right-6 z-40 flex flex-col rounded-xl overflow-hidden shadow-2xl"
+          className="fixed bottom-20 right-4 md:bottom-6 md:right-6 z-40 flex flex-col rounded-xl overflow-hidden shadow-2xl"
           style={{
             width: 'min(380px, calc(100vw - 2rem))',
-            height: 'min(600px, calc(100vh - 3rem))',
+            height: 'min(600px, calc(100vh - 7rem))',
             background: 'var(--surface)',
             border: '1px solid var(--border)',
           }}
