@@ -177,9 +177,9 @@ export default function PartnersPage() {
 
   const handleSuspend = async (partner) => {
     if (!(await confirm({
-      title: 'Suspendre ce partenaire ?',
-      message: `« ${partner.name} » sera suspendu sur tous les clients.`,
-      confirmLabel: 'Suspendre',
+      title: "Suspendre l'accès de ce partenaire ?",
+      message: `L'accès de « ${partner.name} » sera suspendu sur tous les clients qui lui sont attribués. (Ceci ne bloque pas la connexion — pour cela, suspendez le compte depuis Admin → Comptes.)`,
+      confirmLabel: "Suspendre l'accès",
     }))) return
     setSuspending(partner.id)
     try {
@@ -194,8 +194,9 @@ export default function PartnersPage() {
 
   // ── Stat counters ─────────────────────────────────────────────────────────
   const totalSuspended = partners.filter(p => {
+    if (p.status && p.status !== 'active') return true  // compte bloqué
     const s = getAccessSummary(p.id)
-    return s.total > 0 && s.suspended === s.total
+    return s.total > 0 && s.suspended === s.total       // ou accès suspendu partout
   }).length
   const totalActive = partners.length - totalSuspended
 
@@ -297,6 +298,9 @@ export default function PartnersPage() {
           {filtered.map(partner => {
             const summary = getAccessSummary(partner.id)
             const isSuspendedEverywhere = summary.total > 0 && summary.suspended === summary.total
+            // Statut du COMPTE (bloque la connexion) — prioritaire sur l'accès par client.
+            const accountBlocked = partner.status && partner.status !== 'active'
+            const accountLabel = partner.status === 'disabled' ? 'Compte désactivé' : 'Compte suspendu'
 
             return (
               <div
@@ -304,7 +308,7 @@ export default function PartnersPage() {
                 onClick={() => navigate(`/partners/${partner.id}`)}
                 className={clsx(
                   'card p-4 flex items-center gap-4 hover:border-white/10 transition-all duration-150 cursor-pointer',
-                  isSuspendedEverywhere && 'border-red-500/20 opacity-80'
+                  (isSuspendedEverywhere || accountBlocked) && 'border-red-500/20 opacity-80'
                 )}
               >
                 {/* Avatar */}
@@ -316,9 +320,14 @@ export default function PartnersPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <span className="text-sm font-semibold text-white">{partner.name}</span>
+                    {accountBlocked && (
+                      <span className="badge bg-red-500/15 text-red-400 border border-red-500/30 text-[10px] flex items-center gap-1" title="Le compte est bloqué : ce partenaire ne peut pas se connecter, quels que soient ses accès clients.">
+                        <ShieldOff size={9} /> {accountLabel}
+                      </span>
+                    )}
                     {isSuspendedEverywhere && (
-                      <span className="badge bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] flex items-center gap-1">
-                        <ShieldOff size={9} /> Suspendu partout
+                      <span className="badge bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] flex items-center gap-1" title="Accès suspendu sur tous les clients qui lui sont attribués.">
+                        <ShieldOff size={9} /> Accès suspendu{summary.total ? ` (${summary.total})` : ''}
                       </span>
                     )}
                   </div>
@@ -351,7 +360,7 @@ export default function PartnersPage() {
                       onClick={() => handleSuspend(partner)}
                       disabled={suspending === partner.id}
                       className="btn-ghost p-2 text-slate-400 hover:text-red-400 transition-colors"
-                      title="Suspendre sur tous les clients"
+                      title="Suspendre l'accès à tous ses clients (ne bloque pas la connexion)"
                     >
                       {suspending === partner.id
                         ? <Loader2 size={13} className="animate-spin" />

@@ -103,10 +103,13 @@ export default function AccountEditModal({ account, isSelf, onClose, onSaved }) 
           </div>
 
           <div>
-            <label className="label">Statut</label>
+            <label className="label">Statut du compte</label>
             <select className="input" value={status} onChange={e => setStatus(e.target.value)} disabled={isSelf}>
               {STATUS_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
             </select>
+            <p className="text-[11px] text-[var(--text-faint)] mt-1">
+              « Suspendu » / « Désactivé » <strong>bloque la connexion</strong> du compte (accès total). Différent de la suspension d'accès à un client précis, qui se gère dans Partenaires.
+            </p>
           </div>
 
           {isSelf && (

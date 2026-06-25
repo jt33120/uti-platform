@@ -205,7 +205,15 @@ export default function PartnerDetailPage() {
           {partner.name?.charAt(0).toUpperCase() || '?'}
         </div>
         <div className="flex-1 min-w-0">
-          <h1 className="text-2xl font-bold text-white">{partner.name}</h1>
+          <div className="flex items-center gap-2 flex-wrap">
+            <h1 className="text-2xl font-bold text-white">{partner.name}</h1>
+            {partner.status && partner.status !== 'active' && (
+              <span className="badge bg-red-500/15 text-red-400 border border-red-500/30 text-[10px] flex items-center gap-1"
+                title="Le compte est bloqué : ce partenaire ne peut pas se connecter, quels que soient ses accès clients (à gérer dans Admin → Comptes).">
+                <AlertCircle size={10} /> {partner.status === 'disabled' ? 'Compte désactivé' : 'Compte suspendu'}
+              </span>
+            )}
+          </div>
           <p className="text-xs text-slate-500 mt-0.5 flex items-center gap-1.5">
             <Mail size={11} /> {partner.email}
           </p>
