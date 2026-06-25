@@ -72,7 +72,7 @@ export default function ScoringSettingsPage() {
     <div className="animate-slide-up max-w-2xl">
       <div className="flex items-center gap-2.5 mb-1">
         <SlidersHorizontal size={18} style={{ color: 'var(--accent-text)' }} />
-        <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Paramètres du scoring</h1>
+        <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Réglages du matching IA</h1>
       </div>
       <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
         Notez l'importance de chaque critère avec des étoiles — les poids se

@@ -30,7 +30,7 @@ export default function NotificationsPage() {
         <div>
           <h1 className="section-title flex items-center gap-2">
             <Bell size={20} strokeWidth={1.75} style={{ color: 'var(--accent-text)' }} />
-            Notifications mail
+            Journal des emails
           </h1>
           <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
             Journal des emails envoyés aux partenaires (ouverture d'AO, relances, renvois ciblés).

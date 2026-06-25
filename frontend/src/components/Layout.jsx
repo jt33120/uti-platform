@@ -217,10 +217,10 @@ export default function Layout() {
 
         {/* Nav */}
         <nav className="flex-1 px-2 py-3 space-y-0.5 overflow-y-auto">
-          <NavItem to="/dashboard" icon={LayoutDashboard} label="Dashboard" end tour="nav-dashboard" />
+          <NavItem to="/dashboard" icon={LayoutDashboard} label="Accueil" end tour="nav-dashboard" />
           <NavItem to="/aos" icon={FileText} label={isStaff ? "Appels d'offres" : "Mes AOs"} tour="nav-aos" />
           <NavItem to="/clients" icon={Building2} label={isStaff ? "Clients" : "Mes clients"} tour="nav-clients" />
-          <NavItem to="/consultants" icon={Users} label={isStaff ? "Consultants" : "Mes consultants"} tour="nav-consultants" />
+          <NavItem to="/consultants" icon={Users} label={isStaff ? "Vivier de consultants" : "Mon vivier"} tour="nav-consultants" />
 
           {isAdmin && (
             <>
@@ -231,19 +231,19 @@ export default function Layout() {
 
               <NavSection id="partenaires" label="Partenaires">
                 <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
-                <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
+                <NavItem to="/partners-access" icon={Network} label="Habilitations partenaires" />
               </NavSection>
 
               <NavSection id="outils" label="Outils">
-                <NavItem to="/carte" icon={Map} label="Carte" />
-                <NavItem to="/graph" icon={Compass} label="Cartographie" />
-                <NavItem to="/notifications" icon={Bell} label="Notifications mail" />
+                <NavItem to="/carte" icon={Map} label="Carte géographique" />
+                <NavItem to="/graph" icon={Compass} label="Graphe de connexions" />
+                <NavItem to="/notifications" icon={Bell} label="Journal des emails" />
                 <NavItem to="/pacs" icon={Package} label="PACs" />
               </NavSection>
 
               <NavSection id="administration" label="Administration" defaultOpen={false}>
-                <NavItem to="/admin" icon={Gauge} label="Admin comptes" />
-                <NavItem to="/admin/scoring" icon={SlidersHorizontal} label="Paramètres scoring" />
+                <NavItem to="/admin" icon={Gauge} label="Comptes & utilisateurs" />
+                <NavItem to="/admin/scoring" icon={SlidersHorizontal} label="Réglages du matching IA" />
                 <NavItem to="/tickets" icon={Ticket} label="Tickets support" />
                 <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
               </NavSection>
@@ -258,13 +258,13 @@ export default function Layout() {
 
               <NavSection id="c_partenaires" label="Partenaires">
                 <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
-                <NavItem to="/partners-access" icon={Network} label="Accès partenaires" />
+                <NavItem to="/partners-access" icon={Network} label="Habilitations partenaires" />
               </NavSection>
 
               <NavSection id="c_outils" label="Outils">
-                <NavItem to="/carte" icon={Map} label="Carte" />
-                <NavItem to="/graph" icon={Compass} label="Cartographie" />
-                <NavItem to="/notifications" icon={Bell} label="Notifications mail" />
+                <NavItem to="/carte" icon={Map} label="Carte géographique" />
+                <NavItem to="/graph" icon={Compass} label="Graphe de connexions" />
+                <NavItem to="/notifications" icon={Bell} label="Journal des emails" />
               </NavSection>
 
               <div className="mt-3">
