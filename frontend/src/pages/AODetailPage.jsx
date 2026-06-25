@@ -9,7 +9,7 @@ import {
   Loader2, FileText, Trash2, RotateCcw, Building2, Plus,
   Upload, X, UserCircle2, Briefcase, Calendar, Pencil,
   CalendarClock, AlertTriangle, BarChart3, Sparkles,
-  UploadCloud, Download, Target
+  UploadCloud, Download, Target, Hash
 } from 'lucide-react'
 import ScoringPriorities, { DEFAULT_STARS } from '../components/ScoringPriorities'
 
@@ -562,6 +562,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
     title: ao.title || '',
     description: ao.description || '',
     skills_required: ao.skills_required || '',
+    reference: ao.reference || '',
     budget_max: ao.budget_max?.toString() || '',
     location: ao.location || '',
     duration: ao.duration || '',
@@ -613,6 +614,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
         title: data.title || p.title,
         description: data.description || p.description,
         skills_required: data.skills_required || p.skills_required,
+        reference: data.reference || p.reference,
         ao_type: data.ao_type || p.ao_type,
         budget_max: data.budget_max != null ? String(data.budget_max) : p.budget_max,
         location: data.location || p.location,
@@ -740,6 +742,10 @@ function AOEditModal({ ao, onClose, onSaved }) {
             <div className="sm:col-span-2">
               <label className="label">Titre *</label>
               <input className="input" required value={form.title} onChange={set('title')} />
+            </div>
+            <div className="sm:col-span-2">
+              <label className="label">Référence client / consultation</label>
+              <input className="input" value={form.reference} onChange={set('reference')} placeholder="ex: Marché Spécifique n°23915SA230MS" />
             </div>
           </div>
 
@@ -1194,6 +1200,12 @@ export default function AODetailPage() {
 
       {/* Key info cards — tiennent sur une seule ligne en grand écran */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+        {ao.reference && (
+          <div className="card p-4 flex flex-col gap-1">
+            <span className="text-xs text-slate-500 flex items-center gap-1"><Hash size={11} className="text-brand-400" />Référence</span>
+            <span className="text-sm font-bold text-white leading-tight break-words">{ao.reference}</span>
+          </div>
+        )}
         {ao.budget_max && (
           <div className="card p-4 flex flex-col gap-1">
             <span className="text-xs text-slate-500 flex items-center gap-1"><Euro size={11} className="text-emerald-400" />Budget max</span>

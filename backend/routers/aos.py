@@ -94,6 +94,7 @@ class AOCreate(BaseModel):
     title: str
     description: str
     skills_required: str
+    reference: Optional[str] = None  # référence client / de la consultation
     budget_max: Optional[int] = None
     location: Optional[str] = None
     duration: Optional[str] = None
@@ -109,6 +110,7 @@ class AOUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
     skills_required: Optional[str] = None
+    reference: Optional[str] = None  # référence client / de la consultation
     budget_max: Optional[int] = None
     location: Optional[str] = None
     duration: Optional[str] = None
@@ -200,6 +202,7 @@ async def create_ao(body: AOCreate, background_tasks: BackgroundTasks, user: dic
             "title": body.title,
             "description": body.description,
             "skills_required": body.skills_required,
+            "reference": body.reference,
             "budget_max": body.budget_max,
             "location": body.location,
             "duration": body.duration,
@@ -216,8 +219,8 @@ async def create_ao(body: AOCreate, background_tasks: BackgroundTasks, user: dic
                 {**record, "scoring_overrides": overrides}
             ).execute()
         except Exception:
-            # Colonnes récentes (scoring_overrides / work_mode) pas encore migrées.
-            slim = {k: v for k, v in record.items() if k != "work_mode"}
+            # Colonnes récentes (scoring_overrides / work_mode / reference) pas migrées.
+            slim = {k: v for k, v in record.items() if k not in ("work_mode", "reference")}
             response = supabase.table("appels_offres").insert(slim).execute()
         ao = response.data[0]
         # Kick off vivier recommendations right away — staff get suggested

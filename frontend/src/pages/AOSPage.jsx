@@ -393,6 +393,7 @@ export default function AOSPage() {
     const matchSearch = !search ||
       ao.title.toLowerCase().includes(search.toLowerCase()) ||
       ao.skills_required?.toLowerCase().includes(search.toLowerCase()) ||
+      ao.reference?.toLowerCase().includes(search.toLowerCase()) ||
       ao.clients?.name?.toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'all' || ao.status === filter
     return matchSearch && matchFilter
@@ -457,7 +458,7 @@ export default function AOSPage() {
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
           <input
             type="text" className="input pl-9"
-            placeholder="Rechercher par titre, client, compétence..."
+            placeholder="Rechercher par titre, client, compétence, référence..."
             value={search}
             onChange={e => setSearch(e.target.value)}
           />

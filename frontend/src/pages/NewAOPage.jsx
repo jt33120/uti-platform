@@ -15,7 +15,7 @@ export default function NewAOPage() {
   const AO_TYPES = ['Assurance', 'Banque / Finance', 'IT / Dev', 'Énergie', 'Retail', 'Public', 'Santé', 'Autre']
 
   const [form, setForm] = useState({
-    client_id: '', title: '', description: '', skills_required: '',
+    client_id: '', title: '', description: '', skills_required: '', reference: '',
     budget_max: '', location: '', duration: '', context: '', ao_type: '', deadline: '', work_mode: '',
     ...(state?.assistantPrefill || {}),  // assistant may pre-fill (never submits)
   })
@@ -52,6 +52,7 @@ export default function NewAOPage() {
         title: data.title || p.title,
         description: data.description || p.description,
         skills_required: data.skills_required || p.skills_required,
+        reference: data.reference || p.reference,
         ao_type: data.ao_type || p.ao_type,
         budget_max: data.budget_max != null ? String(data.budget_max) : p.budget_max,
         location: data.location || p.location,
@@ -98,6 +99,7 @@ export default function NewAOPage() {
     setLoading(true)
     try {
       const payload = { ...form }
+      if (!payload.reference?.trim()) delete payload.reference
       if (!payload.budget_max) delete payload.budget_max
       else payload.budget_max = parseInt(payload.budget_max)
       if (!payload.deadline) delete payload.deadline
@@ -247,6 +249,16 @@ export default function NewAOPage() {
                   </select>
                   <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
                 </div>
+              </div>
+
+              <div>
+                <label className="label">Référence client / consultation</label>
+                <input
+                  type="text" className="input"
+                  placeholder="ex: Marché Spécifique n°23915SA230MS"
+                  value={form.reference} onChange={set('reference')}
+                />
+                <p className="text-[11px] text-slate-600 mt-1">Référence du marché / de la consultation — sert aussi à rechercher l'AO.</p>
               </div>
 
               <div>
