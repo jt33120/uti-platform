@@ -149,7 +149,7 @@ export default function GraphPage() {
         <div>
           <h1 className="section-title flex items-center gap-2">
             <Compass size={19} strokeWidth={2} style={{ color: 'var(--accent-text)' }} />
-            Cartographie
+            Graphe de connexions
           </h1>
           <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
             Vue réseau des relations partenaires ↔ consultants ↔ clients. Survolez un nœud pour isoler ses liens.

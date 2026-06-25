@@ -77,7 +77,7 @@ export default function CartePage() {
     <div className="animate-slide-up">
       <div className="flex items-center gap-2.5 mb-1">
         <MapIcon size={18} style={{ color: 'var(--accent-text)' }} />
-        <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Carte</h1>
+        <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Carte géographique</h1>
       </div>
       <p className="text-sm mb-4" style={{ color: 'var(--text-muted)' }}>
         Consultants (par ville) et appels d'offres (par localisation) sur le territoire.

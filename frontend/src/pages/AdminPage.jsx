@@ -134,7 +134,7 @@ export default function AdminPage() {
         <div>
           <h1 className="section-title flex items-center gap-2">
             <Gauge size={20} strokeWidth={1.75} style={{ color: 'var(--accent-text)' }} />
-            Admin comptes Utilisateurs
+            Comptes & utilisateurs
           </h1>
           <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
             Comptes, accès et activité de la plateforme.

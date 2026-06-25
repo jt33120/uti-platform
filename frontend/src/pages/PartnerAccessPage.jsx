@@ -205,7 +205,7 @@ export default function PartnerAccessPage() {
         <div>
           <h1 className="section-title flex items-center gap-2">
             <Users size={19} strokeWidth={2} style={{ color: 'var(--accent-text)' }} />
-            Accès partenaires
+            Habilitations partenaires
           </h1>
           <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
             {readOnly
