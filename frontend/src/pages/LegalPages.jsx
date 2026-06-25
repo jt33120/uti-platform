@@ -2,15 +2,16 @@ import { Link } from 'react-router-dom'
 import { ArrowLeft } from 'lucide-react'
 
 // Pages légales publiques (France). PROJETS à valider juridiquement avant
-// publication sur le réseau partenaires UTI. Les [À COMPLÉTER] attendent les
-// informations société (SIREN, adresse, etc.).
+// publication. NB : certaines mentions société (capital, RCS/SIREN, directeur
+// de la publication, durées de conservation, juridiction) restent à compléter —
+// voir MENTIONS_LEGALES_TODO.md à la racine du dépôt.
 
 function LegalLayout({ title, updated, children }) {
   return (
     <div className="min-h-screen app-bg" style={{ color: 'var(--text)' }}>
       <header className="h-14 flex items-center px-6 gap-2.5" style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}>
-        <img src="/logo.png" alt="UTI Group" className="h-7 w-7 object-contain" />
-        <span className="text-[13px] font-semibold" style={{ color: 'var(--text)' }}>UTI Group</span>
+        <img src="/logo.png" alt="Groupement-IT" className="h-7 w-7 object-contain" />
+        <span className="text-[13px] font-semibold" style={{ color: 'var(--text)' }}>Groupement-IT</span>
       </header>
       <main className="max-w-3xl mx-auto px-6 py-10">
         <Link to="/" className="inline-flex items-center gap-1.5 text-xs mb-6" style={{ color: 'var(--text-muted)' }}>
@@ -36,21 +37,20 @@ export function MentionsLegales() {
     <LegalLayout title="Mentions légales" updated="17 juin 2026">
       <H>Éditeur</H>
       <p>
-        La plateforme UTI Group est éditée par <strong>UTI Group</strong>,
-        [À COMPLÉTER : forme juridique] au capital de [À COMPLÉTER], immatriculée
-        au RCS de [À COMPLÉTER] sous le numéro [À COMPLÉTER : SIREN], dont le siège
-        social est situé [À COMPLÉTER : adresse].
+        La plateforme Groupement-IT est éditée par <strong>UTI GROUP SA</strong>,
+        société anonyme dont le siège social est situé 68 rue de Villiers,
+        92300 Levallois-Perret Cedex.
       </p>
-      <p>Directeur de la publication : [À COMPLÉTER].</p>
-      <p>Contact : [À COMPLÉTER : e-mail] — Téléphone : [À COMPLÉTER].</p>
+      <p>Contact : via le formulaire de contact disponible sur la plateforme.</p>
 
       <H>Délégué à la protection des données (DPO)</H>
-      <p>Sullyvan BIJON — [À COMPLÉTER : e-mail DPO].</p>
+      <p>Sullyvan BIJON — sullyvan.bijon@uti-group.com.</p>
 
       <H>Hébergement</H>
       <p>
         Frontend : Vercel Inc. — 340 S Lemon Ave #4133, Walnut, CA 91789, USA.<br />
-        Backend & base de données : [À COMPLÉTER : OVH / Supabase — raison sociale et adresse].
+        Backend (API) : OVH SAS — 2 rue Kellermann, 59100 Roubaix, France.<br />
+        Base de données : Supabase, Inc.
       </p>
 
       <H>Propriété intellectuelle</H>
@@ -66,12 +66,12 @@ export function Confidentialite() {
   return (
     <LegalLayout title="Politique de confidentialité & cookies" updated="17 juin 2026">
       <p>
-        UTI Group accorde une importance particulière à la protection des données
+        UTI GROUP SA accorde une importance particulière à la protection des données
         personnelles, conformément au RGPD et à la loi Informatique et Libertés.
       </p>
 
       <H>Responsable de traitement</H>
-      <p>UTI Group — [À COMPLÉTER : coordonnées]. DPO : Sullyvan BIJON — [À COMPLÉTER : e-mail].</p>
+      <p>UTI GROUP SA — 68 rue de Villiers, 92300 Levallois-Perret Cedex. DPO : Sullyvan BIJON — sullyvan.bijon@uti-group.com.</p>
 
       <H>Données traitées & finalités</H>
       <ul className="list-disc pl-5 space-y-1">
@@ -93,11 +93,11 @@ export function Confidentialite() {
       </p>
 
       <H>Base légale</H>
-      <p>Consentement et/ou intérêt légitime, selon les traitements. [À COMPLÉTER : préciser par finalité — DPO].</p>
+      <p>Consentement et/ou intérêt légitime, selon les traitements concernés.</p>
 
       <H>Destinataires & transferts hors UE</H>
       <p>
-        Les données sont accessibles aux équipes habilitées d'UTI Group et, le cas
+        Les données sont accessibles aux équipes habilitées d'UTI GROUP SA et, le cas
         échéant, aux partenaires concernés. Le texte des CV est traité, après
         <strong> pseudonymisation</strong> (retrait du nom et des coordonnées), par
         un sous-traitant d'IA situé hors UE (OpenRouter / Anthropic), encadré par
@@ -105,14 +105,18 @@ export function Confidentialite() {
       </p>
 
       <H>Durées de conservation</H>
-      <p>[À COMPLÉTER : durées par catégorie — voir politique de conservation interne].</p>
+      <p>
+        Les données sont conservées pour la durée nécessaire aux finalités décrites
+        ci-dessus, puis archivées ou supprimées conformément aux obligations légales
+        applicables.
+      </p>
 
       <H>Vos droits</H>
       <p>
         Vous disposez des droits d'accès, de rectification, d'effacement,
         d'opposition, de limitation et de portabilité, ainsi que du droit à une
         intervention humaine sur les décisions assistées par IA. Pour les exercer :
-        [À COMPLÉTER : e-mail DPO]. Vous pouvez introduire une réclamation auprès de
+        sullyvan.bijon@uti-group.com. Vous pouvez introduire une réclamation auprès de
         la CNIL (www.cnil.fr).
       </p>
 
@@ -133,9 +137,10 @@ export function CGU() {
     <LegalLayout title="Conditions générales d'utilisation" updated="17 juin 2026">
       <H>1. Objet</H>
       <p>
-        Les présentes CGU régissent l'accès et l'utilisation de la plateforme UTI
-        Group, destinée à la mise en relation entre UTI Group, ses partenaires et
-        leurs consultants dans le cadre d'appels d'offres.
+        Les présentes CGU régissent l'accès et l'utilisation de la plateforme
+        Groupement-IT, éditée par UTI GROUP SA, destinée à la mise en relation entre
+        UTI GROUP SA, ses partenaires et leurs consultants dans le cadre d'appels
+        d'offres.
       </p>
 
       <H>2. Accès & comptes</H>
@@ -163,9 +168,9 @@ export function CGU() {
 
       <H>5. Responsabilité</H>
       <p>
-        UTI Group met en œuvre les moyens raisonnables pour assurer la disponibilité
+        UTI GROUP SA met en œuvre les moyens raisonnables pour assurer la disponibilité
         et la sécurité de la plateforme, sans garantie d'absence d'interruption ou
-        d'erreur. [À COMPLÉTER : clauses de responsabilité — juridique].
+        d'erreur.
       </p>
 
       <H>6. Données personnelles</H>
@@ -175,7 +180,11 @@ export function CGU() {
       </p>
 
       <H>7. Droit applicable</H>
-      <p>Les présentes CGU sont régies par le droit français. [À COMPLÉTER : juridiction compétente].</p>
+      <p>
+        Les présentes CGU sont régies par le droit français. Tout litige relatif à
+        leur interprétation ou à leur exécution relève de la compétence des tribunaux
+        français.
+      </p>
     </LegalLayout>
   )
 }
