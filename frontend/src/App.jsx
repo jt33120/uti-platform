@@ -29,6 +29,7 @@ const CartePage = lazy(() => import('./pages/CartePage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const TicketsPage = lazy(() => import('./pages/TicketsPage'))
 const ScoringSettingsPage = lazy(() => import('./pages/ScoringSettingsPage'))
+const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
 
 // roles: array of allowed roles; omitted = any authenticated user.
 function ProtectedRoute({ children, roles = null }) {
@@ -91,6 +92,13 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/pacs" element={<ProtectedRoute roles={ADMIN}><PacsPage /></ProtectedRoute>} />
+          <Route path="/notifications" element={
+            <ProtectedRoute roles={STAFF}>
+              <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
+                <NotificationsPage />
+              </Suspense>
+            </ProtectedRoute>
+          } />
           <Route path="/admin/scoring" element={
             <ProtectedRoute roles={ADMIN}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>

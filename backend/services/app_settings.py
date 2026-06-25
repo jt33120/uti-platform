@@ -10,7 +10,7 @@ from services.supabase_client import supabase
 # Réglages des notifications partenaires + relances (tous éditables par l'admin).
 NOTIFICATION_DEFAULTS: dict[str, Any] = {
     "enabled": True,            # envoi des notifications activé
-    "list2_delay_days": 7,      # délai entre l'envoi liste 1 et liste 2
+    "list2_delay_days": 2,      # délai (jours) entre l'envoi liste 1 et liste 2 (48 h)
     "relance_auto_enabled": False,  # relance automatique des partenaires
     "relance_interval_days": 7,     # fréquence des relances automatiques
     "relance_max": 2,               # nombre maximum de relances automatiques

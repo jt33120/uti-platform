@@ -1019,6 +1019,10 @@ export default function AODetailPage() {
   const [submitPrefill, setSubmitPrefill] = useState(location.state?.assistantPrefill || null)
   const [notifBusy, setNotifBusy] = useState('')   // '' | 'notify' | 'relance'
   const [notifMsg, setNotifMsg] = useState('')
+  const [targetOpen, setTargetOpen] = useState(false)
+  const [eligible, setEligible] = useState(null)
+  const [selectedPartners, setSelectedPartners] = useState(() => new Set())
+  const [targetBusy, setTargetBusy] = useState(false)
 
   const fetchAo = async () => {
     const r = await api.get(`/aos/${id}`)
@@ -1060,7 +1064,11 @@ export default function AODetailPage() {
       setNotifMsg(`Liste 1 : ${data.sent_list_1} partenaire(s) notifié(s) · ${l2}.`)
       await fetchAo()
     } catch (e) {
-      setNotifMsg(e.response?.data?.detail || "Échec de l'envoi")
+      setNotifMsg(
+        e.response?.status === 404
+          ? "Indisponible : le serveur n'est pas encore à jour (déploiement backend requis)."
+          : (e.response?.data?.detail || "Échec de l'envoi")
+      )
     } finally {
       setNotifBusy('')
     }
@@ -1076,6 +1084,33 @@ export default function AODetailPage() {
       setNotifMsg(e.response?.data?.detail || 'Échec de la relance')
     } finally {
       setNotifBusy('')
+    }
+  }
+
+  const openTarget = async () => {
+    setTargetOpen(true); setEligible(null); setSelectedPartners(new Set())
+    try {
+      const { data } = await api.get(`/aos/${id}/eligible-partners`)
+      setEligible(data.partners || [])
+    } catch (e) {
+      setEligible([]); setNotifMsg(e.response?.data?.detail || 'Impossible de charger les partenaires')
+    }
+  }
+  const togglePartner = (pid) => setSelectedPartners(prev => {
+    const n = new Set(prev); n.has(pid) ? n.delete(pid) : n.add(pid); return n
+  })
+  const sendTarget = async () => {
+    if (selectedPartners.size === 0) return
+    setTargetBusy(true); setNotifMsg('')
+    try {
+      const { data } = await api.post(`/aos/${id}/notify-partners`, { partner_ids: [...selectedPartners] })
+      setNotifMsg(`Email renvoyé à ${data.sent} partenaire(s) sélectionné(s).`)
+      setTargetOpen(false)
+      await fetchAo()
+    } catch (e) {
+      setNotifMsg(e.response?.data?.detail || 'Échec du renvoi ciblé')
+    } finally {
+      setTargetBusy(false)
     }
   }
 
@@ -1332,6 +1367,9 @@ export default function AODetailPage() {
                     {notifBusy === 'notify' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
                     {ao.notified_at ? 'Renvoyer' : 'Envoyer aux partenaires'}
                   </button>
+                  <button onClick={openTarget} disabled={notifBusy !== ''} className="btn-ghost" title="Renvoyer à des partenaires précis (sans toucher les autres)">
+                    <UserCircle2 size={14} /> Renvoyer à un partenaire
+                  </button>
                   {ao.notified_at && (
                     <button onClick={handleRelance} disabled={notifBusy !== ''} className="btn-primary">
                       {notifBusy === 'relance' ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
@@ -1340,6 +1378,41 @@ export default function AODetailPage() {
                   )}
                 </div>
               </div>
+
+              {/* Renvoi ciblé : sélection de partenaires éligibles */}
+              {targetOpen && (
+                <div className="mt-3 pt-3 border-t border-white/10">
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-semibold text-slate-300">Renvoyer à des partenaires précis</p>
+                    <button onClick={() => setTargetOpen(false)} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>
+                  </div>
+                  {eligible === null ? (
+                    <div className="py-4 text-center"><Loader2 size={16} className="animate-spin inline text-slate-500" /></div>
+                  ) : eligible.length === 0 ? (
+                    <p className="text-xs text-slate-500 py-2">Aucun partenaire en liste 1/2 sur ce client.</p>
+                  ) : (
+                    <>
+                      <div className="space-y-1 max-h-56 overflow-y-auto">
+                        {eligible.map(p => (
+                          <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 cursor-pointer">
+                            <input type="checkbox" checked={selectedPartners.has(p.id)} onChange={() => togglePartner(p.id)} />
+                            <span className="flex-1 min-w-0">
+                              <span className="text-[13px] text-white">{p.name || p.email}</span>
+                              <span className="text-[11px] text-slate-500 ml-2">{p.tier === 'list_1' ? 'Liste 1' : 'Liste 2'}{p.has_submitted ? ' · a déjà répondu' : ''}{p.blocked ? ' · compte bloqué' : ''}</span>
+                            </span>
+                          </label>
+                        ))}
+                      </div>
+                      <div className="flex items-center justify-end gap-2 mt-2">
+                        <button onClick={() => setTargetOpen(false)} className="btn-ghost text-xs">Annuler</button>
+                        <button onClick={sendTarget} disabled={targetBusy || selectedPartners.size === 0} className="btn-primary text-xs">
+                          {targetBusy ? <><Loader2 size={13} className="animate-spin" /> Envoi…</> : `Renvoyer (${selectedPartners.size})`}
+                        </button>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
