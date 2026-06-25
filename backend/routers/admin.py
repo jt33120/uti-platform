@@ -11,6 +11,7 @@ from typing import Literal, Optional
 import httpx
 
 from services.supabase_client import supabase
+from services.app_settings import get_notification_settings, set_notification_settings
 from routers.auth import require_admin
 from config import settings
 
@@ -227,6 +228,28 @@ async def delete_account(account_id: str, user: dict = Depends(require_admin)):
         return {"message": "Compte supprimé"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class NotificationSettings(BaseModel):
+    enabled: Optional[bool] = None
+    list2_delay_days: Optional[int] = None
+    relance_auto_enabled: Optional[bool] = None
+    relance_interval_days: Optional[int] = None
+    relance_max: Optional[int] = None
+
+
+@router.get("/settings")
+async def get_settings(user: dict = Depends(require_admin)):
+    """Réglages globaux pilotés par l'admin (notifications + relances)."""
+    return {"notifications": get_notification_settings()}
+
+
+@router.put("/settings/notifications")
+async def update_notif_settings(body: NotificationSettings, user: dict = Depends(require_admin)):
+    patch = body.model_dump(exclude_none=True)
+    if not patch:
+        raise HTTPException(status_code=422, detail="Aucun réglage fourni.")
+    return {"notifications": set_notification_settings(patch)}
 
 
 @router.get("/tickets")

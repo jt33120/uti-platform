@@ -1,10 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
-import { Outlet, NavLink, useNavigate } from 'react-router-dom'
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
   Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
-  HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal, ChevronDown, Map
+  HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal, ChevronDown, Map,
+  Menu, X
 } from 'lucide-react'
 import clsx from 'clsx'
 import InviteModal from './InviteModal'
@@ -122,8 +123,10 @@ const ActionButton = ({ to, icon: Icon, label, tour }) => (
 export default function Layout() {
   const { user, logout, isAdmin, isCommerce, isStaff } = useAuth()
   const navigate = useNavigate()
+  const location = useLocation()
 
   const [dark, setDark] = useState(() => localStorage.getItem('theme') === 'dark')
+  const [mobileNavOpen, setMobileNavOpen] = useState(false)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -131,6 +134,9 @@ export default function Layout() {
   const [contactDefaultType, setContactDefaultType] = useState('question')
   const [showTour, setShowTour] = useState(false)
   const profileMenuRef = useRef(null)
+
+  // Ferme le tiroir de navigation mobile à chaque changement de page.
+  useEffect(() => { setMobileNavOpen(false) }, [location.pathname])
 
   const openContact = (type = 'question') => {
     setContactDefaultType(type)
@@ -176,18 +182,37 @@ export default function Layout() {
 
   return (
     <div className="flex h-screen overflow-hidden">
-      {/* Sidebar */}
+      {/* Backdrop mobile — ferme le tiroir au clic */}
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 z-40 md:hidden"
+          style={{ background: 'rgba(0,0,0,0.45)' }}
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+
+      {/* Sidebar — statique en desktop, tiroir coulissant en mobile */}
       <aside
-        className="w-[232px] shrink-0 flex flex-col"
+        className={clsx(
+          'w-[232px] shrink-0 flex flex-col fixed inset-y-0 left-0 z-50 transition-transform duration-200 md:static md:translate-x-0',
+          mobileNavOpen ? 'translate-x-0' : '-translate-x-full md:translate-x-0'
+        )}
         style={{ background: 'var(--surface)', borderRight: '1px solid var(--border)' }}
       >
         {/* Brand */}
         <div data-tour="brand" className="px-4 h-14 flex items-center gap-2.5" style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}>
           <img src="/logo.png" alt="Groupement-IT" className="h-7 w-7 object-contain" />
-          <div className="leading-tight">
+          <div className="leading-tight flex-1 min-w-0">
             <div className="text-[13px] font-semibold tracking-tightest text-[var(--text)]">Groupement-IT</div>
             <div className="text-[10px] text-[var(--text-faint)]">Plateforme Partenaires</div>
           </div>
+          <button
+            onClick={() => setMobileNavOpen(false)}
+            className="md:hidden h-8 w-8 -mr-1 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]"
+            aria-label="Fermer le menu"
+          >
+            <X size={16} strokeWidth={1.75} />
+          </button>
         </div>
 
         {/* Nav */}
@@ -328,9 +353,17 @@ export default function Layout() {
       <main className="flex-1 overflow-y-auto app-bg">
         {/* Top bar */}
         <div
-          className="h-14 flex items-center justify-end gap-1 px-6"
+          className="h-14 flex items-center justify-between gap-1 px-4 sm:px-6"
           style={{ background: 'var(--chrome)', borderBottom: '1px solid var(--border)' }}
         >
+          <button
+            onClick={() => setMobileNavOpen(true)}
+            className="md:hidden h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
+            aria-label="Ouvrir le menu"
+          >
+            <Menu size={18} strokeWidth={1.75} />
+          </button>
+          <div className="flex items-center gap-1 ml-auto">
           <button
             onClick={() => openContact('bug')}
             className="h-8 w-8 rounded-md flex items-center justify-center text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] transition-colors"
@@ -346,8 +379,9 @@ export default function Layout() {
           >
             {dark ? <Sun size={15} strokeWidth={1.75} /> : <Moon size={15} strokeWidth={1.75} />}
           </button>
+          </div>
         </div>
-        <div className="px-6 py-6 max-w-6xl mx-auto">
+        <div className="px-4 sm:px-6 py-5 sm:py-6 max-w-6xl mx-auto">
           <Outlet />
           <Footer />
         </div>

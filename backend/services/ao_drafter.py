@@ -76,6 +76,7 @@ def _sanitize(d: dict, ao_types: list[str]) -> dict:
         "title": text("title")[:300],
         "description": text("description"),
         "skills_required": text("skills_required"),
+        "reference": text("reference")[:200],
         "ao_type": ao_type,
         "budget_max": budget,
         "location": text("location"),
@@ -124,6 +125,7 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
         "Génère la fiche AO à partir du contenu source ci-dessous.\n\n"
         "Champs JSON attendus (tous présents, vide si l'info est absente) :\n"
         '- "title": titre court et parlant de la mission\n'
+        '- "reference": référence client / de la consultation si présente (ex. "Marché Spécifique n°23915SA230MS"), sinon ""\n'
         '- "description": description claire et professionnelle (3 à 6 phrases), reformulée\n'
         '- "skills_required": compétences techniques clés, séparées par des virgules\n'
         f'- "ao_type": exactement l\'une de ces valeurs si pertinent, sinon "" : {", ".join(ao_types)}\n'

@@ -219,7 +219,7 @@ html.dark {
   }
 
   .page-header {
-    @apply flex items-center justify-between mb-6;
+    @apply flex flex-col gap-3 mb-6 sm:flex-row sm:items-center sm:justify-between;
   }
 
   /* Stat: vertical numeric tile */

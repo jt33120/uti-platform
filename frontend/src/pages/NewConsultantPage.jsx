@@ -55,14 +55,14 @@ export default function NewConsultantPage() {
         <div className="card p-5 space-y-4">
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-widest">Profil</h2>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div className="col-span-2">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="col-span-1 sm:col-span-2">
               <label className="label">Nom complet *</label>
               <input type="text" className="input" placeholder="Marie Dupont"
                 value={form.name} onChange={set('name')} required />
             </div>
 
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <label className="label">Statut *</label>
               <div className="grid grid-cols-2 gap-2">
                 {[
@@ -94,14 +94,14 @@ export default function NewConsultantPage() {
                 value={form.experience_years} onChange={set('experience_years')} min="0" max="50" />
             </div>
 
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <label className="label">Compétences clés *</label>
               <input type="text" className="input"
                 placeholder="Python, React, AWS, Docker (séparées par des virgules)"
                 value={form.skills} onChange={set('skills')} required />
             </div>
 
-            <div className="col-span-2">
+            <div className="col-span-1 sm:col-span-2">
               <label className="label">Disponibilité</label>
               <input type="text" className="input" placeholder="Immédiate, Janvier 2025..."
                 value={form.availability} onChange={set('availability')} />
