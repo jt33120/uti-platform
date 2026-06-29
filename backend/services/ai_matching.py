@@ -15,11 +15,18 @@ from config import settings
 client = AsyncOpenAI(
     api_key=settings.openrouter_key,
     base_url="https://openrouter.ai/api/v1",
-)
+) if settings.openrouter_key else None
+
+# Fallback : Mistral La Plateforme (OpenAI-compatible, modèle gratuit)
+_mistral_client = AsyncOpenAI(
+    api_key=settings.mistral_key,
+    base_url="https://api.mistral.ai/v1",
+) if settings.mistral_key else None
 
 # Modèle d'extraction figé et versionné (Art. 12 — traçabilité ; Art. 17 — gestion
 # des modifications : tout changement déclenche tests + MAJ doc technique).
 EXTRACTION_MODEL = settings.extraction_model
+_MISTRAL_EXTRACTION_MODEL = settings.mistral_model
 
 # Claude Haiku 4.5 pricing via OpenRouter
 HAIKU_INPUT_COST_PER_MILLION = 1.00   # $1.00 / 1M input tokens
@@ -72,37 +79,50 @@ def _as_int(value) -> Optional[int]:
 _EMPTY_FEATURES = {"skills": [], "experience_years": None, "sectors": [], "summary": ""}
 
 
+async def _call_extraction(c: AsyncOpenAI, model: str, cv_text: str) -> tuple[dict, float]:
+    """Appel d'extraction sur un client/modèle donné. Lève en cas d'erreur."""
+    response = await c.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
+            {"role": "user", "content": cv_text[:6000]},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+        max_tokens=800,
+    )
+    data = json.loads(response.choices[0].message.content)
+    usage = response.usage
+    cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens)
+    features = {
+        "skills": _as_list(data.get("skills")),
+        "experience_years": _as_int(data.get("experience_years")),
+        "sectors": _as_list(data.get("sectors")),
+        "summary": str(data.get("summary") or "")[:500],
+    }
+    return features, cost
+
+
 async def extract_features(cv_text: str) -> tuple[dict, float]:
     """
     Extrait des features structurées d'un texte de CV **déjà pseudonymisé**.
-    Retourne (features, cost_usd). Ne lève jamais : en cas d'erreur, renvoie des
-    features vides (le scoring déterministe retombe alors sur les données
-    déclarées du consultant — dégradation maîtrisée, Art. 15).
+    Essaie OpenRouter en premier, puis Mistral en fallback.
+    Retourne (features, cost_usd). Ne lève jamais : en cas d'erreur totale,
+    renvoie des features vides (dégradation maîtrisée, Art. 15).
     """
     if not cv_text or len(cv_text.strip()) < 20:
         return dict(_EMPTY_FEATURES), 0.0
 
-    try:
-        response = await client.chat.completions.create(
-            model=EXTRACTION_MODEL,
-            messages=[
-                {"role": "system", "content": EXTRACTION_SYSTEM_PROMPT},
-                {"role": "user", "content": cv_text[:6000]},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,  # déterminisme (Art. 15)
-            max_tokens=800,
-        )
-        data = json.loads(response.choices[0].message.content)
-        usage = response.usage
-        cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens)
-        features = {
-            "skills": _as_list(data.get("skills")),
-            "experience_years": _as_int(data.get("experience_years")),
-            "sectors": _as_list(data.get("sectors")),
-            "summary": str(data.get("summary") or "")[:500],
-        }
-        return features, cost
-    except Exception as e:  # noqa: BLE001 — extraction best-effort
-        print(f"[EXTRACTION] échec, features vides: {e}")
-        return dict(_EMPTY_FEATURES), 0.0
+    candidates = []
+    if client:
+        candidates.append((client, EXTRACTION_MODEL, "OpenRouter"))
+    if _mistral_client:
+        candidates.append((_mistral_client, _MISTRAL_EXTRACTION_MODEL, "Mistral"))
+
+    for c, model, provider in candidates:
+        try:
+            return await _call_extraction(c, model, cv_text)
+        except Exception as e:  # noqa: BLE001
+            print(f"[EXTRACTION] {provider} échec ({model}): {e}")
+
+    return dict(_EMPTY_FEATURES), 0.0

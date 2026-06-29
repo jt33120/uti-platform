@@ -28,7 +28,14 @@ _client = AsyncOpenAI(
     base_url="https://openrouter.ai/api/v1",
 ) if settings.openrouter_key else None
 
+# Fallback : Mistral La Plateforme
+_mistral_client = AsyncOpenAI(
+    api_key=settings.mistral_key,
+    base_url="https://api.mistral.ai/v1",
+) if settings.mistral_key else None
+
 SCORING_MODEL = settings.scoring_model
+_MISTRAL_SCORING_MODEL = settings.mistral_model
 
 # Correspondance clés LLM ↔ clés du breakdown déterministe (`services.scoring`).
 _CATS = [
@@ -97,15 +104,41 @@ def _candidate_brief(features: dict, consultant: dict) -> str:
     return "\n".join(bits)
 
 
+async def _call_scoring(c: AsyncOpenAI, model: str, user: str, maxes: dict) -> tuple[Optional[dict], float]:
+    """Appel de scoring sur un client/modèle donné. Lève en cas d'erreur."""
+    resp = await c.chat.completions.create(
+        model=model,
+        messages=[
+            {"role": "system", "content": _SYSTEM},
+            {"role": "user", "content": user},
+        ],
+        response_format={"type": "json_object"},
+        temperature=0,
+        max_tokens=700,
+    )
+    data = json.loads(resp.choices[0].message.content)
+    usage = resp.usage
+    cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens)
+    breakdown = {}
+    score_llm = 0
+    for llm_k, _det_k, _w_k in _CATS:
+        cell = data.get(llm_k) or {}
+        s = _clampi(cell.get("score"), 0, maxes[llm_k])
+        breakdown[llm_k] = {"score": s, "justification": str(cell.get("justification") or "")[:300]}
+        score_llm += s
+    return {
+        "score_llm": score_llm,
+        "llm_breakdown": breakdown,
+        "llm_global": str(data.get("global") or "")[:800],
+    }, cost
+
+
 async def llm_score(features: dict, consultant: dict, ao: dict, weights: dict) -> tuple[Optional[dict], float]:
     """
-    Second avis IA. Retourne (resultat, cost_usd) où resultat vaut :
-        {"score_llm": int, "llm_breakdown": {cat: {"score", "justification"}}, "llm_global": str}
-    ou None si le LLM n'est pas disponible / a échoué (→ fallback déterministe).
+    Second avis IA. Essaie OpenRouter en premier, puis Mistral en fallback.
+    Retourne (resultat, cost_usd) ou (None, 0.0) si tous les providers échouent
+    (→ fallback déterministe, dégradation maîtrisée Art. 15).
     """
-    if _client is None:
-        return None, 0.0
-
     maxes = {llm_k: int(weights.get(w_k, 0)) for llm_k, _det_k, w_k in _CATS}
     user = (
         "APPEL D'OFFRES :\n" + _ao_brief(ao) + "\n\n"
@@ -116,36 +149,20 @@ async def llm_score(features: dict, consultant: dict, ao: dict, weights: dict) -
         f"- MAX_CONTEXTE = {maxes['contexte']}\n"
         f"- MAX_TJM = {maxes['tjm']}\n"
     )
-    try:
-        resp = await _client.chat.completions.create(
-            model=SCORING_MODEL,
-            messages=[
-                {"role": "system", "content": _SYSTEM},
-                {"role": "user", "content": user},
-            ],
-            response_format={"type": "json_object"},
-            temperature=0,  # reproductibilité (Art. 15)
-            max_tokens=700,
-        )
-        data = json.loads(resp.choices[0].message.content)
-        usage = resp.usage
-        cost = calculate_cost(usage.prompt_tokens, usage.completion_tokens)
 
-        breakdown = {}
-        score_llm = 0
-        for llm_k, _det_k, _w_k in _CATS:
-            cell = data.get(llm_k) or {}
-            s = _clampi(cell.get("score"), 0, maxes[llm_k])
-            breakdown[llm_k] = {"score": s, "justification": str(cell.get("justification") or "")[:300]}
-            score_llm += s
-        return {
-            "score_llm": score_llm,
-            "llm_breakdown": breakdown,
-            "llm_global": str(data.get("global") or "")[:800],
-        }, cost
-    except Exception as e:  # noqa: BLE001 — second avis best-effort
-        print(f"[LLM_SCORING] échec, fallback déterministe : {e}")
-        return None, 0.0
+    candidates = []
+    if _client:
+        candidates.append((_client, SCORING_MODEL, "OpenRouter"))
+    if _mistral_client:
+        candidates.append((_mistral_client, _MISTRAL_SCORING_MODEL, "Mistral"))
+
+    for c, model, provider in candidates:
+        try:
+            return await _call_scoring(c, model, user, maxes)
+        except Exception as e:  # noqa: BLE001
+            print(f"[LLM_SCORING] {provider} échec ({model}): {e}")
+
+    return None, 0.0
 
 
 def combine_hybrid(deterministic: dict, llm: Optional[dict], weights: dict) -> dict:
