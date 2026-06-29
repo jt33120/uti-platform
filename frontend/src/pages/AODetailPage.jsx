@@ -95,8 +95,9 @@ const SCORE_CATS = [
   { label: 'Compatibilité TJM', short: 'TJM', det: 'compatibilite_tjm', llm: 'tjm', wKey: 'w_tjm', dflt: 20 },
 ]
 
-// Radar — score hybride par critère (une seule série, normalisée en %).
-function ScoreRadar({ breakdown, llmBreakdown, hybridBreakdown, weights }) {
+// Radar — score hybride par critère (une seule série, normalisée en %),
+// avec le score hybride global affiché au centre.
+function ScoreRadar({ breakdown, hybridBreakdown, weights, score }) {
   const data = SCORE_CATS.map(c => {
     const max = (weights && weights[c.wKey]) || c.dflt || 1
     // Priorité : hybrid > det (si pas encore de résultat hybride stocké)
@@ -104,13 +105,23 @@ function ScoreRadar({ breakdown, llmBreakdown, hybridBreakdown, weights }) {
     return { axis: c.label, score: Math.round((val / max) * 100) }
   })
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <RadarChart data={data} outerRadius="72%">
-        <PolarGrid stroke="rgba(255,255,255,0.12)" />
-        <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-        <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.35} />
-      </RadarChart>
-    </ResponsiveContainer>
+    <div className="relative">
+      <ResponsiveContainer width="100%" height={220}>
+        <RadarChart data={data} outerRadius="68%">
+          <PolarGrid stroke="rgba(255,255,255,0.12)" />
+          <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+          <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.30} />
+        </RadarChart>
+      </ResponsiveContainer>
+      {score != null && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center justify-center w-14 h-14 rounded-full bg-navy-900/80 backdrop-blur-sm border border-indigo-400/30">
+            <span className="text-xl font-bold text-indigo-300 leading-none tabular">{score}</span>
+            <span className="text-[8px] text-slate-500 uppercase tracking-wide mt-0.5">/100</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -228,7 +239,6 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
   const lbd = result.llm_breakdown || null
   const hbd = result.hybrid_breakdown || null
   const weights = result.weights || null
-  const hasLlm = result.score_llm != null
   const headlineScore = result.score_hybride ?? result.score_total
   // Reco cohérente avec le score affiché (hybride) — seuils par défaut 75 / 50.
   const reco = headlineScore >= 75 ? 'FORT' : headlineScore >= 50 ? 'MOYEN' : 'FAIBLE'
@@ -236,8 +246,6 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
     key: c.det,
     label: c.label,
     max: (weights && weights[c.wKey]) || c.dflt,
-    detVal: bd[c.det] ?? 0,
-    iaVal: lbd?.[c.llm]?.score,
     hybridVal: hbd?.[c.det] ?? bd[c.det] ?? 0,
     justif: lbd?.[c.llm]?.justification,
   }))
@@ -275,17 +283,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 mt-1 tabular">
-            <span className="text-slate-300 font-medium">Hybride {headlineScore}/100</span>
-            <span className="mx-1.5 text-slate-600">·</span>Grille {result.score_total}
-            {hasLlm && (
-              <>
-                <span className="mx-1.5 text-slate-600">·</span>IA {result.score_llm}
-                <span className="mx-1.5 text-slate-600">·</span>
-                <span title="Accord entre la grille et l'IA">accord {result.agreement}%</span>
-              </>
-            )}
-          </p>
+          <p className="text-[11px] text-slate-500 mt-1">Score d'adéquation</p>
           {result.consultant_tjm && (
             <span className="text-xs text-emerald-400 mt-1 inline-flex items-center gap-0.5">
               <Euro size={10} />{result.consultant_tjm}€/j
@@ -303,7 +301,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
             {/* Radar : forme du profil — grille vs IA */}
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Profil du candidat</p>
-              <ScoreRadar breakdown={bd} llmBreakdown={lbd} hybridBreakdown={hbd} weights={weights} />
+              <ScoreRadar breakdown={bd} hybridBreakdown={hbd} weights={weights} score={headlineScore} />
             </div>
             {/* Auto-justification rédigée par l'IA */}
             <div>
@@ -323,10 +321,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
               <div key={c.key}>
                 <div className="flex justify-between text-xs text-slate-400 mb-1">
                   <span>{c.label}</span>
-                  <span className="tabular">
-                    <span className="text-white font-medium">{c.hybridVal}/{c.max}</span>
-                    {hasLlm && <span className="text-slate-600 ml-1.5">(grille {c.detVal} · IA {c.iaVal ?? '—'})</span>}
-                  </span>
+                  <span className="tabular text-white font-medium">{c.hybridVal}/{c.max}</span>
                 </div>
                 <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                   <div className="h-full bg-brand-500 rounded-full transition-all duration-700"
