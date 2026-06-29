@@ -16,7 +16,8 @@ import asyncio
 from typing import Optional
 from services.supabase_client import supabase
 from services.ai_matching import extract_features, EXTRACTION_MODEL
-from services.scoring import score_consultant, GRID_VERSION
+from services.scoring import score_consultant, GRID_VERSION, DEFAULTS, stars_to_weights
+from services.llm_scoring import llm_score, combine_hybrid
 from services.scoring_settings import get_config
 from services.pseudonymize import strip_pii
 from services import audit
@@ -29,6 +30,15 @@ async def _features_for(item: dict) -> tuple[dict, float]:
     """Extraction pseudonymisée des features d'un candidat (best-effort)."""
     clean = strip_pii(item.get("cv_text"), item.get("name"))
     return await extract_features(clean)
+
+
+def _weights_from_config(config: dict) -> dict:
+    """Poids effectifs (w_competences…) dérivés de la config, comme score_consultant."""
+    cfg = {**DEFAULTS, **{k: v for k, v in (config or {}).items() if v is not None}}
+    stars = (config or {}).get("stars")
+    if stars:
+        cfg.update(stars_to_weights(stars))
+    return {k: cfg[k] for k in ("w_competences", "w_seniorite", "w_contexte", "w_tjm")}
 
 
 def _persist(ao_id: str, results: list[dict], cost_usd: float, ran_by: Optional[str]):
@@ -45,6 +55,14 @@ def _persist(ao_id: str, results: list[dict], cost_usd: float, ran_by: Optional[
             "points_faibles": r.get("points_faibles"),
             "resume_matching": r.get("resume_matching"),
             "recommandation": r.get("recommandation"),
+            # Architecture hybride : 2e avis IA + score combiné (repli déterministe)
+            "score_llm": r.get("score_llm"),
+            "score_hybride": r.get("score_hybride"),
+            "agreement": r.get("agreement"),
+            "llm_breakdown": r.get("llm_breakdown"),
+            "llm_global": r.get("llm_global"),
+            "hybrid_breakdown": r.get("hybrid_breakdown"),
+            "weights": r.get("weights"),
             "rank": rank,
             "cost_usd": cost_usd,
             "ran_by": ran_by,
@@ -75,12 +93,24 @@ async def _score_all(
 ) -> tuple[list[dict], float]:
     """Extrait (concurremment) puis score chaque candidat ; journalise chaque score."""
     config = _effective_config(ao)  # grille globale + priorités propres à l'AO
+    weights = _weights_from_config(config)
     extracted = await asyncio.gather(*[_features_for(it) for it in items])
+
+    # Étape déterministe (synchrone) puis 2e avis IA (concurrent sur tous les CV).
+    base = []
+    for it, (features, ex_cost) in zip(items, extracted):
+        score = score_consultant(features, it, ao, config)
+        base.append((it, features, score, ex_cost))
+    llm_outs = await asyncio.gather(*[
+        llm_score(features, it, ao, weights) for (it, features, _s, _c) in base
+    ])
+
     total_cost = 0.0
     results: list[dict] = []
-    for it, (features, cost) in zip(items, extracted):
-        total_cost += cost
-        score = score_consultant(features, it, ao, config)
+    for (it, features, score, ex_cost), (llm_res, llm_cost) in zip(base, llm_outs):
+        total_cost += ex_cost + llm_cost
+        score.update(combine_hybrid(score, llm_res, weights))  # score_hybride, score_llm, agreement…
+        score["weights"] = weights  # barèmes effectifs par axe (pour le radar)
         score["submission_id"] = it.get("submission_id")
         score["consultant_id"] = it.get("consultant_id")
         score["consultant_name"] = it.get("name")
@@ -96,11 +126,15 @@ async def _score_all(
                 "submission_id": it.get("submission_id"),
                 "consultant_id": it.get("consultant_id"),
                 "score_total": score["score_total"],
+                "score_llm": score.get("score_llm"),
+                "score_hybride": score.get("score_hybride"),
+                "agreement": score.get("agreement"),
                 "breakdown": score["breakdown"],
                 "recommandation": score["recommandation"],
             },
         )
-    results.sort(key=lambda r: r["score_total"], reverse=True)
+    # Classement par score hybride (repli sur le déterministe si l'IA est absente).
+    results.sort(key=lambda r: (r.get("score_hybride") if r.get("score_hybride") is not None else r["score_total"]), reverse=True)
     return results, total_cost
 
 
