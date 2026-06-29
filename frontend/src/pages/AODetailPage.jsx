@@ -1005,7 +1005,12 @@ export default function AODetailPage() {
 
   const [ao, setAo] = useState(null)
   const [summary, setSummary] = useState('')
-  const [descOpen, setDescOpen] = useState(false)
+  const [descOpen, setDescOpen] = useState(true)
+  // Onglets de la fiche : 'presentation' (la fiche AO) | 'analyse' (CV & matching)
+  const [tab, setTab] = useState('presentation')
+  // Liste des CVs repliable — mémorisée (elle peut être longue). Repliée par défaut.
+  const [cvsOpen, setCvsOpen] = useState(() => localStorage.getItem('uti_ao_cvs_open') === '1')
+  const toggleCvs = () => setCvsOpen(o => { localStorage.setItem('uti_ao_cvs_open', o ? '0' : '1'); return !o })
   const [submissions, setSubmissions] = useState([])
   const [vivier, setVivier] = useState([])
   const [matchResults, setMatchResults] = useState(null)
@@ -1273,7 +1278,34 @@ export default function AODetailPage() {
       {/* Deadline — big & red */}
       <DeadlineBanner deadline={ao.deadline} />
 
-      {/* Key info cards — tiennent sur une seule ligne en grand écran */}
+      {/* Onglets : Présentation (la fiche) / Analyse & CV (matching) */}
+      <div className="flex items-center gap-1 mb-5 border-b border-white/10">
+        {[
+          { key: 'presentation', label: 'Présentation', icon: FileText },
+          { key: 'analyse', label: isAdmin ? 'Analyse & CV' : 'Ma candidature', icon: BarChart3 },
+        ].map(t => (
+          <button
+            key={t.key}
+            onClick={() => setTab(t.key)}
+            className={clsx(
+              'flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium -mb-px border-b-2 transition-colors',
+              tab === t.key
+                ? 'border-brand-400 text-white'
+                : 'border-transparent text-slate-500 hover:text-slate-300'
+            )}
+          >
+            <t.icon size={14} /> {t.label}
+            {t.key === 'analyse' && (ao.submission_count ?? submissions.length) > 0 && (
+              <span className="ml-0.5 text-[11px] rounded-full px-1.5 py-0.5 bg-white/5 text-slate-400">
+                {ao.submission_count ?? submissions.length}
+              </span>
+            )}
+          </button>
+        ))}
+      </div>
+
+      {/* Onglet Présentation : infos clés */}
+      {tab === 'presentation' && (
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
         {ao.reference && (
           <div className="card p-4 flex flex-col gap-1">
@@ -1313,9 +1345,12 @@ export default function AODetailPage() {
           </div>
         )}
       </div>
+      )}
 
-      {/* ── Matching / soumissions — remontés en tête, c'est l'essentiel ── */}
+      {/* ── Onglet Analyse & CV : couverture, diffusion, scoring, CVs ── */}
+      {tab === 'analyse' && (
       <div className="space-y-4 mb-5">
+          {isAdmin && <AOInsightsChart aoId={id} />}
           {/* Partner view: submit a CV */}
           {!isAdmin && (
             <div className="card p-4">
@@ -1416,24 +1451,33 @@ export default function AODetailPage() {
             </div>
           )}
 
-          {/* Submissions list */}
+          {/* Submissions list — repliable */}
           {submissions.length > 0 && (
             <div className="card p-4">
-              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-                {isAdmin ? `Tous les CVs reçus (${submissions.length})` : `Vos soumissions (${submissions.length})`}
-              </p>
-              <div className="space-y-2">
-                {submissions.map(s => (
-                  <SubmissionRow
-                    key={s.id}
-                    sub={s}
-                    canDelete={isAdminRole || s.submitted_by === user.id}
-                    onDelete={handleDeleteSubmission}
-                    isAdmin={isAdmin}
-                    aoSkillsRequired={ao.skills_required}
-                  />
-                ))}
-              </div>
+              <button type="button" onClick={toggleCvs} className="w-full flex items-center justify-between text-left">
+                <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
+                  {isAdmin ? `Tous les CVs reçus (${submissions.length})` : `Vos soumissions (${submissions.length})`}
+                </span>
+                {cvsOpen ? <ChevronUp size={15} className="text-slate-500" /> : <ChevronDown size={15} className="text-slate-500" />}
+              </button>
+              {cvsOpen ? (
+                <div className="space-y-2 mt-3">
+                  {submissions.map(s => (
+                    <SubmissionRow
+                      key={s.id}
+                      sub={s}
+                      canDelete={isAdminRole || s.submitted_by === user.id}
+                      onDelete={handleDeleteSubmission}
+                      isAdmin={isAdmin}
+                      aoSkillsRequired={ao.skills_required}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="text-xs text-slate-500 mt-1">
+                  Repliée — cliquez pour afficher les {submissions.length} CV{submissions.length > 1 ? 's' : ''}.
+                </p>
+              )}
             </div>
           )}
 
@@ -1518,8 +1562,10 @@ export default function AODetailPage() {
             </>
           )}
       </div>
+      )}
 
-      {/* ── Détails de l'AO (secondaire) ── */}
+      {/* ── Onglet Présentation : description, contexte, compétences ── */}
+      {tab === 'presentation' && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
         <div className="lg:col-span-2 space-y-4">
           {/* Description repliable */}
@@ -1541,7 +1587,6 @@ export default function AODetailPage() {
           )}
         </div>
         <div className="space-y-4">
-          {isAdmin && <AOInsightsChart aoId={id} />}
           <div className="card p-4">
             <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2">Compétences requises</p>
             <div className="flex flex-wrap gap-1.5">
@@ -1554,6 +1599,7 @@ export default function AODetailPage() {
           </div>
         </div>
       </div>
+      )}
 
       {showSubmitModal && (
         <SubmitModal aoId={id} vivier={vivier} prefill={submitPrefill}
