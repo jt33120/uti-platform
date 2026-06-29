@@ -1243,8 +1243,16 @@ export default function AODetailPage() {
     setMatching(true)
     setMatchError('')
     try {
-      const { data } = await api.post('/matching/run', { ao_id: id, top_n: 3 })
-      setMatchResults(data.results)
+      const { data: run } = await api.post('/matching/run', { ao_id: id, top_n: 3 })
+      // Réhydrate via l'endpoint qui FUSIONNE l'email partenaire + l'état humain
+      // (classement, badges Contacté/Proposé) — POST /run ne renvoie que les
+      // scores bruts. Garantit un affichage cohérent juste après un scoring.
+      try {
+        const { data } = await api.get(`/matching/results/${id}`)
+        setMatchResults(data.results)
+      } catch {
+        setMatchResults(run.results)  // repli : scores bruts du run
+      }
     } catch (err) {
       setMatchError(err.response?.data?.detail || 'Erreur lors du matching IA')
     } finally {
