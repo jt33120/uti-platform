@@ -347,3 +347,34 @@ html.dark {
 /* Tighten any leftover rounded-2xl to feel more corporate */
 .rounded-2xl { border-radius: 10px !important; }
 .rounded-xl  { border-radius: 8px !important; }
+
+/* ── Éditeur de templates mail (RichTextEditor) ─────────────────── */
+.rte-content h2 { font-size: 1.35rem; font-weight: 700; margin: 0.4em 0; line-height: 1.25; }
+.rte-content h3 { font-size: 1.1rem;  font-weight: 600; margin: 0.4em 0; line-height: 1.3; }
+.rte-content p { margin: 0 0 0.7em; }
+.rte-content ul { list-style: disc;  padding-left: 1.4em; margin: 0 0 0.7em; }
+.rte-content ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.7em; }
+.rte-content li { margin: 0.15em 0; }
+.rte-content a { color: #818cf8; text-decoration: underline; }
+.rte-content img { max-width: 100%; height: auto; border-radius: 8px; }
+.rte-content blockquote {
+  border-left: 3px solid var(--accent-soft); padding-left: 0.9em;
+  margin: 0 0 0.7em; color: var(--text-faint); font-style: italic;
+}
+.rte-content:empty::before {
+  content: attr(data-placeholder); color: var(--text-faint);
+}
+
+/* Aperçu fidèle de l'email (fond clair, façon client mail) */
+.email-preview { color: #1d1d1f; font-size: 15px; line-height: 1.55; }
+.email-preview h2 { font-size: 22px; font-weight: 700; margin: 0.4em 0; }
+.email-preview h3 { font-size: 17px; font-weight: 600; margin: 0.4em 0; }
+.email-preview p { margin: 0 0 0.7em; }
+.email-preview ul { list-style: disc; padding-left: 1.4em; margin: 0 0 0.7em; }
+.email-preview ol { list-style: decimal; padding-left: 1.4em; margin: 0 0 0.7em; }
+.email-preview a { color: #2563eb; }
+.email-preview img { max-width: 100%; height: auto; border-radius: 8px; }
+.email-preview blockquote {
+  border-left: 3px solid #d0d7de; padding-left: 0.9em; margin: 0 0 0.7em;
+  color: #57606a; font-style: italic;
+}

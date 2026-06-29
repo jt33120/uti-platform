@@ -75,13 +75,18 @@ def _render(ao: dict, client_name: str, kind: str) -> tuple[str, str, str]:
     intro = email_templates.render_body(key, context, as_html=True)
     cta_label = "Proposer un consultant" if kind == "relance" else "Voir l'appel d'offres"
 
+    # Bloc méta (référence/localisation/date limite) ajouté automatiquement,
+    # sauf si le template référence déjà ces variables (l'admin gère lui-même).
+    raw = email_templates.raw_body(key)
+    uses_meta_vars = any(("{" + v + "}") in raw for v in ("reference", "location", "deadline"))
     meta_rows = ""
-    for label, val in (("Référence", ref), ("Localisation", loc), ("Date limite", deadline)):
-        if val:
-            meta_rows += (
-                f'<tr><td style="padding:3px 0;color:#6e6e73;width:110px;">{label}</td>'
-                f'<td style="color:#1d1d1f;">{val}</td></tr>'
-            )
+    if not uses_meta_vars:
+        for label, val in (("Référence", ref), ("Localisation", loc), ("Date limite", deadline)):
+            if val:
+                meta_rows += (
+                    f'<tr><td style="padding:3px 0;color:#6e6e73;width:110px;">{label}</td>'
+                    f'<td style="color:#1d1d1f;">{val}</td></tr>'
+                )
     meta_html = (
         f'<table cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;margin-top:8px;">{meta_rows}</table>'
         if meta_rows else ""
