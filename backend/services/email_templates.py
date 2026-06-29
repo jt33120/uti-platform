@@ -47,7 +47,7 @@ _DEFAULT_RELANCE = (
 )
 _DEFAULT_INVITE = (
     '<p style="margin:0 0 14px;">Vous êtes invité(e) à rejoindre '
-    "<strong>{role}</strong> sur la plateforme Groupement-IT.</p>"
+    "<strong>{role}</strong>.</p>"
     '<p style="margin:0 0 14px;">Créez votre compte en cliquant sur le bouton '
     "ci-dessous.</p>"
     '<p style="margin:0;font-size:13px;color:#6e6e73;">Ce lien est à usage '
