@@ -95,8 +95,9 @@ const SCORE_CATS = [
   { label: 'Compatibilité TJM', short: 'TJM', det: 'compatibilite_tjm', llm: 'tjm', wKey: 'w_tjm', dflt: 20 },
 ]
 
-// Radar — score hybride par critère (une seule série, normalisée en %).
-function ScoreRadar({ breakdown, llmBreakdown, hybridBreakdown, weights }) {
+// Radar — score hybride par critère (une seule série, normalisée en %),
+// avec le score hybride global affiché au centre.
+function ScoreRadar({ breakdown, hybridBreakdown, weights, score }) {
   const data = SCORE_CATS.map(c => {
     const max = (weights && weights[c.wKey]) || c.dflt || 1
     // Priorité : hybrid > det (si pas encore de résultat hybride stocké)
@@ -104,13 +105,23 @@ function ScoreRadar({ breakdown, llmBreakdown, hybridBreakdown, weights }) {
     return { axis: c.label, score: Math.round((val / max) * 100) }
   })
   return (
-    <ResponsiveContainer width="100%" height={200}>
-      <RadarChart data={data} outerRadius="72%">
-        <PolarGrid stroke="rgba(255,255,255,0.12)" />
-        <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-        <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.35} />
-      </RadarChart>
-    </ResponsiveContainer>
+    <div className="relative">
+      <ResponsiveContainer width="100%" height={220}>
+        <RadarChart data={data} outerRadius="68%">
+          <PolarGrid stroke="rgba(255,255,255,0.12)" />
+          <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+          <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.30} />
+        </RadarChart>
+      </ResponsiveContainer>
+      {score != null && (
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+          <div className="flex flex-col items-center justify-center w-14 h-14 rounded-full bg-navy-900/80 backdrop-blur-sm border border-indigo-400/30">
+            <span className="text-xl font-bold text-indigo-300 leading-none tabular">{score}</span>
+            <span className="text-[8px] text-slate-500 uppercase tracking-wide mt-0.5">/100</span>
+          </div>
+        </div>
+      )}
+    </div>
   )
 }
 
@@ -202,33 +213,62 @@ function DecisionBar({ aoId, result, rank }) {
   )
 }
 
-// Brouillon d'email pré-rempli vers le partenaire (le commercial l'édite/envoie).
+// Libellé du bouton selon la cible de contact (partenaire vs consultant).
+function contactLabel(kind) {
+  if (kind === 'consultant') return 'Contacter le consultant'
+  if (kind === 'owner') return 'Contacter le référent'
+  return 'Contacter le partenaire'
+}
+
+// Brouillon d'email pré-rempli (le commercial l'édite/envoie). Le texte s'adapte
+// selon qu'on écrit au partenaire (confirmer dispo du consultant) ou au
+// consultant lui-même (lui proposer la mission).
 function buildMailto(result, ao) {
   const to = result.partner_email || ''
   const cli = ao?.clients?.name ? ` (client ${ao.clients.name})` : ''
   const ref = ao?.reference ? ` — réf. ${ao.reference}` : ''
-  const subject = `Proposition de consultant — ${ao?.title || "appel d'offres"}${ref}`
-  const body = [
-    `Bonjour${result.partner_name ? ' ' + result.partner_name : ''},`,
-    '',
-    `Nous souhaitons avancer sur le profil de ${result.consultant_name || 'votre consultant'} pour la mission « ${ao?.title || ''} »${cli}.`,
-    '',
-    `Pouvez-vous nous confirmer sa disponibilité ainsi que ses conditions (TJM, préavis), afin que nous formalisions la proposition au client ?`,
-    '',
-    'Merci d’avance,',
-  ].join('\n')
-  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  const hi = `Bonjour${result.partner_name ? ' ' + result.partner_name : ''},`
+  let subject, lines
+  if (result.contact_kind === 'consultant') {
+    subject = `Proposition de mission — ${ao?.title || "appel d'offres"}${ref}`
+    lines = [
+      hi, '',
+      `Nous avons une mission « ${ao?.title || ''} »${cli} qui pourrait correspondre à votre profil.`,
+      '',
+      `Seriez-vous disponible et intéressé(e) ? Le cas échéant, pouvez-vous nous confirmer vos disponibilités et votre TJM ?`,
+      '', 'Merci d’avance,',
+    ]
+  } else {
+    subject = `Proposition de consultant — ${ao?.title || "appel d'offres"}${ref}`
+    lines = [
+      hi, '',
+      `Nous souhaitons avancer sur le profil de ${result.consultant_name || 'votre consultant'} pour la mission « ${ao?.title || ''} »${cli}.`,
+      '',
+      `Pouvez-vous nous confirmer sa disponibilité ainsi que ses conditions (TJM, préavis), afin que nous formalisions la proposition au client ?`,
+      '', 'Merci d’avance,',
+    ]
+  }
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`
 }
 
-function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
+// Couleur du score selon les paliers (alignée sur ScoreRing).
+function scoreColor(s) {
+  return s >= 75 ? 'text-emerald-400' : s >= 50 ? 'text-brand-300' : s >= 30 ? 'text-amber-400' : 'text-red-400'
+}
+
+function MatchCard({ result, rank, aoId, isAdmin, ao, onContact, expanded: expandedProp, onToggleExpand }) {
   const [contactStatus, setContactStatus] = useState(result.contact_status || 'none')
   useEffect(() => { setContactStatus(result.contact_status || 'none') }, [result.contact_status])
-  const [expanded, setExpanded] = useState(rank === 1)
+  // Vue détaillée/réduite : contrôlée par le parent (carousel) si fourni, pour
+  // conserver le mode choisi quand on change de profil ; sinon état local.
+  const [expandedLocal, setExpandedLocal] = useState(rank === 1)
+  const controlled = onToggleExpand != null
+  const expanded = controlled ? expandedProp : expandedLocal
+  const toggleExpand = controlled ? onToggleExpand : () => setExpandedLocal(p => !p)
   const bd = result.breakdown || {}
   const lbd = result.llm_breakdown || null
   const hbd = result.hybrid_breakdown || null
   const weights = result.weights || null
-  const hasLlm = result.score_llm != null
   const headlineScore = result.score_hybride ?? result.score_total
   // Reco cohérente avec le score affiché (hybride) — seuils par défaut 75 / 50.
   const reco = headlineScore >= 75 ? 'FORT' : headlineScore >= 50 ? 'MOYEN' : 'FAIBLE'
@@ -236,8 +276,6 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
     key: c.det,
     label: c.label,
     max: (weights && weights[c.wKey]) || c.dflt,
-    detVal: bd[c.det] ?? 0,
-    iaVal: lbd?.[c.llm]?.score,
     hybridVal: hbd?.[c.det] ?? bd[c.det] ?? 0,
     justif: lbd?.[c.llm]?.justification,
   }))
@@ -252,7 +290,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
       )}
 
       <div className="flex items-center gap-4 p-4 cursor-pointer hover:bg-white/2 transition-colors"
-           onClick={() => setExpanded(p => !p)}>
+           onClick={toggleExpand}>
         <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
           {rank}
         </div>
@@ -275,17 +313,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 mt-1 tabular">
-            <span className="text-slate-300 font-medium">Hybride {headlineScore}/100</span>
-            <span className="mx-1.5 text-slate-600">·</span>Grille {result.score_total}
-            {hasLlm && (
-              <>
-                <span className="mx-1.5 text-slate-600">·</span>IA {result.score_llm}
-                <span className="mx-1.5 text-slate-600">·</span>
-                <span title="Accord entre la grille et l'IA">accord {result.agreement}%</span>
-              </>
-            )}
-          </p>
+          <p className="text-[11px] text-slate-500 mt-1">Score d'adéquation</p>
           {result.consultant_tjm && (
             <span className="text-xs text-emerald-400 mt-1 inline-flex items-center gap-0.5">
               <Euro size={10} />{result.consultant_tjm}€/j
@@ -303,7 +331,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
             {/* Radar : forme du profil — grille vs IA */}
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Profil du candidat</p>
-              <ScoreRadar breakdown={bd} llmBreakdown={lbd} hybridBreakdown={hbd} weights={weights} />
+              <ScoreRadar breakdown={bd} hybridBreakdown={hbd} weights={weights} score={headlineScore} />
             </div>
             {/* Auto-justification rédigée par l'IA */}
             <div>
@@ -323,10 +351,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
               <div key={c.key}>
                 <div className="flex justify-between text-xs text-slate-400 mb-1">
                   <span>{c.label}</span>
-                  <span className="tabular">
-                    <span className="text-white font-medium">{c.hybridVal}/{c.max}</span>
-                    {hasLlm && <span className="text-slate-600 ml-1.5">(grille {c.detVal} · IA {c.iaVal ?? '—'})</span>}
-                  </span>
+                  <span className="tabular text-white font-medium">{c.hybridVal}/{c.max}</span>
                 </div>
                 <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
                   <div className="h-full bg-brand-500 rounded-full transition-all duration-700"
@@ -350,7 +375,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
                 href={buildMailto(result, ao)}
                 onClick={() => { if (contactStatus === 'none') { setContactStatus('contacted'); onContact?.(result, 'contacted') } }}
                 className="btn-primary text-sm w-full justify-center">
-                <Mail size={14} /> Contacter le partenaire{result.partner_name ? ` · ${result.partner_name}` : ''}
+                <Mail size={14} /> {contactLabel(result.contact_kind)}{result.partner_name ? ` · ${result.partner_name}` : ''}
               </a>
               {contactStatus !== 'none' ? (
                 <div className="flex items-center justify-between gap-2 text-xs flex-wrap">
@@ -370,7 +395,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
                 </div>
               ) : (!result.partner_email && (
                 <p className="text-[11px] text-amber-400/80">
-                  Email partenaire introuvable — le brouillon s'ouvrira sans destinataire (à compléter).
+                  Aucun email de contact trouvé (ni partenaire, ni consultant) — le brouillon s'ouvrira sans destinataire (à compléter).
                 </p>
               ))}
             </div>
@@ -392,6 +417,9 @@ function MatchCarousel({ results: incoming, aoId, isAdmin, ao }) {
   const [results, setResults] = useState(incoming)
   const [idx, setIdx] = useState(0)
   const [savingRank, setSavingRank] = useState(false)
+  // Vue détaillée/réduite PARTAGÉE entre les profils : changer de carte conserve
+  // le mode choisi. Détaillée par défaut.
+  const [expanded, setExpanded] = useState(true)
   // Resynchronise quand un nouveau matching arrive (relance, nouvelle soumission).
   useEffect(() => { setResults(incoming); setIdx(0) }, [incoming])
 
@@ -435,23 +463,38 @@ function MatchCarousel({ results: incoming, aoId, isAdmin, ao }) {
           <span>{isAdmin ? `Profil ${idx + 1}/${results.length} · votre classement` : `Top ${results.length}`}</span>
           {savingRank && <Loader2 size={11} className="animate-spin text-slate-500" />}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setExpanded(e => !e)} className="btn-ghost text-[11px] px-2 py-1 gap-1">
+            {expanded ? <><ChevronUp size={12} /> Réduire</> : <><ChevronDown size={12} /> Détailler</>}
+          </button>
           <button onClick={prev} disabled={idx === 0}
             className="btn-ghost p-1.5 disabled:opacity-30 disabled:cursor-not-allowed" title="Profil précédent">
             <ChevronLeft size={16} />
           </button>
-          <div className="flex gap-1.5 items-center">
-            {results.map((_, i) => (
-              <button key={i} onClick={() => setIdx(i)}
-                className={clsx('rounded-full transition-all duration-200',
-                  i === idx ? 'w-5 h-1.5 bg-brand-400' : 'w-1.5 h-1.5 bg-white/20 hover:bg-white/40')} />
-            ))}
-          </div>
           <button onClick={next} disabled={idx === results.length - 1}
             className="btn-ghost p-1.5 disabled:opacity-30 disabled:cursor-not-allowed" title="Profil suivant">
             <ChevronRight size={16} />
           </button>
         </div>
+      </div>
+
+      {/* Barre galerie pleine largeur : trigramme + score de chaque profil sélectionné */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+        {results.map((r, i) => {
+          const sc = r.score_hybride ?? r.score_total
+          const active = i === idx
+          return (
+            <button key={r.consultant_id || i} onClick={() => setIdx(i)}
+              className={clsx('flex-1 min-w-[104px] rounded-lg border px-3 py-2 text-left transition-all',
+                active ? 'border-brand-400 bg-brand-500/10' : 'border-white/10 bg-white/3 hover:border-white/25')}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-slate-500">#{i + 1}</span>
+                <span className={clsx('text-sm font-bold tabular', scoreColor(sc))}>{sc}</span>
+              </div>
+              <div className="text-sm font-semibold text-white truncate mt-0.5">{r.consultant_name}</div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Réordonnancement (staff) : l'humain impose son classement */}
@@ -469,7 +512,8 @@ function MatchCarousel({ results: incoming, aoId, isAdmin, ao }) {
       )}
 
       <div key={`${result?.consultant_id || idx}-${idx}`} className="animate-fade-in">
-        <MatchCard result={result} rank={idx + 1} aoId={aoId} isAdmin={isAdmin} ao={ao} onContact={onContact} />
+        <MatchCard result={result} rank={idx + 1} aoId={aoId} isAdmin={isAdmin} ao={ao}
+          onContact={onContact} expanded={expanded} onToggleExpand={() => setExpanded(e => !e)} />
       </div>
     </div>
   )
@@ -1248,8 +1292,16 @@ export default function AODetailPage() {
     setMatching(true)
     setMatchError('')
     try {
-      const { data } = await api.post('/matching/run', { ao_id: id, top_n: 3 })
-      setMatchResults(data.results)
+      const { data: run } = await api.post('/matching/run', { ao_id: id, top_n: 3 })
+      // Réhydrate via l'endpoint qui FUSIONNE l'email partenaire + l'état humain
+      // (classement, badges Contacté/Proposé) — POST /run ne renvoie que les
+      // scores bruts. Garantit un affichage cohérent juste après un scoring.
+      try {
+        const { data } = await api.get(`/matching/results/${id}`)
+        setMatchResults(data.results)
+      } catch {
+        setMatchResults(run.results)  // repli : scores bruts du run
+      }
     } catch (err) {
       setMatchError(err.response?.data?.detail || 'Erreur lors du matching IA')
     } finally {
@@ -1346,22 +1398,20 @@ export default function AODetailPage() {
         if (isAdmin && subs.length > 0) {
           setLoading(false)
 
-          // Use cached results only if they were run AFTER the latest submission
+          // CACHE-FIRST : on réutilise toujours le scoring stocké (pas d'appels
+          // LLM à chaque ouverture). Le serveur re-score déjà tout seul à chaque
+          // nouvelle soumission (auto_rescore_ao) ; pour le reste (modifs d'AO,
+          // ajustement de la grille…), le bouton « Relancer » est là.
           try {
             const cached = await api.get(`/matching/results/${id}`)
             const cachedResults = cached.data.results || []
             if (cachedResults.length) {
-              const latestRun = cachedResults[0]?.created_at
-              const latestSub = subs.reduce((max, s) =>
-                s.submitted_at > max ? s.submitted_at : max, '')
-              if (latestRun && latestRun > latestSub) {
-                setMatchResults(cachedResults)
-                return
-              }
+              setMatchResults(cachedResults)
+              return
             }
-          } catch { /* no cache */ }
+          } catch { /* pas de cache : on score pour la première fois ci-dessous */ }
 
-          // No valid cache — run fresh
+          // Aucun résultat stocké → premier scoring de cet AO.
           await runMatching()
           return
         }
@@ -1803,7 +1853,13 @@ export default function AODetailPage() {
         <AOEditModal
           ao={ao}
           onClose={() => setShowEditModal(false)}
-          onSaved={async () => { setShowEditModal(false); await fetchAo() }}
+          onSaved={async () => {
+            setShowEditModal(false)
+            await fetchAo()
+            // Une modif d'AO (compétences, priorités, budget…) peut changer les
+            // scores → on re-score, mais SEULEMENT ici, pas à chaque ouverture.
+            if (isAdmin && submissions.length > 0) await runMatching()
+          }}
         />
       )}
     </div>
