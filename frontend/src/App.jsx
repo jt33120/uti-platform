@@ -29,6 +29,7 @@ const CartePage = lazy(() => import('./pages/CartePage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const TicketsPage = lazy(() => import('./pages/TicketsPage'))
 const ScoringSettingsPage = lazy(() => import('./pages/ScoringSettingsPage'))
+const EmailTemplatesPage = lazy(() => import('./pages/EmailTemplatesPage'))
 const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
 
 // roles: array of allowed roles; omitted = any authenticated user.
@@ -103,6 +104,13 @@ export default function App() {
             <ProtectedRoute roles={ADMIN}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
                 <ScoringSettingsPage />
+              </Suspense>
+            </ProtectedRoute>
+          } />
+          <Route path="/admin/email-templates" element={
+            <ProtectedRoute roles={ADMIN}>
+              <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
+                <EmailTemplatesPage />
               </Suspense>
             </ProtectedRoute>
           } />

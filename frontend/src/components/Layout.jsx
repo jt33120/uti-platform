@@ -244,6 +244,7 @@ export default function Layout() {
               <NavSection id="administration" label="Administration" defaultOpen={false}>
                 <NavItem to="/admin" icon={Gauge} label="Comptes & utilisateurs" />
                 <NavItem to="/admin/scoring" icon={SlidersHorizontal} label="Réglages du matching IA" />
+                <NavItem to="/admin/email-templates" icon={Mail} label="Templates mails" />
                 <NavItem to="/tickets" icon={Ticket} label="Tickets support" />
                 <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
               </NavSection>
