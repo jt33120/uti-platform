@@ -251,10 +251,20 @@ function buildMailto(result, ao) {
   return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`
 }
 
-function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
+// Couleur du score selon les paliers (alignée sur ScoreRing).
+function scoreColor(s) {
+  return s >= 75 ? 'text-emerald-400' : s >= 50 ? 'text-brand-300' : s >= 30 ? 'text-amber-400' : 'text-red-400'
+}
+
+function MatchCard({ result, rank, aoId, isAdmin, ao, onContact, expanded: expandedProp, onToggleExpand }) {
   const [contactStatus, setContactStatus] = useState(result.contact_status || 'none')
   useEffect(() => { setContactStatus(result.contact_status || 'none') }, [result.contact_status])
-  const [expanded, setExpanded] = useState(rank === 1)
+  // Vue détaillée/réduite : contrôlée par le parent (carousel) si fourni, pour
+  // conserver le mode choisi quand on change de profil ; sinon état local.
+  const [expandedLocal, setExpandedLocal] = useState(rank === 1)
+  const controlled = onToggleExpand != null
+  const expanded = controlled ? expandedProp : expandedLocal
+  const toggleExpand = controlled ? onToggleExpand : () => setExpandedLocal(p => !p)
   const bd = result.breakdown || {}
   const lbd = result.llm_breakdown || null
   const hbd = result.hybrid_breakdown || null
@@ -280,7 +290,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
       )}
 
       <div className="flex items-center gap-4 p-4 cursor-pointer hover:bg-white/2 transition-colors"
-           onClick={() => setExpanded(p => !p)}>
+           onClick={toggleExpand}>
         <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
           {rank}
         </div>
@@ -407,6 +417,9 @@ function MatchCarousel({ results: incoming, aoId, isAdmin, ao }) {
   const [results, setResults] = useState(incoming)
   const [idx, setIdx] = useState(0)
   const [savingRank, setSavingRank] = useState(false)
+  // Vue détaillée/réduite PARTAGÉE entre les profils : changer de carte conserve
+  // le mode choisi. Détaillée par défaut.
+  const [expanded, setExpanded] = useState(true)
   // Resynchronise quand un nouveau matching arrive (relance, nouvelle soumission).
   useEffect(() => { setResults(incoming); setIdx(0) }, [incoming])
 
@@ -450,23 +463,38 @@ function MatchCarousel({ results: incoming, aoId, isAdmin, ao }) {
           <span>{isAdmin ? `Profil ${idx + 1}/${results.length} · votre classement` : `Top ${results.length}`}</span>
           {savingRank && <Loader2 size={11} className="animate-spin text-slate-500" />}
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
+          <button onClick={() => setExpanded(e => !e)} className="btn-ghost text-[11px] px-2 py-1 gap-1">
+            {expanded ? <><ChevronUp size={12} /> Réduire</> : <><ChevronDown size={12} /> Détailler</>}
+          </button>
           <button onClick={prev} disabled={idx === 0}
             className="btn-ghost p-1.5 disabled:opacity-30 disabled:cursor-not-allowed" title="Profil précédent">
             <ChevronLeft size={16} />
           </button>
-          <div className="flex gap-1.5 items-center">
-            {results.map((_, i) => (
-              <button key={i} onClick={() => setIdx(i)}
-                className={clsx('rounded-full transition-all duration-200',
-                  i === idx ? 'w-5 h-1.5 bg-brand-400' : 'w-1.5 h-1.5 bg-white/20 hover:bg-white/40')} />
-            ))}
-          </div>
           <button onClick={next} disabled={idx === results.length - 1}
             className="btn-ghost p-1.5 disabled:opacity-30 disabled:cursor-not-allowed" title="Profil suivant">
             <ChevronRight size={16} />
           </button>
         </div>
+      </div>
+
+      {/* Barre galerie pleine largeur : trigramme + score de chaque profil sélectionné */}
+      <div className="flex gap-2 overflow-x-auto pb-1 mb-3">
+        {results.map((r, i) => {
+          const sc = r.score_hybride ?? r.score_total
+          const active = i === idx
+          return (
+            <button key={r.consultant_id || i} onClick={() => setIdx(i)}
+              className={clsx('flex-1 min-w-[104px] rounded-lg border px-3 py-2 text-left transition-all',
+                active ? 'border-brand-400 bg-brand-500/10' : 'border-white/10 bg-white/3 hover:border-white/25')}>
+              <div className="flex items-center justify-between gap-2">
+                <span className="text-[10px] font-bold text-slate-500">#{i + 1}</span>
+                <span className={clsx('text-sm font-bold tabular', scoreColor(sc))}>{sc}</span>
+              </div>
+              <div className="text-sm font-semibold text-white truncate mt-0.5">{r.consultant_name}</div>
+            </button>
+          )
+        })}
       </div>
 
       {/* Réordonnancement (staff) : l'humain impose son classement */}
@@ -484,7 +512,8 @@ function MatchCarousel({ results: incoming, aoId, isAdmin, ao }) {
       )}
 
       <div key={`${result?.consultant_id || idx}-${idx}`} className="animate-fade-in">
-        <MatchCard result={result} rank={idx + 1} aoId={aoId} isAdmin={isAdmin} ao={ao} onContact={onContact} />
+        <MatchCard result={result} rank={idx + 1} aoId={aoId} isAdmin={isAdmin} ao={ao}
+          onContact={onContact} expanded={expanded} onToggleExpand={() => setExpanded(e => !e)} />
       </div>
     </div>
   )
