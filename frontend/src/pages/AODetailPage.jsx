@@ -12,6 +12,7 @@ import {
   UploadCloud, Download, Target, Hash, Send, Bell
 } from 'lucide-react'
 import ScoringPriorities, { DEFAULT_STARS } from '../components/ScoringPriorities'
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, Legend } from 'recharts'
 
 // Parse date-only strings ("YYYY-MM-DD") as *local* dates to avoid the UTC
 // off-by-one; full timestamps fall back to native parsing.
@@ -83,6 +84,40 @@ function BreakdownBar({ label, value, max }) {
         <div className="h-full bg-brand-500 rounded-full transition-all duration-700" style={{ width: `${pct}%` }} />
       </div>
     </div>
+  )
+}
+
+// Catégories de score : libellé, clé du breakdown déterministe, clé côté LLM, poids par défaut.
+const SCORE_CATS = [
+  { label: 'Compétences', short: 'Compét.', det: 'competences_techniques', llm: 'competences', wKey: 'w_competences', dflt: 40 },
+  { label: 'Séniorité', short: 'Séniorité', det: 'seniorite', llm: 'seniorite', wKey: 'w_seniorite', dflt: 20 },
+  { label: 'Contexte / domaine', short: 'Contexte', det: 'contexte_domaine', llm: 'contexte', wKey: 'w_contexte', dflt: 20 },
+  { label: 'Compatibilité TJM', short: 'TJM', det: 'compatibilite_tjm', llm: 'tjm', wKey: 'w_tjm', dflt: 20 },
+]
+
+// Radar « Grille (déterministe) vs IA » — chaque axe normalisé à son barème (en %).
+function ScoreRadar({ breakdown, llmBreakdown, weights }) {
+  const data = SCORE_CATS.map(c => {
+    const max = (weights && weights[c.wKey]) || c.dflt || 1
+    const det = breakdown?.[c.det] ?? 0
+    const ia = llmBreakdown?.[c.llm]?.score
+    return {
+      axis: c.short,
+      grille: Math.round((det / max) * 100),
+      ia: ia == null ? null : Math.round((ia / max) * 100),
+    }
+  })
+  const hasIa = data.some(d => d.ia != null)
+  return (
+    <ResponsiveContainer width="100%" height={220}>
+      <RadarChart data={data} outerRadius="72%">
+        <PolarGrid stroke="rgba(255,255,255,0.12)" />
+        <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
+        <Radar name="Grille" dataKey="grille" stroke="#6366f1" fill="#6366f1" fillOpacity={0.28} />
+        {hasIa && <Radar name="IA" dataKey="ia" stroke="#c084fc" fill="#c084fc" fillOpacity={0.22} />}
+        <Legend wrapperStyle={{ fontSize: 11 }} />
+      </RadarChart>
+    </ResponsiveContainer>
   )
 }
 
@@ -177,12 +212,22 @@ function DecisionBar({ aoId, result, rank }) {
 function MatchCard({ result, rank, aoId, isAdmin }) {
   const [expanded, setExpanded] = useState(rank === 1)
   const bd = result.breakdown || {}
-  const bdEntries = [
-    { label: 'Compétences techniques', value: bd.competences_techniques ?? 0, max: 40 },
-    { label: 'Séniorité', value: bd.seniorite ?? 0, max: 20 },
-    { label: 'Contexte / domaine', value: bd.contexte_domaine ?? 0, max: 20 },
-    { label: 'Compatibilité TJM', value: bd.compatibilite_tjm ?? 0, max: 20 },
-  ]
+  const lbd = result.llm_breakdown || null
+  const hbd = result.hybrid_breakdown || null
+  const weights = result.weights || null
+  const hasLlm = result.score_llm != null
+  const headlineScore = result.score_hybride ?? result.score_total
+  // Reco cohérente avec le score affiché (hybride) — seuils par défaut 75 / 50.
+  const reco = headlineScore >= 75 ? 'FORT' : headlineScore >= 50 ? 'MOYEN' : 'FAIBLE'
+  const cats = SCORE_CATS.map(c => ({
+    key: c.det,
+    label: c.label,
+    max: (weights && weights[c.wKey]) || c.dflt,
+    detVal: bd[c.det] ?? 0,
+    iaVal: lbd?.[c.llm]?.score,
+    hybridVal: hbd?.[c.det] ?? bd[c.det] ?? 0,
+    justif: lbd?.[c.llm]?.justification,
+  }))
 
   return (
     <div className={clsx('card overflow-hidden transition-all duration-200', rank === 1 && 'border-emerald-500/30 bg-emerald-500/3')}>
@@ -198,18 +243,28 @@ function MatchCard({ result, rank, aoId, isAdmin }) {
         <div className="w-7 h-7 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-xs font-bold text-slate-400 shrink-0">
           {rank}
         </div>
-        <ScoreRing score={result.score_total} size={64} />
+        <ScoreRing score={headlineScore} size={64} />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <h3 className="text-sm font-semibold text-white">{result.consultant_name}</h3>
-            <RecoTag reco={result.recommandation} />
+            <RecoTag reco={reco} />
             {result.employment_type && (
               <span className="badge bg-white/5 text-slate-400 text-[10px]">
                 {result.employment_type === 'salarie' ? 'Salarié' : 'Indépendant'}
               </span>
             )}
           </div>
-          <p className="text-xs text-slate-500 mt-0.5 line-clamp-2">{result.resume_matching}</p>
+          <p className="text-[11px] text-slate-500 mt-1 tabular">
+            <span className="text-slate-300 font-medium">Hybride {headlineScore}/100</span>
+            <span className="mx-1.5 text-slate-600">·</span>Grille {result.score_total}
+            {hasLlm && (
+              <>
+                <span className="mx-1.5 text-slate-600">·</span>IA {result.score_llm}
+                <span className="mx-1.5 text-slate-600">·</span>
+                <span title="Accord entre la grille et l'IA">accord {result.agreement}%</span>
+              </>
+            )}
+          </p>
           {result.consultant_tjm && (
             <span className="text-xs text-emerald-400 mt-1 inline-flex items-center gap-0.5">
               <Euro size={10} />{result.consultant_tjm}€/j
@@ -223,39 +278,42 @@ function MatchCard({ result, rank, aoId, isAdmin }) {
 
       {expanded && (
         <div className="px-4 pb-4 space-y-4 border-t border-white/5 pt-4 animate-fade-in">
-          <div className="space-y-2.5">
-            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Détail du score</p>
-            {bdEntries.map(e => <BreakdownBar key={e.label} {...e} />)}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 items-center">
+            {/* Radar : forme du profil — grille vs IA */}
+            <div>
+              <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Profil du candidat</p>
+              <ScoreRadar breakdown={bd} llmBreakdown={lbd} weights={weights} />
+            </div>
+            {/* Auto-justification rédigée par l'IA */}
+            <div>
+              <p className="text-xs font-semibold text-violet-300 uppercase tracking-wide mb-2 flex items-center gap-1">
+                <Sparkles size={11} /> Analyse IA
+              </p>
+              {result.llm_global
+                ? <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">{result.llm_global}</p>
+                : <p className="text-xs text-slate-500 italic">Avis IA indisponible pour ce profil — score déterministe seul (grille auditable).</p>}
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            {result.points_forts?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-emerald-400 mb-2 flex items-center gap-1">
-                  <CheckCircle size={11} /> Points forts
-                </p>
-                <ul className="space-y-1">
-                  {result.points_forts.map((p, i) => (
-                    <li key={i} className="text-xs text-slate-400 flex items-start gap-1.5">
-                      <span className="text-emerald-500 mt-0.5 shrink-0">·</span> {p}
-                    </li>
-                  ))}
-                </ul>
+
+          {/* Détail par critère : barre hybride + justification IA */}
+          <div className="space-y-3">
+            <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Détail par critère</p>
+            {cats.map(c => (
+              <div key={c.key}>
+                <div className="flex justify-between text-xs text-slate-400 mb-1">
+                  <span>{c.label}</span>
+                  <span className="tabular">
+                    <span className="text-white font-medium">{c.hybridVal}/{c.max}</span>
+                    {hasLlm && <span className="text-slate-600 ml-1.5">(grille {c.detVal} · IA {c.iaVal ?? '—'})</span>}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-white/5 rounded-full overflow-hidden">
+                  <div className="h-full bg-brand-500 rounded-full transition-all duration-700"
+                       style={{ width: `${Math.min((c.hybridVal / c.max) * 100, 100)}%` }} />
+                </div>
+                {c.justif && <p className="text-[11px] text-slate-500 mt-1">{c.justif}</p>}
               </div>
-            )}
-            {result.points_faibles?.length > 0 && (
-              <div>
-                <p className="text-xs font-semibold text-amber-400 mb-2 flex items-center gap-1">
-                  <AlertCircle size={11} /> Points de vigilance
-                </p>
-                <ul className="space-y-1">
-                  {result.points_faibles.map((p, i) => (
-                    <li key={i} className="text-xs text-slate-400 flex items-start gap-1.5">
-                      <span className="text-amber-500 mt-0.5 shrink-0">·</span> {p}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
+            ))}
           </div>
           {result.cv_url && (
             <a href={result.cv_url} target="_blank" rel="noopener noreferrer"
@@ -1347,10 +1405,10 @@ export default function AODetailPage() {
       </div>
       )}
 
-      {/* ── Onglet Analyse & CV : couverture, diffusion, scoring, CVs ── */}
+      {/* ── Onglet Analyse & CV : top profils, CVs, couverture, diffusion (ordre adaptatif) ── */}
       {tab === 'analyse' && (
-      <div className="space-y-4 mb-5">
-          {isAdmin && <AOInsightsChart aoId={id} />}
+      <div className="flex flex-col gap-4 mb-5">
+          {isAdmin && <div className="order-3"><AOInsightsChart aoId={id} /></div>}
           {/* Partner view: submit a CV */}
           {!isAdmin && (
             <div className="card p-4">
@@ -1373,9 +1431,11 @@ export default function AODetailPage() {
             </div>
           )}
 
-          {/* Staff view: ajout manuel d'un CV + diffusion aux partenaires */}
+          {/* Staff view: ajout manuel d'un CV + diffusion aux partenaires.
+              Ordre adaptatif : remonte en tête quand aucun CV (action n°1 = diffuser),
+              passe en bas dès qu'il y a des CV (on lit d'abord « je contacte qui ? »). */}
           {isAdmin && (
-            <div className="card p-4">
+            <div className={clsx('card p-4', submissions.length > 0 ? 'order-4' : 'order-first')}>
               <div className="flex items-center justify-between flex-wrap gap-3">
                 <div className="min-w-0">
                   <p className="text-sm font-semibold text-white flex items-center gap-2">
@@ -1453,7 +1513,7 @@ export default function AODetailPage() {
 
           {/* Submissions list — repliable */}
           {submissions.length > 0 && (
-            <div className="card p-4">
+            <div className="card p-4 order-2">
               <button type="button" onClick={toggleCvs} className="w-full flex items-center justify-between text-left">
                 <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">
                   {isAdmin ? `Tous les CVs reçus (${submissions.length})` : `Vos soumissions (${submissions.length})`}
@@ -1502,15 +1562,15 @@ export default function AODetailPage() {
             )
           )}
 
-          {/* Admin: matching results / controls */}
+          {/* Admin: matching results / controls — « je contacte qui ? » en tête */}
           {isAdmin && (
-            <>
+            <div className="order-1 flex flex-col gap-4">
               <div className="card p-4">
                 <div className="flex items-center justify-between flex-wrap gap-3">
                   <div>
                     <p className="text-sm font-semibold text-white flex items-center gap-2">
                       <Zap size={15} className="text-brand-400" />
-                      Scoring IA
+                      Scoring hybride (grille + IA)
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5">
                       {submissions.length === 0
@@ -1546,7 +1606,7 @@ export default function AODetailPage() {
                 <div className="space-y-3">
                   <div className="flex items-center gap-2 text-xs text-slate-500">
                     <TrendingUp size={12} className="text-brand-400" />
-                    <span>Top {matchResults.length} · classés par score IA</span>
+                    <span>Top {matchResults.length} · classés par score hybride</span>
                   </div>
                   {matchResults.map((result, i) => (
                     <MatchCard key={result.submission_id || result.consultant_id || i} result={result} rank={i + 1} aoId={id} isAdmin />
@@ -1559,7 +1619,7 @@ export default function AODetailPage() {
                   <p className="text-xs text-slate-600 mt-1">Le scoring se lancera automatiquement dès la première soumission</p>
                 </div>
               ) : null}
-            </>
+            </div>
           )}
       </div>
       )}

@@ -41,6 +41,7 @@ class Settings(BaseSettings):
     #   * assistant  : conversationnel         → Sonnet
     extraction_model: str = "anthropic/claude-haiku-4.5"   # ai_matching (features CV)
     summary_model: str = "anthropic/claude-haiku-4.5"      # résumé d'AO 1 phrase
+    scoring_model: str = "anthropic/claude-haiku-4.5"      # 2e avis IA sur le score (hybride)
     draft_model: str = "anthropic/claude-sonnet-4.5"       # génération de fiche AO
 
     # In-app AI assistant — optional dedicated OpenRouter key + model
