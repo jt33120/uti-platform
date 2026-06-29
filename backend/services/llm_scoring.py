@@ -187,13 +187,14 @@ def combine_hybrid(deterministic: dict, llm: Optional[dict], weights: dict) -> d
     llm_bd = llm.get("llm_breakdown") or {}
     hybrid_bd: dict = {}
     diff_sum = 0
+    IA_WEIGHT = 0.65  # 65 % IA / 35 % grille quand accord parfait ; repli déterministe si divergence
     for llm_k, det_k, w_k in _CATS:
         w = int(weights.get(w_k, 0)) or 1
         d = int(det_bd.get(det_k) or 0)
         l = int((llm_bd.get(llm_k) or {}).get("score") or 0)
         diff_sum += abs(d - l)
         a = 1 - abs(d - l) / w            # proximité sur ce critère
-        hybrid_bd[det_k] = round(a * (d + l) / 2 + (1 - a) * d)
+        hybrid_bd[det_k] = round(a * (IA_WEIGHT * l + (1 - IA_WEIGHT) * d) + (1 - a) * d)
 
     score_hybride = sum(hybrid_bd.values())
     agreement = round(100 * (1 - diff_sum / 100))  # somme des poids = 100

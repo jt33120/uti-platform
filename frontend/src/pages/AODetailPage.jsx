@@ -12,7 +12,7 @@ import {
   UploadCloud, Download, Target, Hash, Send, Bell
 } from 'lucide-react'
 import ScoringPriorities, { DEFAULT_STARS } from '../components/ScoringPriorities'
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer, Legend } from 'recharts'
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 
 // Parse date-only strings ("YYYY-MM-DD") as *local* dates to avoid the UTC
 // off-by-one; full timestamps fall back to native parsing.
@@ -95,27 +95,20 @@ const SCORE_CATS = [
   { label: 'Compatibilité TJM', short: 'TJM', det: 'compatibilite_tjm', llm: 'tjm', wKey: 'w_tjm', dflt: 20 },
 ]
 
-// Radar « Grille (déterministe) vs IA » — chaque axe normalisé à son barème (en %).
-function ScoreRadar({ breakdown, llmBreakdown, weights }) {
+// Radar — score hybride par critère (une seule série, normalisée en %).
+function ScoreRadar({ breakdown, llmBreakdown, hybridBreakdown, weights }) {
   const data = SCORE_CATS.map(c => {
     const max = (weights && weights[c.wKey]) || c.dflt || 1
-    const det = breakdown?.[c.det] ?? 0
-    const ia = llmBreakdown?.[c.llm]?.score
-    return {
-      axis: c.short,
-      grille: Math.round((det / max) * 100),
-      ia: ia == null ? null : Math.round((ia / max) * 100),
-    }
+    // Priorité : hybrid > det (si pas encore de résultat hybride stocké)
+    const val = hybridBreakdown?.[c.det] ?? breakdown?.[c.det] ?? 0
+    return { axis: c.label, score: Math.round((val / max) * 100) }
   })
-  const hasIa = data.some(d => d.ia != null)
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={200}>
       <RadarChart data={data} outerRadius="72%">
         <PolarGrid stroke="rgba(255,255,255,0.12)" />
         <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
-        <Radar name="Grille" dataKey="grille" stroke="#6366f1" fill="#6366f1" fillOpacity={0.28} />
-        {hasIa && <Radar name="IA" dataKey="ia" stroke="#c084fc" fill="#c084fc" fillOpacity={0.22} />}
-        <Legend wrapperStyle={{ fontSize: 11 }} />
+        <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.35} />
       </RadarChart>
     </ResponsiveContainer>
   )
@@ -282,7 +275,7 @@ function MatchCard({ result, rank, aoId, isAdmin }) {
             {/* Radar : forme du profil — grille vs IA */}
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Profil du candidat</p>
-              <ScoreRadar breakdown={bd} llmBreakdown={lbd} weights={weights} />
+              <ScoreRadar breakdown={bd} llmBreakdown={lbd} hybridBreakdown={hbd} weights={weights} />
             </div>
             {/* Auto-justification rédigée par l'IA */}
             <div>
