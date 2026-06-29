@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useConfirm } from '../contexts/ConfirmContext'
 import {
   ArrowLeft, Zap, Euro, MapPin, Clock, Users, CheckCircle,
-  AlertCircle, TrendingUp, Award, ChevronDown, ChevronUp,
+  AlertCircle, TrendingUp, Award, ChevronDown, ChevronUp, ChevronLeft, ChevronRight,
   Loader2, FileText, Trash2, RotateCcw, Building2, Plus,
   Upload, X, UserCircle2, Briefcase, Calendar, Pencil,
   CalendarClock, AlertTriangle, BarChart3, Sparkles,
@@ -326,6 +326,45 @@ function MatchCard({ result, rank, aoId, isAdmin }) {
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Carousel : swipe entre les top profils ──────────────────────
+function MatchCarousel({ results, aoId, isAdmin }) {
+  const [idx, setIdx] = useState(0)
+  const result = results[idx]
+  const prev = () => setIdx(i => Math.max(0, i - 1))
+  const next = () => setIdx(i => Math.min(results.length - 1, i + 1))
+
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-2 text-xs text-slate-500">
+          <TrendingUp size={12} className="text-brand-400" />
+          <span>Top {results.length} · classés par score hybride</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <button onClick={prev} disabled={idx === 0}
+            className="btn-ghost p-1.5 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronLeft size={16} />
+          </button>
+          <div className="flex gap-1.5 items-center">
+            {results.map((_, i) => (
+              <button key={i} onClick={() => setIdx(i)}
+                className={clsx('rounded-full transition-all duration-200',
+                  i === idx ? 'w-5 h-1.5 bg-brand-400' : 'w-1.5 h-1.5 bg-white/20 hover:bg-white/40')} />
+            ))}
+          </div>
+          <button onClick={next} disabled={idx === results.length - 1}
+            className="btn-ghost p-1.5 disabled:opacity-30 disabled:cursor-not-allowed">
+            <ChevronRight size={16} />
+          </button>
+        </div>
+      </div>
+      <div key={idx} className="animate-fade-in">
+        <MatchCard result={result} rank={idx + 1} aoId={aoId} isAdmin={isAdmin} />
+      </div>
     </div>
   )
 }
@@ -1548,11 +1587,7 @@ export default function AODetailPage() {
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3 flex items-center gap-1.5">
                   <TrendingUp size={12} className="text-brand-400" /> Vos scores IA
                 </p>
-                <div className="space-y-3">
-                  {matchResults.map((result, i) => (
-                    <MatchCard key={result.submission_id || i} result={result} rank={i + 1} />
-                  ))}
-                </div>
+                <MatchCarousel results={matchResults} />
               </div>
             ) : (
               <div className="card p-4 border-dashed border-white/10 text-center">
@@ -1603,15 +1638,7 @@ export default function AODetailPage() {
               </div>
 
               {matchResults && matchResults.length > 0 ? (
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-xs text-slate-500">
-                    <TrendingUp size={12} className="text-brand-400" />
-                    <span>Top {matchResults.length} · classés par score hybride</span>
-                  </div>
-                  {matchResults.map((result, i) => (
-                    <MatchCard key={result.submission_id || result.consultant_id || i} result={result} rank={i + 1} aoId={id} isAdmin />
-                  ))}
-                </div>
+                <MatchCarousel results={matchResults} aoId={id} isAdmin />
               ) : !matching && submissions.length === 0 ? (
                 <div className="card p-8 text-center border-dashed border-white/10">
                   <Users size={28} className="mx-auto text-slate-700 mb-3" />
