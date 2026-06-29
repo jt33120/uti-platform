@@ -58,26 +58,10 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
     Returns (success, error_message). Never raises — caller decides what to do.
     """
     first = _greeting_name(partner_name)
-    salutation = f"Bonjour {first}" if first else "Bonjour"  # plain "Bonjour," when unsure
     role_label = "l'équipe commerciale Groupement-IT" if role == "commerce" else "la plateforme partenaires Groupement-IT"
-    # Sujet + corps proviennent du template éditable (Administration → Templates Mails).
+    # Sujet + corps + coquille via la source unique (= aperçu admin fidèle).
     context = {"name": first, "role": role_label, "link": invite_url}
-    subject = email_templates.render_subject("invite", context)
-    body_html = email_templates.render_body("invite", context, as_html=True)
-    html = render_email_html(
-        title=f"{salutation},",
-        body_html=body_html,
-        cta={"label": "Créer mon compte", "url": invite_url},
-        footer_note="Si vous n'attendiez pas cette invitation, ignorez simplement cet email.",
-    )
-
-    text = (
-        f"{salutation},\n\n"
-        f"{email_templates.render_body('invite', context, as_html=False)}\n\n"
-        "Créez votre compte en ouvrant le lien ci-dessous :\n\n"
-        f"{invite_url}\n\n"
-        "Si vous n'attendiez pas cette invitation, ignorez simplement cet email."
-    )
+    subject, html, text = email_templates.build_email("invite", context)
     return send_email(to_email, subject, html, text=text)
 
 

@@ -10,7 +10,7 @@ from typing import Optional
 from datetime import datetime, timezone
 
 from services.supabase_client import supabase
-from services.email import send_email, render_email_html
+from services.email import send_email
 from services import email_templates
 from config import settings
 
@@ -59,55 +59,18 @@ def _render(ao: dict, client_name: str, kind: str) -> tuple[str, str, str]:
     Sujet et corps proviennent des templates éditables (Administration →
     Templates Mails), avec repli sur les valeurs par défaut.
     """
-    title = ao.get("title") or "Appel d'offres"
     url = f"{settings.frontend_url.rstrip('/')}/aos/{ao['id']}"
-    ref = ao.get("reference")
-    loc = ao.get("location")
-    deadline = ao.get("deadline")
-
     key = "ao_relance" if kind == "relance" else "ao_new"
     context = {
-        "title": title, "client": client_name,
-        "reference": ref or "", "location": loc or "",
-        "deadline": deadline or "", "link": url,
+        "title": ao.get("title") or "Appel d'offres",
+        "client": client_name,
+        "reference": ao.get("reference") or "",
+        "location": ao.get("location") or "",
+        "deadline": ao.get("deadline") or "",
+        "link": url,
     }
-    subject = email_templates.render_subject(key, context)
-    intro = email_templates.render_body(key, context, as_html=True)
-    cta_label = "Proposer un consultant" if kind == "relance" else "Voir l'appel d'offres"
-
-    # Bloc méta (référence/localisation/date limite) ajouté automatiquement,
-    # sauf si le template référence déjà ces variables (l'admin gère lui-même).
-    raw = email_templates.raw_body(key)
-    uses_meta_vars = any(("{" + v + "}") in raw for v in ("reference", "location", "deadline"))
-    meta_rows = ""
-    if not uses_meta_vars:
-        for label, val in (("Référence", ref), ("Localisation", loc), ("Date limite", deadline)):
-            if val:
-                meta_rows += (
-                    f'<tr><td style="padding:3px 0;color:#6e6e73;width:110px;">{label}</td>'
-                    f'<td style="color:#1d1d1f;">{val}</td></tr>'
-                )
-    meta_html = (
-        f'<table cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;margin-top:8px;">{meta_rows}</table>'
-        if meta_rows else ""
-    )
-    body_html = f"{intro}{meta_html}"
-
-    html = render_email_html(
-        title=title,
-        body_html=body_html,
-        cta={"label": cta_label, "url": url},
-        footer_note="Vous recevez cet email car vous êtes partenaire référencé sur ce client.",
-    )
-    text_lines = [
-        email_templates.render_body(key, context, as_html=False),
-        "",
-        f"Client : {client_name}",
-    ]
-    if ref:
-        text_lines.append(f"Référence : {ref}")
-    text_lines += ["", "Proposez un consultant sur la plateforme :", url]
-    return subject, html, "\n".join(text_lines)
+    # Source unique de rendu (identique à l'aperçu admin).
+    return email_templates.build_email(key, context)
 
 
 def _log_send(ao_id, recipient: dict, kind: str, status: str, error, sent_by) -> None:

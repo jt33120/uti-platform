@@ -24,10 +24,44 @@ _IMG_EXT = {
 }
 
 
+# Valeurs d'exemple pour l'aperçu (rendu via la MÊME coquille que l'envoi réel).
+_PREVIEW_SAMPLE = {
+    "title": "Tech Lead Big Data",
+    "client": "AGIRC SAD",
+    "reference": "AO-2026-014",
+    "location": "Paris / hybride",
+    "deadline": "2026-07-15",
+    "link": "https://plateforme.groupement-it.com/aos/exemple",
+    "name": "Marie",
+    "role": "la plateforme partenaires Groupement-IT",
+}
+
+
 @router.get("")
 async def list_templates(user: dict = Depends(require_staff)):
     """Liste des templates (valeur effective + défaut + variables disponibles)."""
     return {"templates": email_templates.get_all()}
+
+
+class PreviewRequest(BaseModel):
+    key: str
+    subject: str = Field(min_length=1, max_length=300)
+    body: str = Field(min_length=1, max_length=50000)
+
+
+@router.post("/preview")
+async def preview_template(req: PreviewRequest, user: dict = Depends(require_staff)):
+    """Rend l'email complet (coquille de marque) avec des valeurs d'exemple.
+
+    Utilise build_email — la même fonction que l'envoi réel — donc l'aperçu est
+    fidèle au mail effectivement reçu.
+    """
+    if req.key not in email_templates.DEFAULTS:
+        raise HTTPException(status_code=404, detail="Template inconnu")
+    subject, html, _ = email_templates.build_email(
+        req.key, _PREVIEW_SAMPLE, subject=req.subject, body=req.body
+    )
+    return {"subject": subject, "html": html}
 
 
 class TemplateUpdate(BaseModel):

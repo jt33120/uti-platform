@@ -22,21 +22,28 @@ from services.supabase_client import supabase
 _BOLD = {"title", "client"}
 
 # ── Corps par défaut — HTML riche, styles inline (compatibles clients mail) ──
+# Le titre de l'AO est présenté UNE fois, comme bloc mis en valeur (pas dans le
+# H1, qui reste un libellé court) pour éviter les pavés en double.
+_AO_TITLE_BLOCK = (
+    '<p style="margin:0 0 16px;padding:12px 16px;background:#f4f5fb;'
+    'border-left:3px solid #4f46e5;border-radius:6px;font-size:16px;'
+    'font-weight:700;color:#1d1d1f;">{title}</p>'
+)
 _DEFAULT_NEW = (
-    '<p style="margin:0 0 14px;">Bonjour,</p>'
-    '<p style="margin:0 0 14px;">Un nouvel appel d\'offres '
-    '<strong>{title}</strong> pour le client <strong>{client}</strong> '
-    "vient d'être ouvert sur la plateforme.</p>"
-    '<p style="margin:0 0 14px;">Vous pouvez dès à présent proposer un '
-    "consultant correspondant au besoin.</p>"
+    '<p style="margin:0 0 12px;">Bonjour,</p>'
+    '<p style="margin:0 0 4px;">Un nouvel appel d\'offres vient d\'être ouvert '
+    "pour le client <strong>{client}</strong> :</p>"
+    + _AO_TITLE_BLOCK +
+    '<p style="margin:0;">Vous pouvez dès à présent proposer un consultant '
+    "correspondant directement sur la plateforme.</p>"
 )
 _DEFAULT_RELANCE = (
-    '<p style="margin:0 0 14px;">Bonjour,</p>'
-    '<p style="margin:0 0 14px;">Pour rappel, l\'appel d\'offres '
-    "<strong>{title}</strong> ({client}) est toujours ouvert et nous n'avons "
-    "pas encore reçu de proposition de votre part.</p>"
-    '<p style="margin:0 0 14px;">N\'hésitez pas à nous proposer un profil '
-    "avant la date limite.</p>"
+    '<p style="margin:0 0 12px;">Bonjour,</p>'
+    '<p style="margin:0 0 4px;">Pour rappel, cet appel d\'offres pour '
+    "<strong>{client}</strong> est toujours ouvert :</p>"
+    + _AO_TITLE_BLOCK +
+    '<p style="margin:0;">Nous n\'avons pas encore reçu de proposition de votre '
+    "part — n'hésitez pas à nous proposer un profil avant la date limite.</p>"
 )
 _DEFAULT_INVITE = (
     '<p style="margin:0 0 14px;">Vous êtes invité(e) à rejoindre '
@@ -56,7 +63,9 @@ _DEFAULT_RESET = (
 )
 
 # `placeholders` : variables proposées dans l'éditeur.
-# `preview_*`     : éléments de coquille (titre H1, bouton, pied) pour l'aperçu.
+# `email_title`  : H1 court de l'email (≠ corps), peut utiliser des variables.
+# `cta_label`    : libellé du bouton d'action (le lien = {link} du contexte).
+# `footer`       : note de pied de page.
 DEFAULTS = {
     "ao_new": {
         "label": "Nouvel appel d'offres — notification aux partenaires",
@@ -64,7 +73,7 @@ DEFAULTS = {
         "body": _DEFAULT_NEW,
         "format": "html",
         "placeholders": ["title", "client", "reference", "location", "deadline", "link"],
-        "preview_title": "{title}",
+        "email_title": "Nouvel appel d'offres",
         "cta_label": "Voir l'appel d'offres",
         "footer": "Vous recevez cet email car vous êtes partenaire référencé sur ce client.",
     },
@@ -74,7 +83,7 @@ DEFAULTS = {
         "body": _DEFAULT_RELANCE,
         "format": "html",
         "placeholders": ["title", "client", "reference", "location", "deadline", "link"],
-        "preview_title": "{title}",
+        "email_title": "Appel d'offres toujours ouvert",
         "cta_label": "Proposer un consultant",
         "footer": "Vous recevez cet email car vous êtes partenaire référencé sur ce client.",
     },
@@ -84,7 +93,7 @@ DEFAULTS = {
         "body": _DEFAULT_INVITE,
         "format": "html",
         "placeholders": ["name", "role", "link"],
-        "preview_title": "Bonjour {name},",
+        "email_title": "Bonjour {name},",
         "cta_label": "Créer mon compte",
         "footer": "Si vous n'attendiez pas cette invitation, ignorez simplement cet email.",
     },
@@ -94,7 +103,7 @@ DEFAULTS = {
         "body": _DEFAULT_RESET,
         "format": "html",
         "placeholders": ["link"],
-        "preview_title": "Réinitialisation du mot de passe",
+        "email_title": "Réinitialisation du mot de passe",
         "cta_label": "Réinitialiser mon mot de passe",
         "footer": "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe reste inchangé.",
     },
@@ -144,10 +153,6 @@ def get_all() -> list[dict]:
             "default_format": d.get("format", "html"),
             "is_custom": bool(row),
             "placeholders": d.get("placeholders", []),
-            # Coquille (pour un aperçu fidèle côté front).
-            "preview_title": d.get("preview_title", ""),
-            "cta_label": d.get("cta_label", ""),
-            "footer": d.get("footer", ""),
         })
     return out
 
@@ -212,3 +217,79 @@ def render_body(key: str, context: dict, as_html: bool) -> str:
         rep = f"<strong>{v}</strong>" if (name in _BOLD and v) else v
         out = out.replace("{" + name + "}", rep)
     return out.replace("\n", "<br>")
+
+
+def _subst(s: str, context: dict) -> str:
+    for name, val in context.items():
+        s = s.replace("{" + name + "}", str(val or ""))
+    return s
+
+
+def _meta_table(context: dict) -> str:
+    """Tableau Référence / Localisation / Date limite (emails AO)."""
+    rows = ""
+    for label, key in (("Référence", "reference"), ("Localisation", "location"), ("Date limite", "deadline")):
+        val = context.get(key)
+        if val:
+            rows += (
+                f'<tr><td style="padding:4px 0;color:#9098a3;width:120px;">{_html.escape(label)}</td>'
+                f'<td style="color:#3a3f4a;">{_html.escape(str(val))}</td></tr>'
+            )
+    if not rows:
+        return ""
+    return f'<table cellpadding="0" cellspacing="0" style="width:100%;font-size:14px;margin-top:14px;">{rows}</table>'
+
+
+def build_email(key: str, context: dict, subject: str = None, body: str = None) -> tuple[str, str, str]:
+    """Construit (sujet, html, texte) d'un email transactionnel — SOURCE UNIQUE.
+
+    Utilisée pour l'envoi réel ET pour l'aperçu, ce qui garantit que l'aperçu
+    affiché à l'admin est exactement le mail reçu. `subject`/`body` permettent
+    de prévisualiser un contenu non encore enregistré.
+    """
+    # Import local pour éviter toute dépendance circulaire au chargement.
+    from services.email import render_email_html
+
+    d = DEFAULTS.get(key, {})
+
+    # Sujet
+    subj = subject if subject is not None else _effective(key)["subject"]
+    subj = _subst(subj, context).strip() or "Groupement-IT"
+
+    # Corps (HTML) — override éventuel (aperçu) ou template effectif.
+    if body is not None:
+        intro = _inject_html(body, context) if _looks_html(body) else _inject_html(
+            "<p>" + _html.escape(body).replace("\n", "<br>") + "</p>", context
+        )
+        raw = body
+    else:
+        intro = render_body(key, context, as_html=True)
+        raw = raw_body(key)
+
+    # Bloc méta automatique (AO) si le template n'y fait pas déjà référence.
+    if key in ("ao_new", "ao_relance"):
+        if not any(("{" + v + "}") in (raw or "") for v in ("reference", "location", "deadline")):
+            intro += _meta_table(context)
+
+    # H1 court (jamais le titre brut de l'AO).
+    title = _subst(d.get("email_title", "Groupement-IT"), context)
+    title = title.replace(" ,", ",").strip() or "Groupement-IT"
+
+    # Bouton d'action : lien réel = {link} du contexte.
+    cta = None
+    link = context.get("link")
+    if d.get("cta_label") and link:
+        cta = {"label": d["cta_label"], "url": str(link)}
+
+    html = render_email_html(
+        title=title, body_html=intro, cta=cta, footer_note=d.get("footer"),
+    )
+
+    # Version texte (fallback).
+    text_body = render_body(key, context, as_html=False) if body is None else _subst(
+        _strip_html(body) if _looks_html(body) else body, context
+    )
+    text_lines = [title, "", text_body]
+    if link:
+        text_lines += ["", str(link)]
+    return subj, html, "\n".join(text_lines)
