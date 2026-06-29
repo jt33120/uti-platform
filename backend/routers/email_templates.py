@@ -7,9 +7,10 @@ Toute modification est journalisée (audit_log).
 import uuid
 from datetime import datetime, timezone
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, EmailStr
 
 from services import email_templates, audit, storage
+from services.email import send_email
 from services.supabase_client import supabase
 from routers.auth import require_staff, require_admin
 
@@ -62,6 +63,35 @@ async def preview_template(req: PreviewRequest, user: dict = Depends(require_sta
         req.key, _PREVIEW_SAMPLE, subject=req.subject, body=req.body
     )
     return {"subject": subject, "html": html}
+
+
+class TestSendRequest(BaseModel):
+    key: str
+    to: EmailStr
+    subject: str = Field(min_length=1, max_length=300)
+    body: str = Field(min_length=1, max_length=50000)
+
+
+@router.post("/send-test")
+async def send_test(req: TestSendRequest, user: dict = Depends(require_admin)):
+    """Envoie un email de test (contenu en cours d'édition, valeurs d'exemple).
+
+    Rendu via build_email — donc strictement identique à l'envoi réel.
+    """
+    if req.key not in email_templates.DEFAULTS:
+        raise HTTPException(status_code=404, detail="Template inconnu")
+    subject, html, text = email_templates.build_email(
+        req.key, _PREVIEW_SAMPLE, subject=req.subject, body=req.body
+    )
+    subject = f"[TEST] {subject}"
+    ok, err = send_email(req.to, subject, html, text=text)
+    if not ok:
+        raise HTTPException(status_code=502, detail=f"Échec de l'envoi : {err}")
+    audit.log_event(
+        "email_template_test", audit.new_run_id(),
+        actor_id=user["sub"], payload={"key": req.key, "to": req.to},
+    )
+    return {"message": f"Email de test envoyé à {req.to}."}
 
 
 class TemplateUpdate(BaseModel):

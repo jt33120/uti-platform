@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import api from '../lib/api'
 import RichTextEditor from '../components/RichTextEditor'
-import { Mail, Loader2, Save, RotateCcw, CheckCircle, Eye } from 'lucide-react'
+import { useAuth } from '../contexts/AuthContext'
+import { Mail, Loader2, Save, RotateCcw, CheckCircle, Eye, Send, AlertCircle } from 'lucide-react'
 
 const VAR_LABELS = {
   title: "Titre de l'AO",
@@ -83,12 +84,28 @@ function EmailPreview({ tplKey, subject, body }) {
 }
 
 function TemplateCard({ tpl, onSaved }) {
+  const { user } = useAuth()
   const [subject, setSubject] = useState(tpl.subject)
   const [body, setBody] = useState(() => toEditorHtml(tpl.body))
   const [version, setVersion] = useState(0) // force la ré-init de l'éditeur
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [error, setError] = useState('')
+  const [testEmail, setTestEmail] = useState(user?.email || '')
+  const [testing, setTesting] = useState(false)
+  const [testMsg, setTestMsg] = useState(null) // { ok, text }
+
+  const sendTest = async () => {
+    setTesting(true); setTestMsg(null)
+    try {
+      const r = await api.post('/email-templates/send-test', { key: tpl.key, to: testEmail, subject, body })
+      setTestMsg({ ok: true, text: r.data.message })
+    } catch (e) {
+      setTestMsg({ ok: false, text: e.response?.data?.detail || "Échec de l'envoi du test" })
+    } finally {
+      setTesting(false)
+    }
+  }
 
   const initialBody = toEditorHtml(tpl.body)
   const dirty = subject !== tpl.subject || body !== initialBody
@@ -161,6 +178,34 @@ function TemplateCard({ tpl, onSaved }) {
           </p>
           <EmailPreview tplKey={tpl.key} subject={subject} body={body} />
         </div>
+      </div>
+
+      {/* Envoi d'un email de test (contenu en cours d'édition, valeurs d'exemple) */}
+      <div className="rounded-lg border border-white/10 bg-navy-900/30 p-3">
+        <p className="text-[11px] text-slate-500 mb-2 flex items-center gap-1">
+          <Send size={12} /> Envoyer un test (le contenu actuel, avec des valeurs d'exemple)
+        </p>
+        <div className="flex flex-wrap items-center gap-2">
+          <input
+            type="email"
+            className="input flex-1 min-w-[200px]"
+            placeholder="adresse@email.com"
+            value={testEmail}
+            onChange={(e) => { setTestEmail(e.target.value); setTestMsg(null) }}
+          />
+          <button
+            onClick={sendTest}
+            disabled={testing || !testEmail}
+            className="btn-ghost text-sm gap-1.5 whitespace-nowrap"
+          >
+            {testing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Envoyer un test
+          </button>
+        </div>
+        {testMsg && (
+          <p className={`text-xs mt-2 inline-flex items-center gap-1 ${testMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+            {testMsg.ok ? <CheckCircle size={13} /> : <AlertCircle size={13} />} {testMsg.text}
+          </p>
+        )}
       </div>
 
       {error && <p className="text-xs text-red-400">{error}</p>}
