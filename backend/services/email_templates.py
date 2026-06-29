@@ -11,18 +11,17 @@ Le corps est stocké en **HTML** (format "html"). Pour la rétro-compatibilité,
 un corps en texte brut (format "text", anciennes lignes) reste rendu comme
 avant. Le sujet est toujours du texte simple.
 
-Variables disponibles dans le sujet et le corps :
-  {title} {client} {reference} {location} {deadline} {link}
+Chaque template déclare ses propres variables (`placeholders`). À l'envoi, on
+remplace toutes les `{clé}` présentes dans le contexte fourni.
 """
 import re
 import html as _html
 from services.supabase_client import supabase
 
-PLACEHOLDERS = ["title", "client", "reference", "location", "deadline", "link"]
 # Variables mises en évidence (gras) dans le rendu des anciens corps "texte".
 _BOLD = {"title", "client"}
 
-# Corps par défaut — HTML riche, styles inline (compatibles clients mail).
+# ── Corps par défaut — HTML riche, styles inline (compatibles clients mail) ──
 _DEFAULT_NEW = (
     '<p style="margin:0 0 14px;">Bonjour,</p>'
     '<p style="margin:0 0 14px;">Un nouvel appel d\'offres '
@@ -39,19 +38,65 @@ _DEFAULT_RELANCE = (
     '<p style="margin:0 0 14px;">N\'hésitez pas à nous proposer un profil '
     "avant la date limite.</p>"
 )
+_DEFAULT_INVITE = (
+    '<p style="margin:0 0 14px;">Vous êtes invité(e) à rejoindre '
+    "<strong>{role}</strong> sur la plateforme Groupement-IT.</p>"
+    '<p style="margin:0 0 14px;">Créez votre compte en cliquant sur le bouton '
+    "ci-dessous.</p>"
+    '<p style="margin:0;font-size:13px;color:#6e6e73;">Ce lien est à usage '
+    "unique et expire dans 7 jours.</p>"
+)
+_DEFAULT_RESET = (
+    '<p style="margin:0 0 14px;">Vous avez demandé à réinitialiser le mot de '
+    "passe de votre compte sur la plateforme Groupement-IT.</p>"
+    '<p style="margin:0 0 14px;">Cliquez sur le bouton ci-dessous pour choisir '
+    "un nouveau mot de passe.</p>"
+    '<p style="margin:0;font-size:13px;color:#6e6e73;">Ce lien est à usage '
+    "unique et expire dans 1 heure.</p>"
+)
 
+# `placeholders` : variables proposées dans l'éditeur.
+# `preview_*`     : éléments de coquille (titre H1, bouton, pied) pour l'aperçu.
 DEFAULTS = {
     "ao_new": {
         "label": "Nouvel appel d'offres — notification aux partenaires",
         "subject": "Nouvel appel d'offres : {title}",
         "body": _DEFAULT_NEW,
         "format": "html",
+        "placeholders": ["title", "client", "reference", "location", "deadline", "link"],
+        "preview_title": "{title}",
+        "cta_label": "Voir l'appel d'offres",
+        "footer": "Vous recevez cet email car vous êtes partenaire référencé sur ce client.",
     },
     "ao_relance": {
         "label": "Relance des partenaires — AO resté sans réponse",
         "subject": "Rappel — Appel d'offres : {title}",
         "body": _DEFAULT_RELANCE,
         "format": "html",
+        "placeholders": ["title", "client", "reference", "location", "deadline", "link"],
+        "preview_title": "{title}",
+        "cta_label": "Proposer un consultant",
+        "footer": "Vous recevez cet email car vous êtes partenaire référencé sur ce client.",
+    },
+    "invite": {
+        "label": "Invitation — création de compte (partenaire / commercial)",
+        "subject": "Invitation — GROUPEMENT-IT Plateforme",
+        "body": _DEFAULT_INVITE,
+        "format": "html",
+        "placeholders": ["name", "role", "link"],
+        "preview_title": "Bonjour {name},",
+        "cta_label": "Créer mon compte",
+        "footer": "Si vous n'attendiez pas cette invitation, ignorez simplement cet email.",
+    },
+    "password_reset": {
+        "label": "Mot de passe oublié — lien de réinitialisation",
+        "subject": "Réinitialisation de votre mot de passe — Groupement-IT",
+        "body": _DEFAULT_RESET,
+        "format": "html",
+        "placeholders": ["link"],
+        "preview_title": "Réinitialisation du mot de passe",
+        "cta_label": "Réinitialiser mon mot de passe",
+        "footer": "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe reste inchangé.",
     },
 }
 
@@ -98,7 +143,11 @@ def get_all() -> list[dict]:
             "default_body": d["body"],
             "default_format": d.get("format", "html"),
             "is_custom": bool(row),
-            "placeholders": PLACEHOLDERS,
+            "placeholders": d.get("placeholders", []),
+            # Coquille (pour un aperçu fidèle côté front).
+            "preview_title": d.get("preview_title", ""),
+            "cta_label": d.get("cta_label", ""),
+            "footer": d.get("footer", ""),
         })
     return out
 
@@ -119,30 +168,26 @@ def raw_body(key: str) -> str:
     return _effective(key)["body"]
 
 
-def _val(context: dict, name: str) -> str:
-    return str(context.get(name) or "")
-
-
 def render_subject(key: str, context: dict) -> str:
     s = _effective(key)["subject"]
-    for name in PLACEHOLDERS:
-        s = s.replace("{" + name + "}", _val(context, name))
-    return s.strip() or "Appel d'offres"
+    for name, val in context.items():
+        s = s.replace("{" + name + "}", str(val or ""))
+    return s.strip() or "Groupement-IT"
 
 
 def _inject_html(body: str, context: dict) -> str:
     """Injecte les variables (valeurs échappées) dans un corps HTML déjà sûr."""
     out = body
-    for name in PLACEHOLDERS:
-        out = out.replace("{" + name + "}", _html.escape(_val(context, name)))
+    for name, val in context.items():
+        out = out.replace("{" + name + "}", _html.escape(str(val or "")))
     return out
 
 
 def render_body(key: str, context: dict, as_html: bool) -> str:
     """Corps rendu.
 
-    - HTML + format html : le corps est de l'HTML de confiance (éditeur admin),
-      on injecte seulement les variables (valeurs échappées).
+    - HTML + format html : corps de confiance (éditeur admin), on injecte
+      seulement les variables (valeurs échappées).
     - HTML + format texte (legacy) : on échappe, met {title}/{client} en gras,
       et convertit les retours ligne.
     - Texte : on retire le HTML éventuel et on injecte les valeurs brutes.
@@ -153,8 +198,8 @@ def render_body(key: str, context: dict, as_html: bool) -> str:
 
     if not as_html:
         text = _strip_html(body) if is_html else body
-        for name in PLACEHOLDERS:
-            text = text.replace("{" + name + "}", _val(context, name))
+        for name, val in context.items():
+            text = text.replace("{" + name + "}", str(val or ""))
         return text
 
     if is_html:
@@ -162,8 +207,8 @@ def render_body(key: str, context: dict, as_html: bool) -> str:
 
     # Legacy : corps texte brut → échappé, variables en gras, sauts de ligne.
     out = _html.escape(body)
-    for name in PLACEHOLDERS:
-        val = _html.escape(_val(context, name))
-        rep = f"<strong>{val}</strong>" if (name in _BOLD and val) else val
+    for name, val in context.items():
+        v = _html.escape(str(val or ""))
+        rep = f"<strong>{v}</strong>" if (name in _BOLD and v) else v
         out = out.replace("{" + name + "}", rep)
     return out.replace("\n", "<br>")

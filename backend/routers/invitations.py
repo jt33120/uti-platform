@@ -6,6 +6,7 @@ from pydantic import BaseModel, EmailStr
 from typing import Optional, Literal
 from services.supabase_client import supabase
 from services.email import send_email, render_email_html
+from services import email_templates
 from routers.auth import require_admin
 from config import settings
 
@@ -59,12 +60,10 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
     first = _greeting_name(partner_name)
     salutation = f"Bonjour {first}" if first else "Bonjour"  # plain "Bonjour," when unsure
     role_label = "l'équipe commerciale Groupement-IT" if role == "commerce" else "la plateforme partenaires Groupement-IT"
-    subject = "Invitation — GROUPEMENT-IT Plateforme"
-    body_html = (
-        f"Vous êtes invité(e) à rejoindre <strong>{role_label}</strong>. "
-        "Créez votre compte en cliquant sur le bouton ci-dessous."
-        '<p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 7 jours.</p>'
-    )
+    # Sujet + corps proviennent du template éditable (Administration → Templates Mails).
+    context = {"name": first, "role": role_label, "link": invite_url}
+    subject = email_templates.render_subject("invite", context)
+    body_html = email_templates.render_body("invite", context, as_html=True)
     html = render_email_html(
         title=f"{salutation},",
         body_html=body_html,
@@ -74,8 +73,8 @@ def _send_invite_email(to_email: str, partner_name: str, invite_url: str, role: 
 
     text = (
         f"{salutation},\n\n"
-        f"Vous êtes invité(e) à rejoindre {role_label}.\n"
-        "Créez votre compte en ouvrant le lien ci-dessous (usage unique, expire dans 7 jours) :\n\n"
+        f"{email_templates.render_body('invite', context, as_html=False)}\n\n"
+        "Créez votre compte en ouvrant le lien ci-dessous :\n\n"
         f"{invite_url}\n\n"
         "Si vous n'attendiez pas cette invitation, ignorez simplement cet email."
     )

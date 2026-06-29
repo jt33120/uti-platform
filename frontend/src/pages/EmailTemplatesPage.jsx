@@ -11,6 +11,8 @@ const SAMPLE = {
   location: 'Paris / hybride',
   deadline: '2026-07-15',
   link: 'https://plateforme.groupement-it.com/aos/abc',
+  name: 'Marie',
+  role: 'la plateforme partenaires Groupement-IT',
 }
 
 const VAR_LABELS = {
@@ -19,7 +21,9 @@ const VAR_LABELS = {
   reference: 'Référence',
   location: 'Localisation',
   deadline: 'Date limite',
-  link: "Lien de l'AO",
+  link: 'Lien / bouton',
+  name: 'Prénom',
+  role: 'Rôle invité',
 }
 
 const escapeHtml = (s) =>
@@ -51,8 +55,8 @@ async function uploadImage(file) {
   return r.data.url
 }
 
-// Aperçu fidèle : reproduit la coquille de l'email réel (logo, titre, CTA).
-function EmailPreview({ subject, bodyHtml }) {
+// Aperçu fidèle : reproduit la coquille de l'email réel (logo, titre, CTA, pied).
+function EmailPreview({ subject, bodyHtml, previewTitle, ctaLabel, footer }) {
   const renderedBody = applyVars(bodyHtml, SAMPLE)
   return (
     <div className="rounded-lg overflow-hidden border border-white/10" style={{ background: '#f5f5f7' }}>
@@ -65,18 +69,24 @@ function EmailPreview({ subject, bodyHtml }) {
             <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6e6e73', fontWeight: 600 }}>
               Groupement-IT
             </div>
-            <h1 style={{ fontSize: 22, margin: '6px 0 0', fontWeight: 600, color: '#111' }}>{SAMPLE.title}</h1>
+            <h1 style={{ fontSize: 22, margin: '6px 0 0', fontWeight: 600, color: '#111' }}>
+              {applyVars(previewTitle, SAMPLE) || 'Groupement-IT'}
+            </h1>
           </div>
           <div className="email-preview" style={{ padding: '14px 28px 22px' }}
                dangerouslySetInnerHTML={{ __html: renderedBody }} />
-          <div style={{ textAlign: 'center', padding: '0 28px 26px' }}>
-            <span style={{ display: 'inline-block', background: '#111', color: '#fff', fontWeight: 600, fontSize: 14, padding: '12px 24px', borderRadius: 8 }}>
-              Voir l'appel d'offres
-            </span>
-          </div>
-          <div style={{ padding: '14px 28px', borderTop: '1px solid #e5e5e7', fontSize: 12, color: '#86868b' }}>
-            Vous recevez cet email car vous êtes partenaire référencé sur ce client.
-          </div>
+          {ctaLabel && (
+            <div style={{ textAlign: 'center', padding: '0 28px 26px' }}>
+              <span style={{ display: 'inline-block', background: '#111', color: '#fff', fontWeight: 600, fontSize: 14, padding: '12px 24px', borderRadius: 8 }}>
+                {ctaLabel}
+              </span>
+            </div>
+          )}
+          {footer && (
+            <div style={{ padding: '14px 28px', borderTop: '1px solid #e5e5e7', fontSize: 12, color: '#86868b' }}>
+              {footer}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -160,7 +170,13 @@ function TemplateCard({ tpl, onSaved }) {
           <p className="label flex items-center gap-1">
             <Eye size={12} /> Aperçu (valeurs d'exemple — remplacées à l'envoi)
           </p>
-          <EmailPreview subject={subject} bodyHtml={body} />
+          <EmailPreview
+            subject={subject}
+            bodyHtml={body}
+            previewTitle={tpl.preview_title}
+            ctaLabel={tpl.cta_label}
+            footer={tpl.footer}
+          />
         </div>
       </div>
 
