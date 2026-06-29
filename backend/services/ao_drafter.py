@@ -124,7 +124,13 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
     user = (
         "Génère la fiche AO à partir du contenu source ci-dessous.\n\n"
         "Champs JSON attendus (tous présents, vide si l'info est absente) :\n"
-        '- "title": titre court et parlant de la mission\n'
+        '- "title": titre TRÈS court (3 à 8 mots) au format "Type de profil — précision". '
+        'Il doit nommer le PROFIL recherché (ex. "Tech Lead Data", "Architecte Cloud", '
+        '"Chef de projet MOA", "Ingénieur DevOps", "AI Tech Lead"), suivi si utile d\'UNE '
+        'précision clé : secteur ou client, longue durée, télétravail. JAMAIS une phrase '
+        'complète, JAMAIS l\'objet de la prestation recopié. '
+        'Exemples : "Tech Lead Big Data — Assurance, longue mission" · '
+        '"Architecte Cloud — secteur bancaire" · "Chef de projet MOA — télétravail partiel"\n'
         '- "reference": référence client / de la consultation si présente (ex. "Marché Spécifique n°23915SA230MS"), sinon ""\n'
         '- "description": description claire et professionnelle (3 à 6 phrases), reformulée\n'
         '- "skills_required": compétences techniques clés, séparées par des virgules\n'
