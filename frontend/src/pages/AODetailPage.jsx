@@ -1341,22 +1341,20 @@ export default function AODetailPage() {
         if (isAdmin && subs.length > 0) {
           setLoading(false)
 
-          // Use cached results only if they were run AFTER the latest submission
+          // CACHE-FIRST : on réutilise toujours le scoring stocké (pas d'appels
+          // LLM à chaque ouverture). Le serveur re-score déjà tout seul à chaque
+          // nouvelle soumission (auto_rescore_ao) ; pour le reste (modifs d'AO,
+          // ajustement de la grille…), le bouton « Relancer » est là.
           try {
             const cached = await api.get(`/matching/results/${id}`)
             const cachedResults = cached.data.results || []
             if (cachedResults.length) {
-              const latestRun = cachedResults[0]?.created_at
-              const latestSub = subs.reduce((max, s) =>
-                s.submitted_at > max ? s.submitted_at : max, '')
-              if (latestRun && latestRun > latestSub) {
-                setMatchResults(cachedResults)
-                return
-              }
+              setMatchResults(cachedResults)
+              return
             }
-          } catch { /* no cache */ }
+          } catch { /* pas de cache : on score pour la première fois ci-dessous */ }
 
-          // No valid cache — run fresh
+          // Aucun résultat stocké → premier scoring de cet AO.
           await runMatching()
           return
         }
@@ -1798,7 +1796,13 @@ export default function AODetailPage() {
         <AOEditModal
           ao={ao}
           onClose={() => setShowEditModal(false)}
-          onSaved={async () => { setShowEditModal(false); await fetchAo() }}
+          onSaved={async () => {
+            setShowEditModal(false)
+            await fetchAo()
+            // Une modif d'AO (compétences, priorités, budget…) peut changer les
+            // scores → on re-score, mais SEULEMENT ici, pas à chaque ouverture.
+            if (isAdmin && submissions.length > 0) await runMatching()
+          }}
         />
       )}
     </div>
