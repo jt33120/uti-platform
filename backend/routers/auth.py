@@ -7,6 +7,7 @@ from datetime import datetime, timedelta, timezone
 from services.supabase_client import supabase
 from services import storage
 from services.email import send_email, render_email_html
+from services import email_templates
 from config import settings
 import traceback
 import httpx
@@ -404,24 +405,20 @@ def _send_reset_email(to_email: str, reset_url: str) -> tuple[bool, Optional[str
     "Supabase Auth <noreply@mail.app.supabase.io>", which alarms users and
     trips spam filters. Returns (success, error); never raises.
     """
-    subject = "Réinitialisation de votre mot de passe — Groupement-IT"
+    # Sujet + corps proviennent du template éditable (Administration → Templates Mails).
+    context = {"link": reset_url}
+    subject = email_templates.render_subject("password_reset", context)
     html = render_email_html(
         title="Réinitialisation du mot de passe",
-        body_html=(
-            "Vous avez demandé à réinitialiser le mot de passe de votre compte sur la "
-            "plateforme Groupement-IT. Cliquez sur le bouton ci-dessous pour choisir un "
-            "nouveau mot de passe."
-            '<p style="font-size:13px;color:#6e6e73;margin:12px 0 0;">Ce lien est à usage unique et expire dans 1 heure.</p>'
-        ),
+        body_html=email_templates.render_body("password_reset", context, as_html=True),
         cta={"label": "Réinitialiser mon mot de passe", "url": reset_url},
         footer_note="Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — votre mot de passe reste inchangé.",
     )
 
     text = (
         "Réinitialisation du mot de passe — Groupement-IT\n\n"
-        "Vous avez demandé à réinitialiser le mot de passe de votre compte sur la "
-        "plateforme Groupement-IT. Ouvrez le lien ci-dessous (usage unique, expire dans 1 heure) "
-        "pour choisir un nouveau mot de passe :\n\n"
+        f"{email_templates.render_body('password_reset', context, as_html=False)}\n\n"
+        "Ouvrez le lien ci-dessous pour choisir un nouveau mot de passe :\n\n"
         f"{reset_url}\n\n"
         "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — "
         "votre mot de passe reste inchangé."
