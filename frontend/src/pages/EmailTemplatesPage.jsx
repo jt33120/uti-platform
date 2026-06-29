@@ -3,18 +3,6 @@ import api from '../lib/api'
 import RichTextEditor from '../components/RichTextEditor'
 import { Mail, Loader2, Save, RotateCcw, CheckCircle, Eye } from 'lucide-react'
 
-// Valeurs d'exemple pour l'aperçu (les vraies seront injectées à l'envoi).
-const SAMPLE = {
-  title: 'Tech Lead Big Data',
-  client: 'AGIRC SAD',
-  reference: 'AO-2026-014',
-  location: 'Paris / hybride',
-  deadline: '2026-07-15',
-  link: 'https://plateforme.groupement-it.com/aos/abc',
-  name: 'Marie',
-  role: 'la plateforme partenaires Groupement-IT',
-}
-
 const VAR_LABELS = {
   title: "Titre de l'AO",
   client: 'Client',
@@ -40,12 +28,6 @@ const plainToHtml = (text) =>
 
 const toEditorHtml = (body) => (looksHtml(body) ? body : plainToHtml(body))
 
-const applyVars = (str, values) => {
-  let out = str || ''
-  Object.keys(values).forEach((k) => { out = out.replaceAll(`{${k}}`, values[k] ?? '') })
-  return out
-}
-
 async function uploadImage(file) {
   const fd = new FormData()
   fd.append('file', file)
@@ -55,40 +37,47 @@ async function uploadImage(file) {
   return r.data.url
 }
 
-// Aperçu fidèle : reproduit la coquille de l'email réel (logo, titre, CTA, pied).
-function EmailPreview({ subject, bodyHtml, previewTitle, ctaLabel, footer }) {
-  const renderedBody = applyVars(bodyHtml, SAMPLE)
+// Aperçu 100 % fidèle : on demande au backend le rendu RÉEL (même fonction que
+// l'envoi) et on l'affiche dans une iframe — zéro écart avec le mail reçu.
+function EmailPreview({ tplKey, subject, body }) {
+  const [html, setHtml] = useState('')
+  const [shownSubject, setShownSubject] = useState(subject)
+  const [status, setStatus] = useState('loading') // loading | ok | error
+
+  useEffect(() => {
+    let cancelled = false
+    setStatus('loading')
+    const t = setTimeout(() => {
+      api.post('/email-templates/preview', { key: tplKey, subject, body })
+        .then((r) => {
+          if (cancelled) return
+          setHtml(r.data.html); setShownSubject(r.data.subject); setStatus('ok')
+        })
+        .catch(() => { if (!cancelled) setStatus('error') })
+    }, 450)
+    return () => { cancelled = true; clearTimeout(t) }
+  }, [tplKey, subject, body])
+
   return (
-    <div className="rounded-lg overflow-hidden border border-white/10" style={{ background: '#f5f5f7' }}>
-      <div className="px-3 py-2 text-[11px]" style={{ background: '#e9e9ec', color: '#57606a' }}>
-        <span className="font-semibold" style={{ color: '#1d1d1f' }}>Objet :</span> {applyVars(subject, SAMPLE)}
+    <div className="rounded-lg overflow-hidden border border-white/10" style={{ background: '#f4f4f7' }}>
+      <div className="px-3 py-2 text-[11px] flex items-center gap-2" style={{ background: '#e9e9ec', color: '#57606a' }}>
+        <span className="font-semibold" style={{ color: '#1d1d1f' }}>Objet :</span>
+        <span className="truncate">{shownSubject}</span>
+        {status === 'loading' && <Loader2 size={11} className="animate-spin ml-auto shrink-0" />}
       </div>
-      <div className="p-4">
-        <div className="mx-auto" style={{ maxWidth: 520, background: '#fff', border: '1px solid #e5e5e7', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ padding: '24px 28px 6px' }}>
-            <div style={{ fontSize: 12, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#6e6e73', fontWeight: 600 }}>
-              Groupement-IT
-            </div>
-            <h1 style={{ fontSize: 22, margin: '6px 0 0', fontWeight: 600, color: '#111' }}>
-              {applyVars(previewTitle, SAMPLE) || 'Groupement-IT'}
-            </h1>
-          </div>
-          <div className="email-preview" style={{ padding: '14px 28px 22px' }}
-               dangerouslySetInnerHTML={{ __html: renderedBody }} />
-          {ctaLabel && (
-            <div style={{ textAlign: 'center', padding: '0 28px 26px' }}>
-              <span style={{ display: 'inline-block', background: '#111', color: '#fff', fontWeight: 600, fontSize: 14, padding: '12px 24px', borderRadius: 8 }}>
-                {ctaLabel}
-              </span>
-            </div>
-          )}
-          {footer && (
-            <div style={{ padding: '14px 28px', borderTop: '1px solid #e5e5e7', fontSize: 12, color: '#86868b' }}>
-              {footer}
-            </div>
-          )}
+      {status === 'error' ? (
+        <div className="p-4 text-xs text-amber-700 bg-amber-50">
+          Aperçu indisponible — le backend doit être redéployé pour activer le rendu fidèle.
         </div>
-      </div>
+      ) : (
+        <iframe
+          title="Aperçu de l'email"
+          srcDoc={html}
+          sandbox=""
+          className="w-full block bg-white"
+          style={{ height: 560, border: 'none' }}
+        />
+      )}
     </div>
   )
 }
@@ -170,13 +159,7 @@ function TemplateCard({ tpl, onSaved }) {
           <p className="label flex items-center gap-1">
             <Eye size={12} /> Aperçu (valeurs d'exemple — remplacées à l'envoi)
           </p>
-          <EmailPreview
-            subject={subject}
-            bodyHtml={body}
-            previewTitle={tpl.preview_title}
-            ctaLabel={tpl.cta_label}
-            footer={tpl.footer}
-          />
+          <EmailPreview tplKey={tpl.key} subject={subject} body={body} />
         </div>
       </div>
 

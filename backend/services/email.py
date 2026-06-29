@@ -40,52 +40,71 @@ def render_email_html(
     - ``cta``         : optional ``{"label", "url"}`` → black button + copyable link.
     - ``footer_note`` : optional small grey note in the bottom (bordered) row.
     """
+    # Couleurs de marque (bleu plateforme).
+    brand = "#4f46e5"
+    brand_grad = "linear-gradient(135deg,#6366f1,#4f46e5)"
+    band = "#eef2ff"   # indigo très clair (bandeau d'en-tête)
+
     cta_html = ""
     if cta:
         cta_html = f"""
             <tr>
-              <td align="center" style="padding:0 32px 32px;">
+              <td align="center" style="padding:8px 32px 34px;">
                 <a href="{cta['url']}"
-                   style="display:inline-block;background:#111;color:#fff;text-decoration:none;font-weight:600;font-size:14px;padding:12px 24px;border-radius:8px;">
+                   style="display:inline-block;background:{brand};background-image:{brand_grad};color:#ffffff;text-decoration:none;font-weight:600;font-size:15px;padding:14px 32px;border-radius:10px;">
                   {cta['label']}
                 </a>
-                <p style="font-size:12px;color:#86868b;margin:20px 0 0;word-break:break-all;">
+                <p style="font-size:12px;color:#9098a3;margin:18px 0 0;word-break:break-all;">
                   Ou copiez ce lien :<br/>
-                  <span style="color:#1d1d1f;">{cta['url']}</span>
+                  <a href="{cta['url']}" style="color:{brand};text-decoration:none;">{cta['url']}</a>
                 </p>
               </td>
             </tr>"""
 
-    footer_html = ""
-    if footer_note:
-        footer_html = f"""
+    footer_html = f"""
             <tr>
-              <td style="padding:16px 32px;border-top:1px solid #e5e5e7;font-size:12px;color:#86868b;">
-                {footer_note}
+              <td style="padding:18px 32px;border-top:1px solid #ececf2;font-size:12px;color:#9098a3;background:#fafafb;">
+                {footer_note or f"Cet email vous est envoyé par la plateforme {BRAND}."}
               </td>
             </tr>"""
 
     return f"""\
 <!DOCTYPE html>
 <html lang="fr">
-  <body style="margin:0;padding:0;background:#f5f5f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;color:#111;">
-    <table width="100%" cellpadding="0" cellspacing="0" style="padding:32px 16px;">
+  <body style="margin:0;padding:0;background:#f4f4f7;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;color:#1d1d1f;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 16px;">
       <tr>
         <td align="center">
-          <table width="520" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #e5e5e7;border-radius:12px;overflow:hidden;">
+          <table width="560" cellpadding="0" cellspacing="0" style="max-width:560px;width:100%;background:#ffffff;border:1px solid #e7e7ee;border-radius:14px;overflow:hidden;">
+            <!-- Filet d'accent en haut -->
+            <tr><td style="height:4px;background:{brand};background-image:{brand_grad};font-size:0;line-height:0;">&nbsp;</td></tr>
+            <!-- Bandeau logo + nom -->
             <tr>
-              <td style="padding:32px 32px 8px;">
-                <img src="{_logo_url()}" alt="{BRAND}" height="36" style="height:36px;width:auto;display:block;margin:0 0 12px;" />
-                <div style="font-size:13px;text-transform:uppercase;letter-spacing:0.08em;color:#6e6e73;font-weight:600;">{BRAND}</div>
-                <h1 style="font-size:22px;margin:8px 0 0;font-weight:600;">{title}</h1>
+              <td style="padding:24px 32px;background:{band};">
+                <table cellpadding="0" cellspacing="0"><tr>
+                  <td style="vertical-align:middle;padding-right:12px;">
+                    <img src="{_logo_url()}" alt="{BRAND}" height="40" style="height:40px;width:auto;display:block;" />
+                  </td>
+                  <td style="vertical-align:middle;font-size:15px;font-weight:700;letter-spacing:0.06em;color:{brand};text-transform:uppercase;">
+                    {BRAND}
+                  </td>
+                </tr></table>
               </td>
             </tr>
+            <!-- Titre -->
             <tr>
-              <td style="padding:16px 32px 24px;font-size:15px;line-height:1.55;color:#1d1d1f;">
+              <td style="padding:28px 32px 0;">
+                <h1 style="font-size:21px;line-height:1.3;margin:0;font-weight:700;color:#15171c;">{title}</h1>
+              </td>
+            </tr>
+            <!-- Corps -->
+            <tr>
+              <td style="padding:16px 32px 22px;font-size:15px;line-height:1.6;color:#3a3f4a;">
                 {body_html}
               </td>
             </tr>{cta_html}{footer_html}
           </table>
+          <p style="font-size:11px;color:#b0b4bd;margin:18px 0 0;">© {BRAND}</p>
         </td>
       </tr>
     </table>

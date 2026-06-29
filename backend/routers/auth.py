@@ -405,24 +405,9 @@ def _send_reset_email(to_email: str, reset_url: str) -> tuple[bool, Optional[str
     "Supabase Auth <noreply@mail.app.supabase.io>", which alarms users and
     trips spam filters. Returns (success, error); never raises.
     """
-    # Sujet + corps proviennent du template éditable (Administration → Templates Mails).
+    # Sujet + corps + coquille via la source unique (= aperçu admin fidèle).
     context = {"link": reset_url}
-    subject = email_templates.render_subject("password_reset", context)
-    html = render_email_html(
-        title="Réinitialisation du mot de passe",
-        body_html=email_templates.render_body("password_reset", context, as_html=True),
-        cta={"label": "Réinitialiser mon mot de passe", "url": reset_url},
-        footer_note="Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — votre mot de passe reste inchangé.",
-    )
-
-    text = (
-        "Réinitialisation du mot de passe — Groupement-IT\n\n"
-        f"{email_templates.render_body('password_reset', context, as_html=False)}\n\n"
-        "Ouvrez le lien ci-dessous pour choisir un nouveau mot de passe :\n\n"
-        f"{reset_url}\n\n"
-        "Si vous n'êtes pas à l'origine de cette demande, ignorez simplement cet email — "
-        "votre mot de passe reste inchangé."
-    )
+    subject, html, text = email_templates.build_email("password_reset", context)
     return send_email(to_email, subject, html, text=text)
 
 
