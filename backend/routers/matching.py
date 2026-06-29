@@ -76,20 +76,49 @@ async def get_matching_stats(user: dict = Depends(require_staff)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
-def _partner_emails(results: list[dict]) -> dict:
-    """submission_id → {name, email} du partenaire ayant soumis le CV (pour le mailto)."""
+def _contact_targets(results: list[dict]) -> dict:
+    """
+    consultant_id → {email, name, kind} : à QUI envoyer le mail de proposition.
+    Chaîne de fallback (du plus pertinent au dernier recours) :
+      1. 'partner'    — le partenaire qui a SOUMIS le CV ;
+      2. 'partner'    — sinon le propriétaire du profil au vivier s'il est partenaire ;
+      3. 'consultant' — sinon l'email du consultant lui-même (profil vivier staff) ;
+      4. 'owner'      — sinon le propriétaire (staff) à défaut de tout le reste.
+    """
+    out: dict = {}
+
+    # 1. Partenaire soumetteur (par consultant), si une soumission existe.
     sub_ids = [r["submission_id"] for r in results if r.get("submission_id")]
-    if not sub_ids:
-        return {}
-    try:
-        subs = supabase.table("submissions").select("id, submitted_by").in_("id", sub_ids).execute().data or []
-        by_sub = {s["id"]: s.get("submitted_by") for s in subs}
-        pids = [p for p in by_sub.values() if p]
-        profs = supabase.table("profiles").select("id, name, email").in_("id", pids).execute().data or [] if pids else []
-        by_pid = {p["id"]: p for p in profs}
-        return {sid: by_pid.get(pid, {}) for sid, pid in by_sub.items() if pid}
-    except Exception:
-        return {}
+    if sub_ids:
+        try:
+            subs = supabase.table("submissions").select("id, consultant_id, submitted_by").in_("id", sub_ids).execute().data or []
+            pids = [s["submitted_by"] for s in subs if s.get("submitted_by")]
+            profs = {p["id"]: p for p in (supabase.table("profiles").select("id, name, email, role").in_("id", pids).execute().data or [])} if pids else {}
+            for s in subs:
+                p = profs.get(s.get("submitted_by"))
+                if p and p.get("email"):
+                    out[s["consultant_id"]] = {"email": p["email"], "name": p.get("name"), "kind": "partner"}
+        except Exception:
+            pass
+
+    # 2-4. Consultant (email propre) + propriétaire au vivier (rôle).
+    cons_ids = [r.get("consultant_id") for r in results if r.get("consultant_id") and r.get("consultant_id") not in out]
+    if cons_ids:
+        try:
+            rows = supabase.table("consultants").select(
+                "id, name, email, owner:profiles!created_by(name, email, role)"
+            ).in_("id", cons_ids).execute().data or []
+            for c in rows:
+                owner = c.get("owner") or {}
+                if owner.get("email") and owner.get("role") == "ao":      # propriétaire partenaire
+                    out[c["id"]] = {"email": owner["email"], "name": owner.get("name"), "kind": "partner"}
+                elif c.get("email"):                                       # email du consultant
+                    out[c["id"]] = {"email": c["email"], "name": c.get("name"), "kind": "consultant"}
+                elif owner.get("email"):                                   # dernier recours : propriétaire staff
+                    out[c["id"]] = {"email": owner["email"], "name": owner.get("name"), "kind": "owner"}
+        except Exception:
+            pass
+    return out
 
 
 @router.get("/results/{ao_id}")
@@ -113,8 +142,8 @@ async def get_matching_results(ao_id: str, user: dict = Depends(get_current_user
         response = query.execute()
         results = response.data or []
         states = _fetch_states(ao_id)
-        # Email partenaire : seulement côté staff (le partenaire n'a pas à se contacter lui-même).
-        partners = {} if is_partner else _partner_emails(results)
+        # Cible de contact : seulement côté staff (le partenaire n'a personne à contacter ici).
+        targets = {} if is_partner else _contact_targets(results)
 
         for r in results:
             c = r.get("consultants") or {}
@@ -131,9 +160,10 @@ async def get_matching_results(ao_id: str, user: dict = Depends(get_current_user
             r["contact_status"] = st.get("contact_status") or "none"
             r["contacted_at"] = st.get("contacted_at")
             if not is_partner:
-                p = partners.get(r.get("submission_id")) or {}
-                r["partner_name"] = p.get("name")
-                r["partner_email"] = p.get("email")
+                t = targets.get(r.get("consultant_id")) or {}
+                r["partner_name"] = t.get("name")
+                r["partner_email"] = t.get("email")
+                r["contact_kind"] = t.get("kind")  # 'partner' | 'consultant' | 'owner'
 
         # L'humain a le dernier mot : son classement prime, sinon le rang IA.
         results.sort(key=lambda r: (r.get("human_rank") is None, r.get("human_rank") or 0, r.get("rank") or 0))

@@ -213,22 +213,42 @@ function DecisionBar({ aoId, result, rank }) {
   )
 }
 
-// Brouillon d'email pré-rempli vers le partenaire (le commercial l'édite/envoie).
+// Libellé du bouton selon la cible de contact (partenaire vs consultant).
+function contactLabel(kind) {
+  if (kind === 'consultant') return 'Contacter le consultant'
+  if (kind === 'owner') return 'Contacter le référent'
+  return 'Contacter le partenaire'
+}
+
+// Brouillon d'email pré-rempli (le commercial l'édite/envoie). Le texte s'adapte
+// selon qu'on écrit au partenaire (confirmer dispo du consultant) ou au
+// consultant lui-même (lui proposer la mission).
 function buildMailto(result, ao) {
   const to = result.partner_email || ''
   const cli = ao?.clients?.name ? ` (client ${ao.clients.name})` : ''
   const ref = ao?.reference ? ` — réf. ${ao.reference}` : ''
-  const subject = `Proposition de consultant — ${ao?.title || "appel d'offres"}${ref}`
-  const body = [
-    `Bonjour${result.partner_name ? ' ' + result.partner_name : ''},`,
-    '',
-    `Nous souhaitons avancer sur le profil de ${result.consultant_name || 'votre consultant'} pour la mission « ${ao?.title || ''} »${cli}.`,
-    '',
-    `Pouvez-vous nous confirmer sa disponibilité ainsi que ses conditions (TJM, préavis), afin que nous formalisions la proposition au client ?`,
-    '',
-    'Merci d’avance,',
-  ].join('\n')
-  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+  const hi = `Bonjour${result.partner_name ? ' ' + result.partner_name : ''},`
+  let subject, lines
+  if (result.contact_kind === 'consultant') {
+    subject = `Proposition de mission — ${ao?.title || "appel d'offres"}${ref}`
+    lines = [
+      hi, '',
+      `Nous avons une mission « ${ao?.title || ''} »${cli} qui pourrait correspondre à votre profil.`,
+      '',
+      `Seriez-vous disponible et intéressé(e) ? Le cas échéant, pouvez-vous nous confirmer vos disponibilités et votre TJM ?`,
+      '', 'Merci d’avance,',
+    ]
+  } else {
+    subject = `Proposition de consultant — ${ao?.title || "appel d'offres"}${ref}`
+    lines = [
+      hi, '',
+      `Nous souhaitons avancer sur le profil de ${result.consultant_name || 'votre consultant'} pour la mission « ${ao?.title || ''} »${cli}.`,
+      '',
+      `Pouvez-vous nous confirmer sa disponibilité ainsi que ses conditions (TJM, préavis), afin que nous formalisions la proposition au client ?`,
+      '', 'Merci d’avance,',
+    ]
+  }
+  return `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(lines.join('\n'))}`
 }
 
 function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
@@ -345,7 +365,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
                 href={buildMailto(result, ao)}
                 onClick={() => { if (contactStatus === 'none') { setContactStatus('contacted'); onContact?.(result, 'contacted') } }}
                 className="btn-primary text-sm w-full justify-center">
-                <Mail size={14} /> Contacter le partenaire{result.partner_name ? ` · ${result.partner_name}` : ''}
+                <Mail size={14} /> {contactLabel(result.contact_kind)}{result.partner_name ? ` · ${result.partner_name}` : ''}
               </a>
               {contactStatus !== 'none' ? (
                 <div className="flex items-center justify-between gap-2 text-xs flex-wrap">
@@ -365,7 +385,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact }) {
                 </div>
               ) : (!result.partner_email && (
                 <p className="text-[11px] text-amber-400/80">
-                  Email partenaire introuvable — le brouillon s'ouvrira sans destinataire (à compléter).
+                  Aucun email de contact trouvé (ni partenaire, ni consultant) — le brouillon s'ouvrira sans destinataire (à compléter).
                 </p>
               ))}
             </div>
