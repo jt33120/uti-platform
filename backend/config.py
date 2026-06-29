@@ -44,6 +44,10 @@ class Settings(BaseSettings):
     scoring_model: str = "anthropic/claude-haiku-4.5"      # 2e avis IA sur le score (hybride)
     draft_model: str = "anthropic/claude-sonnet-4.5"       # génération de fiche AO
 
+    # Mistral — fallback LLM when OpenRouter is unavailable
+    mistral_key: Optional[str] = None
+    mistral_model: str = "mistral-small-latest"  # free tier fallback
+
     # In-app AI assistant — optional dedicated OpenRouter key + model
     # (falls back to openrouter_key when unset)
     assistant_openrouter_key: Optional[str] = None
