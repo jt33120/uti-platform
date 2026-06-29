@@ -141,25 +141,27 @@ function TemplateCard({ tpl, onSaved }) {
                onChange={(e) => { setSubject(e.target.value); touch() }} />
       </div>
 
-      <div>
-        <label className="label">Corps du message</label>
-        <RichTextEditor
-          value={body}
-          resetKey={`${tpl.key}-${version}`}
-          onChange={(html) => { setBody(html); touch() }}
-          placeholders={tpl.placeholders || []}
-          varLabels={VAR_LABELS}
-          uploadImage={uploadImage}
-          minHeight={220}
-        />
-      </div>
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+        <div>
+          <label className="label">Corps du message</label>
+          <RichTextEditor
+            value={body}
+            resetKey={`${tpl.key}-${version}`}
+            onChange={(html) => { setBody(html); touch() }}
+            placeholders={tpl.placeholders || []}
+            varLabels={VAR_LABELS}
+            uploadImage={uploadImage}
+            minHeight={300}
+          />
+        </div>
 
-      {/* Aperçu fidèle */}
-      <div>
-        <p className="text-[11px] text-slate-500 mb-1.5 flex items-center gap-1">
-          <Eye size={12} /> Aperçu (valeurs d'exemple — remplacées à l'envoi)
-        </p>
-        <EmailPreview subject={subject} bodyHtml={body} />
+        {/* Aperçu fidèle */}
+        <div>
+          <p className="label flex items-center gap-1">
+            <Eye size={12} /> Aperçu (valeurs d'exemple — remplacées à l'envoi)
+          </p>
+          <EmailPreview subject={subject} bodyHtml={body} />
+        </div>
       </div>
 
       {error && <p className="text-xs text-red-400">{error}</p>}
@@ -196,7 +198,7 @@ export default function EmailTemplatesPage() {
   useEffect(load, [])
 
   return (
-    <div className="animate-slide-up max-w-3xl">
+    <div className="animate-slide-up w-full">
       <div className="mb-5">
         <h1 className="text-xl font-bold text-white flex items-center gap-2">
           <Mail size={20} className="text-brand-400" /> Templates Mails
