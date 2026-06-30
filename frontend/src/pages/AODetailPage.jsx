@@ -44,14 +44,16 @@ const MATCH_CACHE_TTL = 30 * 60 * 1000
 const matchCacheKey = (aoId) => `uti_match_${aoId}`
 const readMatchCache = (aoId) => {
   try {
-    const { ts, results } = JSON.parse(sessionStorage.getItem(matchCacheKey(aoId)) || 'null') || {}
-    if (!results?.length || Date.now() - ts > MATCH_CACHE_TTL) return null
-    return results
+    const v = JSON.parse(sessionStorage.getItem(matchCacheKey(aoId)) || 'null')
+    if (!v?.results?.length || Date.now() - v.ts > MATCH_CACHE_TTL) return null
+    return v  // { ts, results, allScores }
   } catch { return null }
 }
-const writeMatchCache = (aoId, results) => {
+const writeMatchCache = (aoId, results, allScores) => {
   try {
-    if (results?.length) sessionStorage.setItem(matchCacheKey(aoId), JSON.stringify({ ts: Date.now(), results }))
+    if (results?.length) {
+      sessionStorage.setItem(matchCacheKey(aoId), JSON.stringify({ ts: Date.now(), results, allScores: allScores || null }))
+    }
   } catch { /* quota indisponible : non bloquant */ }
 }
 const clearMatchCache = (aoId) => { try { sessionStorage.removeItem(matchCacheKey(aoId)) } catch { /* noop */ } }
@@ -268,6 +270,101 @@ function buildMailto(result, ao) {
 function scoreColor(s) {
   return s >= 75 ? 'text-emerald-400' : s >= 50 ? 'text-brand-300' : s >= 30 ? 'text-amber-400' : 'text-red-400'
 }
+// Même palier, en hex (barres d'analyse).
+function scoreHex(s) {
+  return s >= 75 ? '#10b981' : s >= 50 ? '#3b82f6' : s >= 30 ? '#f59e0b' : '#ef4444'
+}
+
+// Analyses de score sous le classement : stats clés, distribution, classement
+// complet de TOUS les candidats notés (pas seulement le Top 3).
+function ScoreAnalytics({ all }) {
+  const rows = (all || [])
+    .filter(a => a && a.score != null)
+    .map(a => ({ ...a, score: Math.round(a.score) }))
+    .sort((a, b) => b.score - a.score)
+  if (rows.length < 2) return null
+
+  const scores = rows.map(r => r.score)
+  const best = scores[0]
+  const avg = Math.round(scores.reduce((s, v) => s + v, 0) / scores.length)
+  const mid = Math.floor(scores.length / 2)
+  const median = scores.length % 2 ? scores[mid] : Math.round((scores[mid - 1] + scores[mid]) / 2)
+  const gap = best - scores[1]
+  const standsOut = gap >= 10
+
+  const buckets = [
+    { label: 'Fort', range: '75+', color: '#10b981', count: scores.filter(s => s >= 75).length },
+    { label: 'Bon', range: '50-74', color: '#3b82f6', count: scores.filter(s => s >= 50 && s < 75).length },
+    { label: 'Moyen', range: '30-49', color: '#f59e0b', count: scores.filter(s => s >= 30 && s < 50).length },
+    { label: 'Faible', range: '<30', color: '#ef4444', count: scores.filter(s => s < 30).length },
+  ]
+  const maxBucket = Math.max(...buckets.map(b => b.count), 1)
+
+  const Stat = ({ label, value, color }) => (
+    <div className="rounded-lg p-3" style={{ background: 'var(--surface-2)' }}>
+      <div className="text-[11px]" style={{ color: 'var(--text-faint)' }}>{label}</div>
+      <div className="text-xl font-bold tabular" style={{ color }}>
+        {value}<span className="text-xs font-normal" style={{ color: 'var(--text-faint)' }}>/100</span>
+      </div>
+    </div>
+  )
+
+  return (
+    <div className="card p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5 mb-4" style={{ color: 'var(--text-muted)' }}>
+        <BarChart3 size={13} className="text-[var(--accent-text)]" /> Analyse des scores · {rows.length} candidats
+      </p>
+
+      {/* Stats clés */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+        <Stat label="Meilleur" value={best} color={scoreHex(best)} />
+        <Stat label="Moyenne" value={avg} color="var(--text)" />
+        <Stat label="Médiane" value={median} color="var(--text)" />
+        <div className="rounded-lg p-3" style={{ background: 'var(--surface-2)' }}>
+          <div className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Écart 1ᵉʳ / 2ᵉ</div>
+          <div className="text-xl font-bold tabular" style={{ color: 'var(--text)' }}>+{gap}</div>
+          <div className="text-[10px] mt-0.5" style={{ color: standsOut ? '#10b981' : 'var(--text-faint)' }}>
+            {standsOut ? 'un profil se détache' : 'profils serrés'}
+          </div>
+        </div>
+      </div>
+
+      {/* Distribution */}
+      <div className="mb-5">
+        <div className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>Distribution</div>
+        <div className="space-y-1.5">
+          {buckets.map(b => (
+            <div key={b.label} className="flex items-center gap-2">
+              <span className="w-24 text-[11px]" style={{ color: 'var(--text-muted)' }}>{b.label} <span style={{ color: 'var(--text-faint)' }}>({b.range})</span></span>
+              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+                <div className="h-full rounded-full" style={{ width: `${b.count ? Math.max((b.count / maxBucket) * 100, 6) : 0}%`, background: b.color }} />
+              </div>
+              <span className="w-6 text-right text-[11px] tabular" style={{ color: 'var(--text-muted)' }}>{b.count}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Classement complet */}
+      <div>
+        <div className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>Classement complet</div>
+        <div className="space-y-1">
+          {rows.map((r, i) => (
+            <div key={r.consultant_id || i} className="flex items-center gap-2.5">
+              <span className="w-5 text-[11px] tabular text-right" style={{ color: 'var(--text-faint)' }}>{i + 1}</span>
+              <span className="w-20 sm:w-32 truncate text-[12px] font-medium" style={{ color: 'var(--text)' }}>{r.consultant_name || '—'}</span>
+              <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+                <div className="h-full rounded-full" style={{ width: `${Math.max(r.score, 2)}%`, background: scoreHex(r.score) }} />
+              </div>
+              <span className="w-9 text-right text-[12px] font-bold tabular" style={{ color: scoreHex(r.score) }}>{r.score}</span>
+              {r.tjm != null && <span className="hidden sm:inline w-14 text-right text-[11px]" style={{ color: 'var(--text-faint)' }}>{r.tjm}€/j</span>}
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  )
+}
 
 function MatchCard({ result, rank, aoId, isAdmin, ao, onContact, expanded: expandedProp, onToggleExpand }) {
   const [contactStatus, setContactStatus] = useState(result.contact_status || 'none')
@@ -326,7 +423,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact, expanded: expan
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">Score d'adéquation</p>
+          <p className="text-[11px] text-slate-500 mt-1">Score d'adéquation · grille + IA</p>
           {result.consultant_tjm && (
             <span className="text-xs text-emerald-400 mt-1 inline-flex items-center gap-0.5">
               <Euro size={10} />{result.consultant_tjm}€/j
@@ -510,17 +607,25 @@ function MatchCarousel({ results: incoming, aoId, isAdmin, ao }) {
         })}
       </div>
 
-      {/* Réordonnancement (staff) : l'humain impose son classement */}
+      {/* Réordonnancement (staff) : l'humain impose son classement.
+          Déplace le PROFIL AFFICHÉ dans votre classement final (qui prime sur l'IA). */}
       {isAdmin && results.length > 1 && (
-        <div className="flex items-center justify-end gap-2 mb-2">
-          <button onClick={() => move(-1)} disabled={idx === 0}
-            className="btn-ghost text-[11px] px-2 py-1 gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
-            <ChevronLeft size={12} /> Classer plus haut
-          </button>
-          <button onClick={() => move(1)} disabled={idx === results.length - 1}
-            className="btn-ghost text-[11px] px-2 py-1 gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
-            Classer plus bas <ChevronRight size={12} />
-          </button>
+        <div className="flex items-center justify-between gap-2 mb-2 flex-wrap">
+          <span className="text-[11px] text-slate-500">
+            Votre classement final (il prime sur celui de l'IA) :
+          </span>
+          <div className="flex items-center gap-2">
+            <button onClick={() => move(-1)} disabled={idx === 0}
+              title="Remonter ce profil d'un rang dans votre classement"
+              className="btn-ghost text-[11px] px-2 py-1 gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
+              <ChevronLeft size={12} /> Monter ce profil
+            </button>
+            <button onClick={() => move(1)} disabled={idx === results.length - 1}
+              title="Descendre ce profil d'un rang dans votre classement"
+              className="btn-ghost text-[11px] px-2 py-1 gap-1 disabled:opacity-30 disabled:cursor-not-allowed">
+              Descendre ce profil <ChevronRight size={12} />
+            </button>
+          </div>
         </div>
       )}
 
@@ -1286,6 +1391,7 @@ export default function AODetailPage() {
   const [submissions, setSubmissions] = useState([])
   const [vivier, setVivier] = useState([])
   const [matchResults, setMatchResults] = useState(null)
+  const [allScores, setAllScores] = useState(null)  // tous les scores (analyses)
   const [loading, setLoading] = useState(true)
   const [matching, setMatching] = useState(false)
   const [matchError, setMatchError] = useState('')
@@ -1329,7 +1435,8 @@ export default function AODetailPage() {
         if (data.results?.length) results = data.results
       } catch { /* relecture indisponible : on garde les résultats du run */ }
       setMatchResults(results)
-      writeMatchCache(id, results)
+      setAllScores(run.all_scores || null)
+      writeMatchCache(id, results, run.all_scores)
       if (results.length === 0) {
         setMatchError(
           "Le scoring n'a renvoyé aucun profil. Les CV soumis n'ont peut-être pas "
@@ -1438,7 +1545,8 @@ export default function AODetailPage() {
           // serveur ; 3) à défaut seulement, premier scoring. « Relancer » force.
           const sessionCached = readMatchCache(id)
           if (sessionCached) {
-            setMatchResults(sessionCached)
+            setMatchResults(sessionCached.results)
+            setAllScores(sessionCached.allScores || null)
             return
           }
           try {
@@ -1850,6 +1958,14 @@ export default function AODetailPage() {
                   <p className="text-xs text-slate-600 mt-1">Le scoring se lancera automatiquement dès la première soumission</p>
                 </div>
               ) : null}
+
+              {/* Analyses : distribution + classement complet de tous les scores */}
+              {allScores && allScores.length > 1 && <ScoreAnalytics all={allScores} />}
+              {matchResults && matchResults.length > 0 && !allScores && (
+                <p className="text-[11px] text-center" style={{ color: 'var(--text-faint)' }}>
+                  Cliquez sur « Relancer » pour afficher l'analyse complète des scores.
+                </p>
+              )}
             </div>
           )}
       </div>
