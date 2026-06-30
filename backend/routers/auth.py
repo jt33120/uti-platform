@@ -9,14 +9,26 @@ from services import storage
 from services.email import send_email, render_email_html
 from services import email_templates
 from config import settings
+import io
+import base64
 import traceback
 import httpx
+import pyotp
+import qrcode
+import qrcode.image.svg
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = 24 * 7  # 7 days
+# Déconnexion automatique après 3 h d'utilisation (durée de vie du jeton de
+# session). Le front applique en plus une coupure côté client (minuteur).
+ACCESS_TOKEN_EXPIRE_HOURS = 3
+
+# MFA (TOTP) — jeton de défi court entre la saisie du mot de passe et la
+# validation du second facteur.
+MFA_CHALLENGE_EXPIRE_MIN = 10
+MFA_ISSUER = "Groupement-IT"
 
 
 class RegisterRequest(BaseModel):
@@ -52,7 +64,75 @@ def decode_token(token: str) -> dict:
 
 
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)) -> dict:
-    return decode_token(credentials.credentials)
+    payload = decode_token(credentials.credentials)
+    # Un jeton de défi MFA (stage présent) n'est PAS une session ouverte :
+    # il ne doit jamais authentifier un appel API.
+    if payload.get("stage"):
+        raise HTTPException(status_code=401, detail="Validation en deux étapes requise")
+    return payload
+
+
+# ── MFA (TOTP) ─────────────────────────────────────────────────────────────
+def create_mfa_challenge(user_id: str, email: str, role: str, stage: str, secret: str = None) -> str:
+    """Jeton court signé reliant l'étape mot de passe à l'étape second facteur.
+
+    `stage` vaut 'verify' (compte déjà enrôlé) ou 'enroll' (premier enrôlement,
+    le secret est embarqué le temps de la confirmation, jamais stocké avant)."""
+    payload = {
+        "sub": user_id,
+        "email": email,
+        "role": role,
+        "stage": stage,
+        "exp": datetime.utcnow() + timedelta(minutes=MFA_CHALLENGE_EXPIRE_MIN),
+    }
+    if secret:
+        payload["mfa_secret"] = secret
+    return jwt.encode(payload, settings.jwt_secret, algorithm=ALGORITHM)
+
+
+def _decode_mfa_challenge(token: str, expected_stage: str) -> dict:
+    try:
+        payload = jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
+    except JWTError:
+        raise HTTPException(status_code=401, detail="Session de connexion expirée. Reconnectez-vous.")
+    if payload.get("stage") != expected_stage:
+        raise HTTPException(status_code=400, detail="Jeton de validation invalide.")
+    return payload
+
+
+def _qr_data_uri(data: str) -> str:
+    """Génère le QR code (SVG, sans dépendance image native) en data URI."""
+    img = qrcode.make(data, image_factory=qrcode.image.svg.SvgPathImage)
+    buf = io.BytesIO()
+    img.save(buf)
+    b64 = base64.b64encode(buf.getvalue()).decode()
+    return f"data:image/svg+xml;base64,{b64}"
+
+
+def _clean_code(code: str) -> str:
+    return "".join(c for c in (code or "") if c.isdigit())
+
+
+def _finalize_login(user_id: str, email: str, profile: dict) -> dict:
+    """Ouvre la session : met à jour la dernière connexion et émet le jeton."""
+    try:
+        supabase.table("profiles").update({
+            "last_login_at": datetime.now(timezone.utc).isoformat(),
+        }).eq("id", user_id).execute()
+    except Exception:
+        pass
+    token = create_token(user_id, email, profile["role"])
+    return {
+        "token": token,
+        "user": {
+            "id": user_id,
+            "email": email,
+            "name": profile["name"],
+            "role": profile["role"],
+            "org": profile.get("org"),
+            "avatar_url": profile.get("avatar_url"),
+        },
+    }
 
 
 VALID_ROLES = ("admin", "commerce", "ao")
@@ -357,34 +437,91 @@ async def login(body: LoginRequest):
     if status == "disabled":
         raise HTTPException(status_code=403, detail="Votre compte a été désactivé. Contactez un administrateur.")
 
-    # Track last connection (powers the admin supervision page) — best-effort
-    try:
-        supabase.table("profiles").update({
-            "last_login_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", user_id).execute()
-    except Exception:
-        pass
-
-    token = create_token(user_id, body.email, profile["role"])
-
-    return {
-        "token": token,
-        "user": {
-            "id": user_id,
-            "email": body.email,
-            "name": profile["name"],
-            "role": profile["role"],
-            "org": profile.get("org"),
-            "avatar_url": profile.get("avatar_url"),
+    # ── MFA obligatoire (TOTP) ────────────────────────────────────
+    # Si les colonnes MFA existent, un second facteur est exigé :
+    #   - compte déjà enrôlé  -> on demande un code de vérification ;
+    #   - pas encore enrôlé   -> enrôlement forcé (QR code) avant la session.
+    if "mfa_enabled" in profile:
+        if profile.get("mfa_enabled") and profile.get("mfa_secret"):
+            return {
+                "mfa": "verify",
+                "challenge_token": create_mfa_challenge(user_id, body.email, profile["role"], "verify"),
+            }
+        secret = pyotp.random_base32()
+        otpauth = pyotp.TOTP(secret).provisioning_uri(name=body.email, issuer_name=MFA_ISSUER)
+        return {
+            "mfa": "enroll",
+            "challenge_token": create_mfa_challenge(user_id, body.email, profile["role"], "enroll", secret=secret),
+            "qr": _qr_data_uri(otpauth),
+            "secret": secret,
         }
-    }
+
+    # Colonnes MFA absentes (migration non encore appliquée) : connexion classique.
+    return _finalize_login(user_id, body.email, profile)
+
+
+class MfaCodeRequest(BaseModel):
+    challenge_token: str
+    code: str
+
+
+@router.post("/mfa/verify")
+async def mfa_verify(body: MfaCodeRequest):
+    """Étape 2 (compte enrôlé) : valide le code TOTP et ouvre la session."""
+    payload = _decode_mfa_challenge(body.challenge_token, "verify")
+    user_id, email = payload["sub"], payload["email"]
+    try:
+        profile = supabase.table("profiles").select("*").eq("id", user_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    secret = (profile or {}).get("mfa_secret")
+    if not secret:
+        raise HTTPException(status_code=400, detail="MFA non configurée pour ce compte.")
+    if not pyotp.TOTP(secret).verify(_clean_code(body.code), valid_window=1):
+        raise HTTPException(status_code=401, detail="Code de vérification invalide.")
+    return _finalize_login(user_id, email, profile)
+
+
+@router.post("/mfa/enroll")
+async def mfa_enroll(body: MfaCodeRequest):
+    """Premier enrôlement : confirme le QR scanné puis active la MFA."""
+    payload = _decode_mfa_challenge(body.challenge_token, "enroll")
+    user_id, email = payload["sub"], payload["email"]
+    secret = payload.get("mfa_secret")
+    if not secret:
+        raise HTTPException(status_code=400, detail="Session d'enrôlement invalide. Reconnectez-vous.")
+    if not pyotp.TOTP(secret).verify(_clean_code(body.code), valid_window=1):
+        raise HTTPException(status_code=401, detail="Code invalide. Vérifiez l'heure de votre téléphone et réessayez.")
+    try:
+        supabase.table("profiles").update({"mfa_secret": secret, "mfa_enabled": True}).eq("id", user_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Impossible d'activer la MFA : {e}")
+    try:
+        profile = supabase.table("profiles").select("*").eq("id", user_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="Profil introuvable")
+    return _finalize_login(user_id, email, profile)
+
+
+@router.post("/mfa/reset/{user_id}")
+async def mfa_reset(user_id: str, admin: dict = Depends(require_admin)):
+    """Réinitialise la MFA d'un utilisateur (perte de téléphone). Il devra la
+    reconfigurer à sa prochaine connexion."""
+    try:
+        supabase.table("profiles").update({"mfa_enabled": False, "mfa_secret": None}).eq("id", user_id).execute()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Échec de la réinitialisation MFA : {e}")
+    return {"message": "MFA réinitialisée. L'utilisateur devra la reconfigurer à sa prochaine connexion."}
 
 
 @router.get("/me")
 async def me(user: dict = Depends(get_current_user)):
     try:
         profile = supabase.table("profiles").select("*").eq("id", user["sub"]).single().execute()
-        return profile.data
+        data = dict(profile.data or {})
+        # Ne jamais exposer le secret TOTP au client.
+        data.pop("mfa_secret", None)
+        return data
     except Exception:
         raise HTTPException(status_code=404, detail="Profil introuvable")
 
@@ -555,7 +692,9 @@ async def update_profile(body: UpdateProfileRequest, user: dict = Depends(get_cu
         supabase.table("profiles").update(profile_update).eq("id", user_id).execute()
 
     profile = supabase.table("profiles").select("*").eq("id", user_id).single().execute()
-    return profile.data
+    data = dict(profile.data or {})
+    data.pop("mfa_secret", None)  # ne jamais exposer le secret TOTP
+    return data
 
 
 _AVATAR_ALLOWED_TYPES = {"image/jpeg", "image/png", "image/webp"}

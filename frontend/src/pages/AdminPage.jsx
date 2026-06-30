@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useConfirm } from '../contexts/ConfirmContext'
 import {
   Gauge, Users, FileText, Sparkles, UserPlus, X, Loader2,
-  Shield, Briefcase, BadgePercent, Coins, Pencil, PauseCircle, Ban,
+  Shield, Briefcase, BadgePercent, Coins, Pencil, PauseCircle, Ban, KeyRound,
 } from 'lucide-react'
 import InviteModal from '../components/InviteModal'
 import AccountEditModal from '../components/AccountEditModal'
@@ -79,6 +79,7 @@ export default function AdminPage() {
   const [loading, setLoading] = useState(true)
   const [inviteOpen, setInviteOpen] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
+  const [mfaResetId, setMfaResetId] = useState(null)
   const [editing, setEditing] = useState(null)
 
   const load = async () => {
@@ -93,6 +94,22 @@ export default function AdminPage() {
   }
 
   useEffect(() => { load() }, [])
+
+  const resetMfa = async (acc) => {
+    if (!(await confirm({
+      title: 'Réinitialiser la MFA ?',
+      message: `« ${acc.name} » devra reconfigurer son application d'authentification (QR code) à sa prochaine connexion. À utiliser en cas de perte de téléphone.`,
+      confirmLabel: 'Réinitialiser',
+    }))) return
+    setMfaResetId(acc.id)
+    try {
+      await api.post(`/auth/mfa/reset/${acc.id}`)
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Erreur lors de la réinitialisation MFA')
+    } finally {
+      setMfaResetId(null)
+    }
+  }
 
   const deleteAccount = async (acc) => {
     if (!(await confirm({
@@ -199,6 +216,14 @@ export default function AdminPage() {
                       title="Modifier le compte"
                     >
                       <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => resetMfa(acc)}
+                      disabled={mfaResetId === acc.id}
+                      className="p-1 rounded transition-colors text-[var(--text-faint)] hover:text-[var(--text)] ml-0.5"
+                      title="Réinitialiser la double authentification (perte de téléphone)"
+                    >
+                      {mfaResetId === acc.id ? <Loader2 size={13} className="animate-spin" /> : <KeyRound size={14} />}
                     </button>
                     {acc.id !== user?.id && (
                       <button
