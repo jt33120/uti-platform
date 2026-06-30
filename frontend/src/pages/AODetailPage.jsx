@@ -1555,6 +1555,7 @@ export default function AODetailPage() {
       <div className="flex items-center gap-1 mb-5 border-b border-white/10">
         {[
           { key: 'presentation', label: 'Présentation', icon: FileText },
+          ...(isAdmin ? [{ key: 'envoi', label: 'Envoi des e-mails', icon: Send }] : []),
           { key: 'analyse', label: isAdmin ? 'Analyse & CV' : 'Ma candidature', icon: BarChart3 },
         ].map(t => (
           <button
@@ -1620,10 +1621,89 @@ export default function AODetailPage() {
       </div>
       )}
 
+      {/* ── Onglet Envoi des e-mails : diffusion aux partenaires + couverture (staff) ── */}
+      {tab === 'envoi' && isAdmin && (
+      <div className="flex flex-col gap-4 mb-5">
+        <div className="card p-4">
+          <div className="flex items-center justify-between flex-wrap gap-3">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white flex items-center gap-2">
+                <Send size={15} className="text-brand-400" /> Diffusion aux partenaires
+              </p>
+              <p className="text-xs text-slate-500 mt-0.5">
+                {ao.notified_at
+                  ? <>Partenaires notifiés le {formatDate(ao.notified_at)}
+                      {ao.list2_notified_at
+                        ? ` · liste 2 envoyée le ${formatDate(ao.list2_notified_at)}`
+                        : ao.list2_scheduled_at
+                          ? ` · liste 2 prévue le ${formatDate(ao.list2_scheduled_at)}`
+                          : ''}
+                      {ao.relance_count ? ` · ${ao.relance_count} relance${ao.relance_count > 1 ? 's' : ''}` : ''}.</>
+                  : "Aucune notification envoyée aux partenaires pour le moment."}
+              </p>
+              {notifMsg && <p className="text-xs text-brand-300 mt-1">{notifMsg}</p>}
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              <button onClick={handleNotify} disabled={notifBusy !== ''} className="btn-ghost">
+                {notifBusy === 'notify' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+                {ao.notified_at ? 'Renvoyer aux partenaires' : 'Envoyer aux partenaires'}
+              </button>
+              <button onClick={openTarget} disabled={notifBusy !== ''} className="btn-ghost" title="Renvoyer à des partenaires précis (sans toucher les autres)">
+                <UserCircle2 size={14} /> Renvoyer à un partenaire
+              </button>
+              {ao.notified_at && (
+                <button onClick={handleRelance} disabled={notifBusy !== ''} className="btn-primary">
+                  {notifBusy === 'relance' ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
+                  Relancer
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Renvoi ciblé : sélection de partenaires éligibles */}
+          {targetOpen && (
+            <div className="mt-3 pt-3 border-t border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-slate-300">Renvoyer à des partenaires précis</p>
+                <button onClick={() => setTargetOpen(false)} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>
+              </div>
+              {eligible === null ? (
+                <div className="py-4 text-center"><Loader2 size={16} className="animate-spin inline text-slate-500" /></div>
+              ) : eligible.length === 0 ? (
+                <p className="text-xs text-slate-500 py-2">Aucun partenaire en liste 1/2 sur ce client.</p>
+              ) : (
+                <>
+                  <div className="space-y-1 max-h-56 overflow-y-auto">
+                    {eligible.map(p => (
+                      <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 cursor-pointer">
+                        <input type="checkbox" checked={selectedPartners.has(p.id)} onChange={() => togglePartner(p.id)} />
+                        <span className="flex-1 min-w-0">
+                          <span className="text-[13px] text-white">{p.name || p.email}</span>
+                          <span className="text-[11px] text-slate-500 ml-2">{p.tier === 'list_1' ? 'Liste 1' : 'Liste 2'}{p.has_submitted ? ' · a déjà répondu' : ''}{p.blocked ? ' · compte bloqué' : ''}</span>
+                        </span>
+                      </label>
+                    ))}
+                  </div>
+                  <div className="flex items-center justify-end gap-2 mt-2">
+                    <button onClick={() => setTargetOpen(false)} className="btn-ghost text-xs">Annuler</button>
+                    <button onClick={sendTarget} disabled={targetBusy || selectedPartners.size === 0} className="btn-primary text-xs">
+                      {targetBusy ? <><Loader2 size={13} className="animate-spin" /> Envoi…</> : `Renvoyer (${selectedPartners.size})`}
+                    </button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Couverture de l'AO (qui peut répondre / qui a répondu) */}
+        <AOInsightsChart aoId={id} />
+      </div>
+      )}
+
       {/* ── Onglet Analyse & CV : top profils, CVs, couverture, diffusion (ordre adaptatif) ── */}
       {tab === 'analyse' && (
       <div className="flex flex-col gap-4 mb-5">
-          {isAdmin && <div className="order-3"><AOInsightsChart aoId={id} /></div>}
           {/* Partner view: submit a CV */}
           {!isAdmin && (
             <div className="card p-4">
@@ -1646,85 +1726,7 @@ export default function AODetailPage() {
             </div>
           )}
 
-          {/* Staff view: ajout manuel d'un CV + diffusion aux partenaires.
-              Ordre adaptatif : remonte en tête quand aucun CV (action n°1 = diffuser),
-              passe en bas dès qu'il y a des CV (on lit d'abord « je contacte qui ? »). */}
-          {isAdmin && (
-            <div className={clsx('card p-4', submissions.length > 0 ? 'order-4' : 'order-first')}>
-              <div className="flex items-center justify-between flex-wrap gap-3">
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-white flex items-center gap-2">
-                    <Send size={15} className="text-brand-400" /> Diffusion & CV
-                  </p>
-                  <p className="text-xs text-slate-500 mt-0.5">
-                    {ao.notified_at
-                      ? <>Partenaires notifiés le {formatDate(ao.notified_at)}
-                          {ao.list2_notified_at
-                            ? ` · liste 2 envoyée le ${formatDate(ao.list2_notified_at)}`
-                            : ao.list2_scheduled_at
-                              ? ` · liste 2 prévue le ${formatDate(ao.list2_scheduled_at)}`
-                              : ''}
-                          {ao.relance_count ? ` · ${ao.relance_count} relance${ao.relance_count > 1 ? 's' : ''}` : ''}.</>
-                      : "Aucune notification envoyée aux partenaires pour le moment."}
-                  </p>
-                  {notifMsg && <p className="text-xs text-brand-300 mt-1">{notifMsg}</p>}
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  <button onClick={() => setShowSubmitModal(true)} className="btn-ghost">
-                    <Plus size={14} /> Ajouter un CV
-                  </button>
-                  <button onClick={handleNotify} disabled={notifBusy !== ''} className="btn-ghost">
-                    {notifBusy === 'notify' ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
-                    {ao.notified_at ? 'Renvoyer' : 'Envoyer aux partenaires'}
-                  </button>
-                  <button onClick={openTarget} disabled={notifBusy !== ''} className="btn-ghost" title="Renvoyer à des partenaires précis (sans toucher les autres)">
-                    <UserCircle2 size={14} /> Renvoyer à un partenaire
-                  </button>
-                  {ao.notified_at && (
-                    <button onClick={handleRelance} disabled={notifBusy !== ''} className="btn-primary">
-                      {notifBusy === 'relance' ? <Loader2 size={14} className="animate-spin" /> : <Bell size={14} />}
-                      Relancer
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Renvoi ciblé : sélection de partenaires éligibles */}
-              {targetOpen && (
-                <div className="mt-3 pt-3 border-t border-white/10">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-xs font-semibold text-slate-300">Renvoyer à des partenaires précis</p>
-                    <button onClick={() => setTargetOpen(false)} className="text-slate-500 hover:text-slate-300"><X size={14} /></button>
-                  </div>
-                  {eligible === null ? (
-                    <div className="py-4 text-center"><Loader2 size={16} className="animate-spin inline text-slate-500" /></div>
-                  ) : eligible.length === 0 ? (
-                    <p className="text-xs text-slate-500 py-2">Aucun partenaire en liste 1/2 sur ce client.</p>
-                  ) : (
-                    <>
-                      <div className="space-y-1 max-h-56 overflow-y-auto">
-                        {eligible.map(p => (
-                          <label key={p.id} className="flex items-center gap-2.5 px-2 py-1.5 rounded-md hover:bg-white/5 cursor-pointer">
-                            <input type="checkbox" checked={selectedPartners.has(p.id)} onChange={() => togglePartner(p.id)} />
-                            <span className="flex-1 min-w-0">
-                              <span className="text-[13px] text-white">{p.name || p.email}</span>
-                              <span className="text-[11px] text-slate-500 ml-2">{p.tier === 'list_1' ? 'Liste 1' : 'Liste 2'}{p.has_submitted ? ' · a déjà répondu' : ''}{p.blocked ? ' · compte bloqué' : ''}</span>
-                            </span>
-                          </label>
-                        ))}
-                      </div>
-                      <div className="flex items-center justify-end gap-2 mt-2">
-                        <button onClick={() => setTargetOpen(false)} className="btn-ghost text-xs">Annuler</button>
-                        <button onClick={sendTarget} disabled={targetBusy || selectedPartners.size === 0} className="btn-primary text-xs">
-                          {targetBusy ? <><Loader2 size={13} className="animate-spin" /> Envoi…</> : `Renvoyer (${selectedPartners.size})`}
-                        </button>
-                      </div>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
+          {/* La diffusion e-mails aux partenaires est dans l'onglet « Envoi des e-mails ». */}
 
           {/* Submissions list — repliable */}
           {submissions.length > 0 && (
@@ -1789,14 +1791,19 @@ export default function AODetailPage() {
                         : `Analyse automatique de ${submissions.length} CV${submissions.length > 1 ? 's' : ''} · Top 3`}
                     </p>
                   </div>
-                  {submissions.length > 0 && (
-                    <button onClick={handleRerunMatch} disabled={matching}
-                            className={clsx('btn-ghost gap-2', matching && 'opacity-75')}>
-                      {matching
-                        ? <><Loader2 size={14} className="animate-spin" />Analyse...</>
-                        : <><RotateCcw size={14} />Relancer</>}
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => setShowSubmitModal(true)} className="btn-ghost gap-1.5">
+                      <Plus size={14} /> Ajouter un CV
                     </button>
-                  )}
+                    {submissions.length > 0 && (
+                      <button onClick={handleRerunMatch} disabled={matching}
+                              className={clsx('btn-ghost gap-2', matching && 'opacity-75')}>
+                        {matching
+                          ? <><Loader2 size={14} className="animate-spin" />Analyse...</>
+                          : <><RotateCcw size={14} />Relancer</>}
+                      </button>
+                    )}
+                  </div>
                 </div>
                 {matching && (
                   <div className="mt-3 p-3 bg-brand-500/5 border border-brand-500/15 rounded-lg">
