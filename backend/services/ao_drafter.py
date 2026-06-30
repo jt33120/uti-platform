@@ -20,15 +20,43 @@ _client: Optional[AsyncOpenAI] = (
     if settings.openrouter_key
     else None
 )
+# Repli Mistral (même schéma que le scoring matching) : si OpenRouter est
+# indisponible — clé révoquée/expirée (401 « User not found »), quota, panne —
+# la génération d'AO continue de fonctionner au lieu d'échouer sèchement.
+_mistral_client: Optional[AsyncOpenAI] = (
+    AsyncOpenAI(api_key=settings.mistral_key, base_url="https://api.mistral.ai/v1")
+    if settings.mistral_key
+    else None
+)
 # Génération de fiche AO : qualité rédactionnelle → Sonnet.
 # Résumé en une phrase : trivial → Haiku (économique). Tous deux via .env.
 DRAFT_MODEL = settings.draft_model
 SUMMARY_MODEL = settings.summary_model
+MISTRAL_MODEL = settings.mistral_model
 MAX_SOURCE_CHARS = 24000
 
 
 def is_available() -> bool:
-    return _client is not None
+    return _client is not None or _mistral_client is not None
+
+
+def _draft_candidates() -> list[tuple[AsyncOpenAI, str, str]]:
+    """Providers à essayer dans l'ordre pour la génération : OpenRouter puis Mistral."""
+    out: list[tuple[AsyncOpenAI, str, str]] = []
+    if _client:
+        out.append((_client, DRAFT_MODEL, "OpenRouter"))
+    if _mistral_client:
+        out.append((_mistral_client, MISTRAL_MODEL, "Mistral"))
+    return out
+
+
+def _summary_candidates() -> list[tuple[AsyncOpenAI, str, str]]:
+    out: list[tuple[AsyncOpenAI, str, str]] = []
+    if _client:
+        out.append((_client, SUMMARY_MODEL, "OpenRouter"))
+    if _mistral_client:
+        out.append((_mistral_client, MISTRAL_MODEL, "Mistral"))
+    return out
 
 
 def _extract_json(raw: str) -> Optional[dict]:
@@ -108,8 +136,10 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
     """
     Generate structured AO fields from raw source text.
     Returns a dict of form fields, or None if the model output was unusable.
+    Essaie OpenRouter puis Mistral en repli (dégradation maîtrisée).
     """
-    if not _client:
+    candidates = _draft_candidates()
+    if not candidates:
         return None
 
     source = source[:MAX_SOURCE_CHARS]
@@ -163,19 +193,29 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
         f'Contenu source :\n"""\n{source}\n"""'
     )
 
-    resp = await _client.chat.completions.create(
-        model=DRAFT_MODEL,
-        messages=[
-            {"role": "system", "content": system},
-            {"role": "user", "content": user},
-        ],
-        temperature=0.2,
-        max_tokens=1200,
-    )
-    data = _extract_json(resp.choices[0].message.content or "")
-    if data is None:
-        return None
-    return _sanitize(data, ao_types)
+    last_err: Optional[Exception] = None
+    for c, model, provider in candidates:
+        try:
+            resp = await c.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": system},
+                    {"role": "user", "content": user},
+                ],
+                temperature=0.2,
+                max_tokens=1200,
+            )
+            data = _extract_json(resp.choices[0].message.content or "")
+            if data is None:
+                continue
+            return _sanitize(data, ao_types)
+        except Exception as e:  # noqa: BLE001
+            last_err = e
+            print(f"[AO_DRAFTER] {provider} échec ({model}): {e}")
+
+    if last_err is not None:
+        raise last_err
+    return None
 
 
 async def summarize_ao(ao: dict) -> Optional[str]:
@@ -184,7 +224,8 @@ async def summarize_ao(ao: dict) -> Optional[str]:
     servir de sous-titre/accroche sur la fiche AO. Best-effort : None si le
     client LLM n'est pas configuré ou si la source est vide.
     """
-    if not _client:
+    candidates = _summary_candidates()
+    if not candidates:
         return None
     fields = ("title", "ao_type", "skills_required", "description",
               "context", "location", "duration", "budget_max")
@@ -192,18 +233,23 @@ async def summarize_ao(ao: dict) -> Optional[str]:
     source = "\n".join(bits)[:4000]
     if not source.strip():
         return None
-    resp = await _client.chat.completions.create(
-        model=SUMMARY_MODEL,
-        messages=[
-            {"role": "system", "content": (
-                "Tu résumes un appel d'offres en UNE seule phrase courte (20 mots "
-                "maximum), en français, claire et parlante. Réponds uniquement par "
-                "la phrase, sans préfixe, sans guillemets."
-            )},
-            {"role": "user", "content": source},
-        ],
-        temperature=0.3,
-        max_tokens=80,
-    )
-    txt = (resp.choices[0].message.content or "").strip().strip('"').strip()
-    return txt[:240] or None
+    for c, model, provider in candidates:
+        try:
+            resp = await c.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": (
+                        "Tu résumes un appel d'offres en UNE seule phrase courte (20 mots "
+                        "maximum), en français, claire et parlante. Réponds uniquement par "
+                        "la phrase, sans préfixe, sans guillemets."
+                    )},
+                    {"role": "user", "content": source},
+                ],
+                temperature=0.3,
+                max_tokens=80,
+            )
+            txt = (resp.choices[0].message.content or "").strip().strip('"').strip()
+            return txt[:240] or None
+        except Exception as e:  # noqa: BLE001
+            print(f"[AO_DRAFTER] résumé {provider} échec ({model}): {e}")
+    return None
