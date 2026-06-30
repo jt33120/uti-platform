@@ -6,7 +6,7 @@ import { useConfirm } from '../contexts/ConfirmContext'
 import ContactPartnerModal from '../components/ContactPartnerModal'
 import {
   Users, Plus, X, Search, Euro, Clock, MapPin, Map as MapIcon,
-  Mail, UserCircle2, SlidersHorizontal,
+  Mail, SlidersHorizontal,
   ChevronRight, RotateCcw,
 } from 'lucide-react'
 import clsx from 'clsx'
@@ -42,16 +42,32 @@ function ConsultantRow({ consultant, onOpen, onMap, onContact, onDelete, canDele
         {c.name.charAt(0).toUpperCase()}
       </div>
 
-      {/* Nom + compétences */}
+      {/* Porteur · trigramme + badge + compétences */}
       <div className="min-w-0 flex-1">
         <div className="flex items-center gap-2 flex-wrap">
+          {c.owner?.name && (
+            <span className="text-[11px] truncate max-w-[160px]" style={{ color: 'var(--text-faint)' }}>
+              {c.owner.name} ·
+            </span>
+          )}
           <span className="text-sm font-semibold truncate" style={{ color: 'var(--text)' }}>{c.name}</span>
           <EmploymentBadge type={c.employment_type} />
+          {/* Compétences en puces, juste à côté du badge */}
+          {skills.slice(0, 4).map((s, i) => (
+            <span key={i} className="badge text-[10px]"
+                  style={{ background: 'var(--accent-soft)', color: 'var(--accent-text)', border: '1px solid var(--border)' }}>
+              {s}
+            </span>
+          ))}
+          {skills.length > 4 && (
+            <span className="text-[10px]" style={{ color: 'var(--text-faint)' }}>+{skills.length - 4}</span>
+          )}
         </div>
-        <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-faint)' }}>
-          {skills.length ? skills.slice(0, 5).join(' · ') : 'Compétences non renseignées'}
-          {skills.length > 5 && ` +${skills.length - 5}`}
-        </div>
+        {skills.length === 0 && (
+          <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-faint)' }}>
+            Compétences non renseignées
+          </div>
+        )}
       </div>
 
       {/* Ville + dispo (md+) */}
@@ -76,15 +92,9 @@ function ConsultantRow({ consultant, onOpen, onMap, onContact, onDelete, canDele
         </div>
       )}
 
-      {/* Porteur + date d'ajout au vivier (lg+) */}
-      {(c.owner || added) && (
+      {/* Date d'ajout au vivier (lg+) — le porteur est désormais affiché avant le trigramme */}
+      {added && (
         <div className="hidden lg:flex flex-col items-end shrink-0 max-w-[170px]">
-          {c.owner && (
-            <span className="text-[11px] flex items-center gap-1 max-w-full" style={{ color: 'var(--text-muted)' }}>
-              <UserCircle2 size={12} strokeWidth={1.75} className="shrink-0" />
-              <span className="truncate">{c.owner.name}</span>
-            </span>
-          )}
           {added && (
             <span
               className="text-[10px] flex items-center gap-1 mt-0.5"
