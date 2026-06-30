@@ -1,4 +1,4 @@
-from fastapi import APIRouter, HTTPException, Depends, UploadFile, File
+from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -113,14 +113,30 @@ def _clean_code(code: str) -> str:
     return "".join(c for c in (code or "") if c.isdigit())
 
 
-def _finalize_login(user_id: str, email: str, profile: dict) -> dict:
-    """Ouvre la session : met à jour la dernière connexion et émet le jeton."""
+def _client_ip(request: Optional[Request]) -> Optional[str]:
+    """IP publique de l'appelant. Derrière le reverse-proxy (nginx/OVH) la vraie
+    IP est dans X-Forwarded-For ; on prend la première (le client d'origine)."""
+    if request is None:
+        return None
+    xff = request.headers.get("x-forwarded-for")
+    if xff:
+        return xff.split(",")[0].strip() or None
+    return request.client.host if request.client else None
+
+
+def _finalize_login(user_id: str, email: str, profile: dict, ip: Optional[str] = None) -> dict:
+    """Ouvre la session : met à jour la dernière connexion (date + IP) et émet le jeton."""
+    now = datetime.now(timezone.utc).isoformat()
     try:
-        supabase.table("profiles").update({
-            "last_login_at": datetime.now(timezone.utc).isoformat(),
-        }).eq("id", user_id).execute()
+        supabase.table("profiles").update(
+            {"last_login_at": now, "last_login_ip": ip} if ip else {"last_login_at": now}
+        ).eq("id", user_id).execute()
     except Exception:
-        pass
+        # Colonne last_login_ip pas encore migrée : on enregistre au moins la date.
+        try:
+            supabase.table("profiles").update({"last_login_at": now}).eq("id", user_id).execute()
+        except Exception:
+            pass
     token = create_token(user_id, email, profile["role"])
     return {
         "token": token,
@@ -395,7 +411,7 @@ def _verify_credentials(email: str, password: str) -> Optional[dict]:
 
 
 @router.post("/login")
-async def login(body: LoginRequest):
+async def login(body: LoginRequest, request: Request):
     # ── Step 1: vérifier les identifiants via GoTrue ──────────────
     # NB: on N'utilise PAS supabase.auth.sign_in_with_password (cela lierait la
     # session au client service_role partagé → lectures suivantes en role
@@ -459,7 +475,7 @@ async def login(body: LoginRequest):
         }
 
     # Colonnes MFA absentes (migration non encore appliquée) : connexion classique.
-    return _finalize_login(user_id, body.email, profile)
+    return _finalize_login(user_id, body.email, profile, _client_ip(request))
 
 
 class MfaCodeRequest(BaseModel):
@@ -468,7 +484,7 @@ class MfaCodeRequest(BaseModel):
 
 
 @router.post("/mfa/verify")
-async def mfa_verify(body: MfaCodeRequest):
+async def mfa_verify(body: MfaCodeRequest, request: Request):
     """Étape 2 (compte enrôlé) : valide le code TOTP et ouvre la session."""
     payload = _decode_mfa_challenge(body.challenge_token, "verify")
     user_id, email = payload["sub"], payload["email"]
@@ -481,11 +497,11 @@ async def mfa_verify(body: MfaCodeRequest):
         raise HTTPException(status_code=400, detail="MFA non configurée pour ce compte.")
     if not pyotp.TOTP(secret).verify(_clean_code(body.code), valid_window=1):
         raise HTTPException(status_code=401, detail="Code de vérification invalide.")
-    return _finalize_login(user_id, email, profile)
+    return _finalize_login(user_id, email, profile, _client_ip(request))
 
 
 @router.post("/mfa/enroll")
-async def mfa_enroll(body: MfaCodeRequest):
+async def mfa_enroll(body: MfaCodeRequest, request: Request):
     """Premier enrôlement : confirme le QR scanné puis active la MFA."""
     payload = _decode_mfa_challenge(body.challenge_token, "enroll")
     user_id, email = payload["sub"], payload["email"]
@@ -502,7 +518,7 @@ async def mfa_enroll(body: MfaCodeRequest):
         profile = supabase.table("profiles").select("*").eq("id", user_id).single().execute().data
     except Exception:
         raise HTTPException(status_code=404, detail="Profil introuvable")
-    return _finalize_login(user_id, email, profile)
+    return _finalize_login(user_id, email, profile, _client_ip(request))
 
 
 @router.post("/mfa/reset/{user_id}")

@@ -231,7 +231,14 @@ export default function AdminPage() {
                   </td>
                   <td className="px-4 py-2.5 hidden md:table-cell" style={{ color: 'var(--text-muted)' }}>{acc.email}</td>
                   <td className="px-4 py-2.5"><RoleBadge item={acc} /></td>
-                  <td className="px-4 py-2.5 hidden md:table-cell tabular" style={{ color: 'var(--text-muted)' }}>{fmtDateTime(acc.last_login_at)}</td>
+                  <td className="px-4 py-2.5 hidden md:table-cell" style={{ color: 'var(--text-muted)' }}>
+                    <div className="tabular">{fmtDateTime(acc.last_login_at)}</div>
+                    {acc.last_login_ip && (
+                      <div className="text-[11px] tabular" style={{ color: 'var(--text-faint)' }} title="IP de la dernière connexion">
+                        {acc.last_login_ip}
+                      </div>
+                    )}
+                  </td>
                   <td className="px-4 py-2.5 hidden xl:table-cell tabular" style={{ color: 'var(--text-faint)' }}>{fmtDate(acc.created_at)}</td>
                   <td className="px-4 py-2.5 text-right whitespace-nowrap">
                     <button

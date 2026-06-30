@@ -79,6 +79,8 @@ export function Confidentialite() {
         <li>CV et données des consultants (identité, compétences, expérience, TJM) :
           mise en relation et évaluation pour des appels d'offres.</li>
         <li>Données d'usage techniques : sécurité et bon fonctionnement.</li>
+        <li>Journaux de connexion (date et adresse IP de la connexion) : sécurité
+          des accès et détection d'accès anormaux (intérêt légitime).</li>
       </ul>
 
       <H>Évaluation par un système d'IA (information spécifique)</H>
@@ -108,7 +110,8 @@ export function Confidentialite() {
       <p>
         Les données sont conservées pour la durée nécessaire aux finalités décrites
         ci-dessus, puis archivées ou supprimées conformément aux obligations légales
-        applicables.
+        applicables. Les <strong>journaux de connexion</strong> (date et adresse IP)
+        sont conservés à des fins de sécurité pour une durée limitée (12 mois maximum).
       </p>
 
       <H>Vos droits</H>

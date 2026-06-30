@@ -99,10 +99,10 @@ async def list_accounts(user: dict = Depends(require_admin)):
     """All accounts (admin, commerce, partners) + pending invitations."""
     try:
         accounts = supabase.table("profiles").select(
-            "id, email, name, role, org, status, created_at, last_login_at, avatar_url, mfa_enabled, mfa_required"
+            "id, email, name, role, org, status, created_at, last_login_at, last_login_ip, avatar_url, mfa_enabled, mfa_required"
         ).order("created_at", desc=True).execute().data or []
     except Exception:
-        # colonnes (org/status/last_login_at/mfa_*) pas encore migrées — dégrade proprement
+        # colonnes (org/status/last_login_*/mfa_*) pas encore migrées — dégrade proprement
         try:
             accounts = supabase.table("profiles").select(
                 "id, email, name, role, org, status, created_at, last_login_at, avatar_url"
