@@ -41,32 +41,62 @@ def _weights_from_config(config: dict) -> dict:
     return {k: cfg[k] for k in ("w_competences", "w_seniorite", "w_contexte", "w_tjm")}
 
 
+# Colonnes ajoutées par supabase_migration_hybrid_scoring.sql. Si la migration
+# n'a pas été appliquée en prod, l'insert les concernant échoue : on retombe sur
+# le sous-ensemble auditable (score déterministe) plutôt que de tout perdre.
+_HYBRID_COLS = (
+    "score_llm", "score_hybride", "agreement",
+    "llm_breakdown", "llm_global", "hybrid_breakdown", "weights",
+)
+
+
 def _persist(ao_id: str, results: list[dict], cost_usd: float, ran_by: Optional[str]):
-    """Replace previous matchings for this AO with the new top results."""
-    supabase.table("matchings").delete().eq("ao_id", ao_id).execute()
-    for rank, r in enumerate(results, start=1):
-        supabase.table("matchings").insert({
-            "ao_id": ao_id,
-            "submission_id": r.get("submission_id"),
-            "consultant_id": r.get("consultant_id"),
-            "score_total": r["score_total"],
-            "breakdown": r.get("breakdown"),
-            "points_forts": r.get("points_forts"),
-            "points_faibles": r.get("points_faibles"),
-            "resume_matching": r.get("resume_matching"),
-            "recommandation": r.get("recommandation"),
-            # Architecture hybride : 2e avis IA + score combiné (repli déterministe)
-            "score_llm": r.get("score_llm"),
-            "score_hybride": r.get("score_hybride"),
-            "agreement": r.get("agreement"),
-            "llm_breakdown": r.get("llm_breakdown"),
-            "llm_global": r.get("llm_global"),
-            "hybrid_breakdown": r.get("hybrid_breakdown"),
-            "weights": r.get("weights"),
-            "rank": rank,
-            "cost_usd": cost_usd,
-            "ran_by": ran_by,
-        }).execute()
+    """
+    Remplace les matchings de cet AO par les nouveaux résultats.
+
+    IMPORTANT : on INSÈRE d'abord, on supprime l'ancien classement ENSUITE. Ainsi
+    un insert qui échoue (ex. colonne hybride absente car migration non appliquée)
+    ne détruit jamais les résultats déjà affichés. En dernier recours, on réessaie
+    sans les colonnes hybrides (dégradation maîtrisée : score déterministe seul).
+    """
+    rows = [{
+        "ao_id": ao_id,
+        "submission_id": r.get("submission_id"),
+        "consultant_id": r.get("consultant_id"),
+        "score_total": r["score_total"],
+        "breakdown": r.get("breakdown"),
+        "points_forts": r.get("points_forts"),
+        "points_faibles": r.get("points_faibles"),
+        "resume_matching": r.get("resume_matching"),
+        "recommandation": r.get("recommandation"),
+        # Architecture hybride : 2e avis IA + score combiné (repli déterministe)
+        "score_llm": r.get("score_llm"),
+        "score_hybride": r.get("score_hybride"),
+        "agreement": r.get("agreement"),
+        "llm_breakdown": r.get("llm_breakdown"),
+        "llm_global": r.get("llm_global"),
+        "hybrid_breakdown": r.get("hybrid_breakdown"),
+        "weights": r.get("weights"),
+        "rank": rank,
+        "cost_usd": cost_usd,
+        "ran_by": ran_by,
+    } for rank, r in enumerate(results, start=1)]
+
+    # ids du classement courant : on ne les supprime qu'après un insert réussi.
+    old_ids = [
+        o["id"] for o in
+        (supabase.table("matchings").select("id").eq("ao_id", ao_id).execute().data or [])
+    ]
+
+    try:
+        supabase.table("matchings").insert(rows).execute()
+    except Exception as e:
+        print(f"[MATCHING] insert complet échoué ({e}); repli sans colonnes hybrides")
+        trimmed = [{k: v for k, v in row.items() if k not in _HYBRID_COLS} for row in rows]
+        supabase.table("matchings").insert(trimmed).execute()
+
+    if old_ids:
+        supabase.table("matchings").delete().in_("id", old_ids).execute()
 
 
 def _effective_config(ao: dict) -> dict:
