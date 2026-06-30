@@ -54,28 +54,62 @@ def extract_text_from_docx(file_bytes: bytes) -> str:
     return clean_text("\n".join(parts))
 
 
+# Titres de feuilles servant de catalogues de référence / sources de listes
+# déroulantes dans les modèles de marché (CCTP/CRT/AF). Leur contenu est du
+# bruit pour l'extraction d'un AO : on les conserve mais reléguées en annexe
+# (et tronquées) pour ne pas noyer les vraies données de la consultation.
+_XLSX_REFERENCE_HINTS = (
+    "liste", "déroulante", "deroulante", "catégorie", "categorie",
+    "référence", "reference", "annexe", "nomenclature",
+)
+_XLSX_REF_MAX_CHARS = 1500
+
+
 def extract_text_from_xlsx(file_bytes: bytes) -> str:
     """
     Extract text from a .xlsx workbook: every sheet, each non-empty row rendered
     as ' | '-joined cells. Useful for AO specs delivered as a spreadsheet
     (cahier des charges Excel). Lazy import so openpyxl is only needed on use.
+
+    Les feuilles « catalogue / listes déroulantes » (ex. liste des UO, des sites,
+    des catégories) sont reléguées en annexe et tronquées : sur un modèle de
+    marché type AGIRC-ARRCO elles représentent l'essentiel du volume mais aucune
+    donnée de l'AO, et placées en tête elles noyaient les vrais champs (objet,
+    références, dates, lieu, budget) que l'IA doit extraire.
     """
     from openpyxl import load_workbook
 
     wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
-    parts: list[str] = []
+    main_parts: list[str] = []
+    ref_parts: list[str] = []
     try:
         for ws in wb.worksheets:
-            parts.append(f"[Feuille : {ws.title}]")
+            title = (ws.title or "").lower()
+            is_ref = any(h in title for h in _XLSX_REFERENCE_HINTS)
+            lines: list[str] = []
             for row in ws.iter_rows(values_only=True):
                 cells = [str(c).strip() for c in row if c is not None and str(c).strip()]
                 if cells:
-                    parts.append(" | ".join(cells))
+                    lines.append(" | ".join(cells))
+            if not lines:
+                continue
+            block = f"[Feuille : {ws.title}]\n" + "\n".join(lines)
+            if is_ref:
+                ref_parts.append(block[:_XLSX_REF_MAX_CHARS])
+            else:
+                main_parts.append(block)
     finally:
         try:
             wb.close()
         except Exception:
             pass
+
+    parts = list(main_parts)
+    if ref_parts:
+        parts.append(
+            "[Listes de référence / valeurs possibles — annexes, à ignorer pour l'extraction des champs de l'AO]"
+        )
+        parts.extend(ref_parts)
     return clean_text("\n".join(parts))
 
 
