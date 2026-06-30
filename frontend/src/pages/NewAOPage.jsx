@@ -22,6 +22,10 @@ export default function NewAOPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const errorRef = useRef(null)
+  // Envoi des e-mails à la création : décoché par défaut (comportement sûr,
+  // l'envoi reste un acte volontaire). Coché → la liste 1 est notifiée juste
+  // après la création (la liste 2 suit selon le délai des réglages admin).
+  const [notifyNow, setNotifyNow] = useState(false)
 
   // Priorités de matching (étoiles 1-5). Pré-remplies par défaut, ajustables ;
   // l'IA peut les suggérer depuis la source. On ne les envoie que si touchées.
@@ -113,6 +117,11 @@ export default function NewAOPage() {
           aiFiles.forEach(f => fd.append('files', f))
           await api.post(`/aos/${data.id}/sources`, fd)
         } catch { /* non bloquant */ }
+      }
+      // Envoi immédiat aux partenaires de la liste 1 si demandé (best-effort :
+      // un échec d'envoi ne doit pas bloquer la création de l'AO).
+      if (notifyNow) {
+        try { await api.post(`/aos/${data.id}/notify`) } catch { /* non bloquant */ }
       }
       navigate(`/aos/${data.id}`)
     } catch (err) {
@@ -440,6 +449,18 @@ export default function NewAOPage() {
                 {error}
               </div>
             )}
+
+            <label className="flex items-start gap-2.5 px-1 py-1 cursor-pointer select-none"
+                   style={{ color: 'var(--text-muted)' }}>
+              <input type="checkbox" className="mt-0.5 accent-brand-500"
+                     checked={notifyNow} onChange={e => setNotifyNow(e.target.checked)} />
+              <span className="text-[13px] leading-snug">
+                Notifier la <strong>liste 1</strong> par e-mail dès la création
+                <span className="block text-[11px]" style={{ color: 'var(--text-faint)' }}>
+                  Décoché : aucun e-mail n'est envoyé maintenant (vous pourrez le faire depuis l'onglet « Envoi des e-mails »).
+                </span>
+              </span>
+            </label>
 
             <div className="flex flex-col gap-2">
               <button type="submit" disabled={loading} className="btn-primary w-full justify-center py-3">
