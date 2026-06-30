@@ -743,7 +743,16 @@ function SubmissionRow({ sub, onDelete, canDelete, isAdmin, aoSkillsRequired }) 
         <UserCircle2 size={28} className="text-slate-500 shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="text-sm font-medium text-white truncate">{c.name || 'Inconnu'}</span>
+            {/* Porteur (partenaire) AVANT le trigramme — demande Sullyvan */}
+            {isAdmin && submitter.name && (
+              <span className="text-sm font-semibold text-brand-300 inline-flex items-center gap-1">
+                <Building2 size={12} /> {submitter.name}
+              </span>
+            )}
+            <span className="text-sm font-medium text-white truncate">
+              {isAdmin && submitter.name && <span className="text-slate-600">· </span>}
+              {c.name || 'Inconnu'}
+            </span>
             {c.employment_type && (
               <span className="badge bg-white/5 text-slate-400 text-[10px]">
                 {c.employment_type === 'salarie' ? 'Salarié' : 'Indépendant'}
@@ -752,11 +761,6 @@ function SubmissionRow({ sub, onDelete, canDelete, isAdmin, aoSkillsRequired }) 
             {c.tjm && (
               <span className="text-[10px] text-emerald-400 inline-flex items-center gap-0.5">
                 <Euro size={9} />{c.tjm}/j
-              </span>
-            )}
-            {isAdmin && submitter.name && (
-              <span className="text-[10px] text-brand-400/70 flex items-center gap-0.5">
-                <UserCircle2 size={9} /> {submitter.name}
               </span>
             )}
           </div>

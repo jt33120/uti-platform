@@ -244,9 +244,17 @@ function AOCard({ ao, isStaff, onEdit, onDelete, navigate, selected, onToggleSel
       )}
       <div className="flex items-start justify-between gap-2 mb-1.5">
         <div className="flex-1 min-w-0">
-          {ao.clients?.name && (
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1">
-              <Building2 size={9} /> {ao.clients.name}
+          {(ao.clients?.name || ao.reference) && (
+            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1 flex items-center gap-1.5 flex-wrap">
+              {ao.clients?.name && (
+                <span className="inline-flex items-center gap-1"><Building2 size={9} /> {ao.clients.name}</span>
+              )}
+              {/* Référence à côté du client — demande Sullyvan (repérage quand 200 AO) */}
+              {ao.reference && (
+                <span className="normal-case text-slate-400 font-medium">
+                  {ao.clients?.name && <span className="text-slate-600">· </span>}réf. {ao.reference}
+                </span>
+              )}
             </div>
           )}
           <h3 className="text-sm font-semibold text-white group-hover:text-brand-300 transition-colors line-clamp-2">
