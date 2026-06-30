@@ -297,7 +297,7 @@ function recommendedCut(scoresDesc) {
 
 // Analyses de score sous le classement : stats clés, histogramme, sélection
 // statistique (rupture naturelle) et classement complet de TOUS les candidats.
-function ScoreAnalytics({ all }) {
+function ScoreAnalytics({ all, isAdmin }) {
   const rows = (all || [])
     .filter(a => a && a.score != null)
     .map(a => ({ ...a, score: Math.round(a.score) }))
@@ -392,7 +392,12 @@ function ScoreAnalytics({ all }) {
             <div key={r.consultant_id || i}>
               <div className="flex items-center gap-2.5" style={{ opacity: i < recoK ? 1 : 0.55 }}>
                 <span className="w-5 text-[11px] tabular text-right" style={{ color: i < recoK ? 'var(--accent-text)' : 'var(--text-faint)', fontWeight: i < recoK ? 700 : 400 }}>{i + 1}</span>
-                <span className="w-20 sm:w-32 truncate text-[12px] font-medium" style={{ color: 'var(--text)' }}>{r.consultant_name || '—'}</span>
+                <span className="w-28 sm:w-48 truncate text-[12px] font-medium" style={{ color: 'var(--text)' }}>
+                  {isAdmin && r.submitter_name && (
+                    <span style={{ color: 'var(--text-faint)' }}>{r.submitter_name} · </span>
+                  )}
+                  {r.consultant_name || '—'}
+                </span>
                 <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
                   <div className="h-full rounded-full" style={{ width: `${Math.max(r.score, 2)}%`, background: scoreHex(r.score) }} />
                 </div>
@@ -2008,7 +2013,7 @@ export default function AODetailPage() {
               ) : null}
 
               {/* Analyses : distribution + classement complet de tous les scores */}
-              {allScores && allScores.length > 1 && <ScoreAnalytics all={allScores} />}
+              {allScores && allScores.length > 1 && <ScoreAnalytics all={allScores} isAdmin={isAdmin} />}
               {matchResults && matchResults.length > 0 && !allScores && (
                 <p className="text-[11px] text-center" style={{ color: 'var(--text-faint)' }}>
                   Cliquez sur « Relancer » pour afficher l'analyse complète des scores.

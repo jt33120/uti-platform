@@ -189,7 +189,16 @@ async def draft_ao(
     try:
         fields = await ao_drafter.draft_ao_fields(source, AO_TYPES)
     except Exception as e:
-        raise HTTPException(status_code=502, detail=f"Erreur de génération IA : {e}")
+        msg = str(e)
+        if "401" in msg or "User not found" in msg or "invalid api key" in msg.lower():
+            detail = (
+                "Le fournisseur d'IA a refusé la requête (clé API invalide ou expirée). "
+                "Vérifiez la clé OpenRouter du serveur — ou configurez une clé Mistral de repli — "
+                "puis redémarrez le backend."
+            )
+        else:
+            detail = f"Erreur de génération IA : {e}"
+        raise HTTPException(status_code=502, detail=detail)
 
     if fields is None:
         raise HTTPException(status_code=502, detail="L'IA n'a pas renvoyé de résultat exploitable. Réessayez.")
