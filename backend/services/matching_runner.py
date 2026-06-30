@@ -144,6 +144,7 @@ async def _score_all(
         score["submission_id"] = it.get("submission_id")
         score["consultant_id"] = it.get("consultant_id")
         score["consultant_name"] = it.get("name")
+        score["submitter_name"] = it.get("submitter_name")
         score["consultant_tjm"] = it.get("tjm")
         score["consultant_skills"] = it.get("skills")
         results.append(score)
@@ -180,7 +181,8 @@ async def run_submission_matching(ao_id: str, ran_by: Optional[str], top_n: int 
         raise LookupError("AO introuvable")
 
     submissions = supabase.table("submissions").select(
-        "id, cv_text, consultant_id, consultants(id, name, tjm, skills, experience_years, employment_type)"
+        "id, cv_text, consultant_id, submitted_by, submitter:profiles!submitted_by(id, name), "
+        "consultants(id, name, tjm, skills, experience_years, employment_type)"
     ).eq("ao_id", ao_id).execute().data
 
     if not submissions:
@@ -194,6 +196,7 @@ async def run_submission_matching(ao_id: str, ran_by: Optional[str], top_n: int 
         items.append({
             "submission_id": s["id"],
             "consultant_id": s["consultant_id"],
+            "submitter_name": (s.get("submitter") or {}).get("name"),
             "name": c.get("name", "Inconnu"),
             "tjm": c.get("tjm"),
             "skills": c.get("skills", ""),
@@ -228,6 +231,7 @@ async def run_submission_matching(ao_id: str, ran_by: Optional[str], top_n: int 
     all_scores = [{
         "consultant_id": r.get("consultant_id"),
         "consultant_name": r.get("consultant_name"),
+        "submitter_name": r.get("submitter_name"),
         "score": r.get("score_hybride") if r.get("score_hybride") is not None else r.get("score_total"),
         "score_total": r.get("score_total"),
         "tjm": r.get("consultant_tjm"),
