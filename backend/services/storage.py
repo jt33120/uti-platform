@@ -89,6 +89,14 @@ def upload(bucket: str, path: str, content: bytes, content_type: str) -> str:
     return get_public_url(bucket, path)
 
 
+def download(bucket: str, path: str) -> bytes:
+    """Read an object's raw bytes (S3 or Supabase). Raises on failure."""
+    if _use_s3():
+        obj = _s3().get_object(Bucket=settings.s3_bucket, Key=f"{bucket}/{path}")
+        return obj["Body"].read()
+    return supabase.storage.from_(bucket).download(path)
+
+
 def _object_path(bucket: str, stored: Optional[str]) -> Optional[str]:
     """Recover the object path inside `bucket` from a stored value that may be a
     full public URL (legacy rows) or already a bare path."""

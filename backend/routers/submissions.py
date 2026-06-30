@@ -49,15 +49,19 @@ async def create_submission(
     employment_type: Optional[str] = Form(None),
     availability: Optional[str] = Form(None),
     consent: bool = Form(False),
-    cv_file: UploadFile = File(...),
+    cv_file: Optional[UploadFile] = File(None),
     user: dict = Depends(get_current_user),
 ):
     """
     Submit a CV to an AO.
 
     Two modes:
-    - Pass `consultant_id` to reuse an existing vivier consultant
+    - Pass `consultant_id` to reuse an existing vivier consultant. Le CV est
+      alors FACULTATIF : si aucun PDF n'est joint, on réutilise le dernier CV
+      déjà présent au vivier pour ce consultant (copié vers la nouvelle
+      soumission pour rester indépendant de l'original).
     - Pass consultant fields (name, skills, ...) to create + submit in one shot
+      (un CV est requis dans ce cas).
     """
     _check_ao_access(ao_id, user)
 
@@ -69,19 +73,14 @@ async def create_submission(
             detail="Le consentement RGPD est requis pour soumettre un CV.",
         )
 
-    # Validate file
-    if cv_file.content_type not in ALLOWED_MIME_TYPES:
-        raise HTTPException(status_code=400, detail="Seuls les fichiers PDF sont acceptés")
-    file_bytes = await cv_file.read()
-    if len(file_bytes) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 10MB)")
-
-    try:
-        cv_text = extract_text_from_pdf(file_bytes)
-    except Exception as e:
-        raise HTTPException(status_code=422, detail=f"Impossible de lire le PDF: {str(e)}")
-    if not cv_text or len(cv_text) < 50:
-        raise HTTPException(status_code=422, detail="Le PDF semble vide ou illisible")
+    # Validate the uploaded file up-front (when one is provided).
+    file_bytes = None
+    if cv_file is not None:
+        if cv_file.content_type not in ALLOWED_MIME_TYPES:
+            raise HTTPException(status_code=400, detail="Seuls les fichiers PDF sont acceptés")
+        file_bytes = await cv_file.read()
+        if len(file_bytes) > MAX_FILE_SIZE:
+            raise HTTPException(status_code=400, detail="Fichier trop volumineux (max 10MB)")
 
     # Resolve consultant (create-on-the-fly or reuse)
     if consultant_id:
@@ -92,6 +91,9 @@ async def create_submission(
         if user["role"] == "ao" and consultant["created_by"] != user["sub"]:
             raise HTTPException(status_code=403, detail="Ce consultant ne vous appartient pas")
     else:
+        # Création d'un nouveau consultant : un CV est obligatoire.
+        if file_bytes is None:
+            raise HTTPException(status_code=422, detail="Un CV (PDF) est requis pour un nouveau consultant.")
         if not name or not skills:
             raise HTTPException(status_code=400, detail="Nom et compétences requis pour créer un consultant")
         if employment_type and employment_type not in ("independant", "salarie"):
@@ -114,18 +116,42 @@ async def create_submission(
     if existing.data:
         raise HTTPException(status_code=409, detail="Ce consultant a déjà été soumis à cet AO")
 
-    # Upload PDF
     submission_uuid = str(uuid.uuid4())
     storage_path = f"{ao_id}/{submission_uuid}.pdf"
-    try:
-        cv_url = storage.upload(
-            "cvs",
-            storage_path,
-            file_bytes,
-            "application/pdf",
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Erreur upload CV: {str(e)}")
+
+    if file_bytes is not None:
+        # Nouveau PDF fourni : extraction + upload.
+        try:
+            cv_text = extract_text_from_pdf(file_bytes)
+        except Exception as e:
+            raise HTTPException(status_code=422, detail=f"Impossible de lire le PDF: {str(e)}")
+        if not cv_text or len(cv_text) < 50:
+            raise HTTPException(status_code=422, detail="Le PDF semble vide ou illisible")
+        cv_filename = cv_file.filename
+        try:
+            cv_url = storage.upload("cvs", storage_path, file_bytes, "application/pdf")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Erreur upload CV: {str(e)}")
+    else:
+        # Pas de PDF : on réutilise le dernier CV du vivier pour ce consultant.
+        prior = supabase.table("submissions").select(
+            "cv_url, cv_text, cv_filename"
+        ).eq("consultant_id", consultant_id).order("submitted_at", desc=True).limit(5).execute().data or []
+        src = next((p for p in prior if p.get("cv_url") and p.get("cv_text")), None)
+        if not src:
+            raise HTTPException(
+                status_code=422,
+                detail="Aucun CV existant pour ce consultant au vivier : veuillez joindre un PDF.",
+            )
+        cv_text = src["cv_text"]
+        cv_filename = src.get("cv_filename") or "CV.pdf"
+        # Copie du fichier vers la nouvelle soumission (indépendant de l'original).
+        try:
+            data = storage.download("cvs", storage._object_path("cvs", src["cv_url"]))
+            cv_url = storage.upload("cvs", storage_path, data, "application/pdf")
+        except Exception:
+            # Repli : on référence l'objet existant (best-effort).
+            cv_url = src["cv_url"]
 
     # Insert submission
     try:
@@ -135,7 +161,7 @@ async def create_submission(
             "consultant_id": consultant_id,
             "cv_url": cv_url,
             "cv_text": cv_text,
-            "cv_filename": cv_file.filename,
+            "cv_filename": cv_filename,
             "submitted_by": user["sub"],
         }).execute().data[0]
     except Exception as e:

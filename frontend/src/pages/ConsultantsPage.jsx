@@ -26,6 +26,7 @@ function ConsultantRow({ consultant, onOpen, onMap, onContact, onDelete, canDele
   const c = consultant
   const skills = c.skills?.split(',').map(s => s.trim()).filter(Boolean) || []
   const ownerIsPartner = c.owner?.role === 'ao'
+  const added = addedInfo(c.created_at)
 
   return (
     <div
@@ -75,11 +76,25 @@ function ConsultantRow({ consultant, onOpen, onMap, onContact, onDelete, canDele
         </div>
       )}
 
-      {/* Porteur (lg+) */}
-      {c.owner && (
-        <div className="hidden lg:flex items-center gap-1.5 text-[11px] shrink-0 max-w-[150px]" style={{ color: 'var(--text-muted)' }}>
-          <UserCircle2 size={12} strokeWidth={1.75} className="shrink-0" />
-          <span className="truncate">{c.owner.name}</span>
+      {/* Porteur + date d'ajout au vivier (lg+) */}
+      {(c.owner || added) && (
+        <div className="hidden lg:flex flex-col items-end shrink-0 max-w-[170px]">
+          {c.owner && (
+            <span className="text-[11px] flex items-center gap-1 max-w-full" style={{ color: 'var(--text-muted)' }}>
+              <UserCircle2 size={12} strokeWidth={1.75} className="shrink-0" />
+              <span className="truncate">{c.owner.name}</span>
+            </span>
+          )}
+          {added && (
+            <span
+              className="text-[10px] flex items-center gap-1 mt-0.5"
+              style={{ color: added.stale ? 'var(--warning, #b45309)' : 'var(--text-faint)' }}
+              title={added.stale ? `Ajouté il y a ${added.months} mois — éligible à la purge (> 6 mois)` : 'Date d’ajout au vivier'}
+            >
+              {added.stale && <span className="w-1.5 h-1.5 rounded-full shrink-0" style={{ background: 'var(--warning, #b45309)' }} />}
+              Ajouté {added.date}
+            </span>
+          )}
         </div>
       )}
 
@@ -121,10 +136,25 @@ function ConsultantRow({ consultant, onOpen, onMap, onContact, onDelete, canDele
 const SORTS = [
   { k: 'name', l: 'Alphabétique' },
   { k: 'recent', l: 'Plus récents' },
+  { k: 'oldest', l: 'Plus anciens' },
   { k: 'tjm', l: 'TJM décroissant' },
 ]
 
-const EMPTY_FILTERS = { employment: 'all', city: '', skill: '', availability: '', tjmMin: '', tjmMax: '', owner: 'all' }
+const EMPTY_FILTERS = { employment: 'all', city: '', skill: '', availability: '', tjmMin: '', tjmMax: '', owner: 'all', age: 'all' }
+
+// Date d'ajout au vivier + ancienneté (purge des CV > 6 mois — demande Sullyvan).
+const SIX_MONTHS_MS = 1000 * 60 * 60 * 24 * 183
+const addedInfo = (iso) => {
+  if (!iso) return null
+  const t = new Date(iso).getTime()
+  if (Number.isNaN(t)) return null
+  const months = Math.floor((Date.now() - t) / (1000 * 60 * 60 * 24 * 30))
+  return {
+    date: new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: 'short', year: '2-digit' }).format(new Date(t)),
+    stale: (Date.now() - t) > SIX_MONTHS_MS,
+    months,
+  }
+}
 
 export default function ConsultantsPage() {
   const { isAdmin, isStaff, isCommerce } = useAuth()
@@ -184,11 +214,13 @@ export default function ConsultantsPage() {
       if (filters.tjmMin && (c.tjm == null || c.tjm < Number(filters.tjmMin))) return false
       if (filters.tjmMax && (c.tjm == null || c.tjm > Number(filters.tjmMax))) return false
       if (filters.owner !== 'all' && c.created_by !== filters.owner) return false
+      if (filters.age === 'stale' && !addedInfo(c.created_at)?.stale) return false
       return true
     })
     out.sort((a, b) => {
       if (sort === 'name') return a.name.localeCompare(b.name)
       if (sort === 'tjm') return (b.tjm || 0) - (a.tjm || 0)
+      if (sort === 'oldest') return new Date(a.created_at) - new Date(b.created_at)
       return new Date(b.created_at) - new Date(a.created_at) // recent
     })
     return out
@@ -202,6 +234,7 @@ export default function ConsultantsPage() {
     if (filters.availability) n++
     if (filters.tjmMin || filters.tjmMax) n++
     if (filters.owner !== 'all') n++
+    if (filters.age !== 'all') n++
     return n
   }, [filters])
 
@@ -328,6 +361,24 @@ export default function ConsultantsPage() {
                     {owners.map(o => <option key={o.id} value={o.id} className="bg-navy-900">{o.name}</option>)}
                   </select>
                 </div>
+              </div>
+            )}
+
+            {isStaff && (
+              <div>
+                <label className="label">Ancienneté au vivier</label>
+                <div className="flex flex-col gap-1">
+                  {[{ v: 'all', l: 'Toutes' }, { v: 'stale', l: 'Anciens (> 6 mois)' }].map(o => (
+                    <button key={o.v} onClick={() => setFilters(p => ({ ...p, age: o.v }))}
+                      className={clsx('text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-all',
+                        filters.age === o.v ? 'seg-active' : 'text-slate-400 hover:text-slate-200 bg-white/5')}>
+                      {o.l}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-[10px] mt-1.5" style={{ color: 'var(--text-faint)' }}>
+                  Repère les CV à trier/supprimer passé 6 mois.
+                </p>
               </div>
             )}
           </aside>
