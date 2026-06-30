@@ -26,15 +26,34 @@ export function AuthProvider({ children }) {
     setUser(data.user)
   }
 
+  // Renvoie soit { mfa: 'verify'|'enroll', ... } (second facteur requis), soit
+  // { mfa: null, user } quand la session est ouverte directement.
   const login = async (email, password) => {
     setLoading(true)
     try {
       const { data } = await api.post('/auth/login', { email, password })
+      if (data.mfa) {
+        return { mfa: data.mfa, challenge: data.challenge_token, qr: data.qr, secret: data.secret }
+      }
       startSession(data)
-      return data.user
+      return { mfa: null, user: data.user }
     } finally {
       setLoading(false)
     }
+  }
+
+  // Étape 2 — valide le code TOTP (compte enrôlé) puis ouvre la session.
+  const verifyMfa = async (challenge, code) => {
+    const { data } = await api.post('/auth/mfa/verify', { challenge_token: challenge, code })
+    startSession(data)
+    return data.user
+  }
+
+  // Premier enrôlement — confirme le QR scanné puis ouvre la session.
+  const enrollMfa = async (challenge, code) => {
+    const { data } = await api.post('/auth/mfa/enroll', { challenge_token: challenge, code })
+    startSession(data)
+    return data.user
   }
 
   const register = async (email, password, name, role, inviteToken = null) => {
@@ -110,7 +129,7 @@ export function AuthProvider({ children }) {
   const isAO = user?.role === 'ao'
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, register, logout, isAdmin, isCommerce, isStaff, isAO, updateProfile, uploadAvatar, deleteAvatar }}>
+    <AuthContext.Provider value={{ user, loading, login, verifyMfa, enrollMfa, register, logout, isAdmin, isCommerce, isStaff, isAO, updateProfile, uploadAvatar, deleteAvatar }}>
       {children}
     </AuthContext.Provider>
   )
