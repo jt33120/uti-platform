@@ -275,8 +275,28 @@ function scoreHex(s) {
   return s >= 75 ? '#10b981' : s >= 50 ? '#3b82f6' : s >= 30 ? '#f59e0b' : '#ef4444'
 }
 
-// Analyses de score sous le classement : stats clés, distribution, classement
-// complet de TOUS les candidats notés (pas seulement le Top 3).
+// Nombre de profils qui « se détachent » par RUPTURE NATURELLE de la distribution :
+// on part des profils ≥ plancher de qualité (50 = « Bon ») et on coupe à la
+// première chute nette de score (écart ≥ 5 pts). Déterministe et auditable
+// (AI Act) — alternative explicable à un mixture model. Borné [1, 10].
+const RECO_FLOOR = 50
+const RECO_MIN_GAP = 5
+function recommendedCut(scoresDesc) {
+  const eligible = scoresDesc.filter(s => s >= RECO_FLOOR)
+  let k = 1
+  if (eligible.length >= 2) {
+    let bestGap = -1, cut = eligible.length
+    for (let i = 1; i < eligible.length; i++) {
+      const g = eligible[i - 1] - eligible[i]
+      if (g > bestGap) { bestGap = g; cut = i }
+    }
+    k = bestGap >= RECO_MIN_GAP ? cut : eligible.length
+  }
+  return Math.max(1, Math.min(k, 10))
+}
+
+// Analyses de score sous le classement : stats clés, histogramme, sélection
+// statistique (rupture naturelle) et classement complet de TOUS les candidats.
 function ScoreAnalytics({ all }) {
   const rows = (all || [])
     .filter(a => a && a.score != null)
@@ -290,21 +310,21 @@ function ScoreAnalytics({ all }) {
   const mid = Math.floor(scores.length / 2)
   const median = scores.length % 2 ? scores[mid] : Math.round((scores[mid - 1] + scores[mid]) / 2)
   const gap = best - scores[1]
-  const standsOut = gap >= 10
 
-  const buckets = [
-    { label: 'Fort', range: '75+', color: '#10b981', count: scores.filter(s => s >= 75).length },
-    { label: 'Bon', range: '50-74', color: '#3b82f6', count: scores.filter(s => s >= 50 && s < 75).length },
-    { label: 'Moyen', range: '30-49', color: '#f59e0b', count: scores.filter(s => s >= 30 && s < 50).length },
-    { label: 'Faible', range: '<30', color: '#ef4444', count: scores.filter(s => s < 30).length },
-  ]
-  const maxBucket = Math.max(...buckets.map(b => b.count), 1)
+  // Sélection statistique dynamique.
+  const recoK = recommendedCut(scores)
+  const cutoffScore = scores[recoK - 1]
 
-  const Stat = ({ label, value, color }) => (
+  // Histogramme : bins de 10 points (0-9, 10-19, …, 90-100).
+  const bins = Array.from({ length: 10 }, (_, i) => ({ lo: i * 10, count: 0 }))
+  scores.forEach(s => { bins[Math.min(9, Math.floor(s / 10))].count++ })
+  const maxC = Math.max(...bins.map(b => b.count), 1)
+
+  const Stat = ({ label, value, color, sub }) => (
     <div className="rounded-lg p-3" style={{ background: 'var(--surface-2)' }}>
       <div className="text-[11px]" style={{ color: 'var(--text-faint)' }}>{label}</div>
       <div className="text-xl font-bold tabular" style={{ color }}>
-        {value}<span className="text-xs font-normal" style={{ color: 'var(--text-faint)' }}>/100</span>
+        {value}{sub ? <span className="text-xs font-normal" style={{ color: 'var(--text-faint)' }}>{sub}</span> : null}
       </div>
     </div>
   )
@@ -315,33 +335,52 @@ function ScoreAnalytics({ all }) {
         <BarChart3 size={13} className="text-[var(--accent-text)]" /> Analyse des scores · {rows.length} candidats
       </p>
 
+      {/* Sélection statistique (rupture naturelle) */}
+      <div className="rounded-lg px-3 py-2 mb-4 flex items-start gap-2 text-[12px]"
+           style={{ background: 'var(--accent-soft)', color: 'var(--accent-text)' }}>
+        <Sparkles size={14} className="shrink-0 mt-0.5" />
+        <span>
+          <strong>{recoK} profil{recoK > 1 ? 's' : ''}</strong> se détache{recoK > 1 ? 'nt' : ''} de la distribution
+          {' '}(score ≥ {cutoffScore}, avant la 1ʳᵉ rupture nette). Les {Math.max(rows.length - recoK, 0)} autres sont en retrait.
+        </span>
+      </div>
+
       {/* Stats clés */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
-        <Stat label="Meilleur" value={best} color={scoreHex(best)} />
-        <Stat label="Moyenne" value={avg} color="var(--text)" />
-        <Stat label="Médiane" value={median} color="var(--text)" />
+        <Stat label="Meilleur" value={best} sub="/100" color={scoreHex(best)} />
+        <Stat label="Moyenne" value={avg} sub="/100" color="var(--text)" />
+        <Stat label="Médiane" value={median} sub="/100" color="var(--text)" />
         <div className="rounded-lg p-3" style={{ background: 'var(--surface-2)' }}>
           <div className="text-[11px]" style={{ color: 'var(--text-faint)' }}>Écart 1ᵉʳ / 2ᵉ</div>
           <div className="text-xl font-bold tabular" style={{ color: 'var(--text)' }}>+{gap}</div>
-          <div className="text-[10px] mt-0.5" style={{ color: standsOut ? '#10b981' : 'var(--text-faint)' }}>
-            {standsOut ? 'un profil se détache' : 'profils serrés'}
+          <div className="text-[10px] mt-0.5" style={{ color: gap >= 10 ? '#10b981' : 'var(--text-faint)' }}>
+            {gap >= 10 ? 'un profil se détache' : 'profils serrés'}
           </div>
         </div>
       </div>
 
-      {/* Distribution */}
+      {/* Histogramme des scores */}
       <div className="mb-5">
-        <div className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>Distribution</div>
-        <div className="space-y-1.5">
-          {buckets.map(b => (
-            <div key={b.label} className="flex items-center gap-2">
-              <span className="w-24 text-[11px]" style={{ color: 'var(--text-muted)' }}>{b.label} <span style={{ color: 'var(--text-faint)' }}>({b.range})</span></span>
-              <div className="flex-1 h-2 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
-                <div className="h-full rounded-full" style={{ width: `${b.count ? Math.max((b.count / maxBucket) * 100, 6) : 0}%`, background: b.color }} />
+        <div className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>
+          Histogramme des scores
+        </div>
+        <div className="relative">
+          <div className="flex items-end gap-1" style={{ height: 96 }}>
+            {bins.map(b => (
+              <div key={b.lo} className="flex-1 flex flex-col items-center justify-end">
+                {b.count > 0 && <span className="text-[9px] tabular mb-0.5" style={{ color: 'var(--text-faint)' }}>{b.count}</span>}
+                <div className="w-full rounded-t" style={{ height: `${(b.count / maxC) * 100}%`, minHeight: b.count ? 3 : 0, background: scoreHex(b.lo + 5) }} />
               </div>
-              <span className="w-6 text-right text-[11px] tabular" style={{ color: 'var(--text-muted)' }}>{b.count}</span>
-            </div>
-          ))}
+            ))}
+          </div>
+          <div className="flex gap-1 mt-1">
+            {bins.map(b => <span key={b.lo} className="flex-1 text-center text-[9px]" style={{ color: 'var(--text-faint)' }}>{b.lo}</span>)}
+          </div>
+          {/* Seuil de recommandation (rupture) */}
+          <div className="absolute top-0 bottom-5 pointer-events-none" style={{ left: `${cutoffScore}%`, borderLeft: '2px dashed var(--accent-text)' }} />
+        </div>
+        <div className="text-[10px] mt-1" style={{ color: 'var(--text-faint)' }}>
+          La ligne pointillée marque le seuil de recommandation (score {cutoffScore}).
         </div>
       </div>
 
@@ -350,14 +389,23 @@ function ScoreAnalytics({ all }) {
         <div className="text-[11px] font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--text-faint)' }}>Classement complet</div>
         <div className="space-y-1">
           {rows.map((r, i) => (
-            <div key={r.consultant_id || i} className="flex items-center gap-2.5">
-              <span className="w-5 text-[11px] tabular text-right" style={{ color: 'var(--text-faint)' }}>{i + 1}</span>
-              <span className="w-20 sm:w-32 truncate text-[12px] font-medium" style={{ color: 'var(--text)' }}>{r.consultant_name || '—'}</span>
-              <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
-                <div className="h-full rounded-full" style={{ width: `${Math.max(r.score, 2)}%`, background: scoreHex(r.score) }} />
+            <div key={r.consultant_id || i}>
+              <div className="flex items-center gap-2.5" style={{ opacity: i < recoK ? 1 : 0.55 }}>
+                <span className="w-5 text-[11px] tabular text-right" style={{ color: i < recoK ? 'var(--accent-text)' : 'var(--text-faint)', fontWeight: i < recoK ? 700 : 400 }}>{i + 1}</span>
+                <span className="w-20 sm:w-32 truncate text-[12px] font-medium" style={{ color: 'var(--text)' }}>{r.consultant_name || '—'}</span>
+                <div className="flex-1 h-2.5 rounded-full overflow-hidden" style={{ background: 'var(--surface-2)' }}>
+                  <div className="h-full rounded-full" style={{ width: `${Math.max(r.score, 2)}%`, background: scoreHex(r.score) }} />
+                </div>
+                <span className="w-9 text-right text-[12px] font-bold tabular" style={{ color: scoreHex(r.score) }}>{r.score}</span>
+                {r.tjm != null && <span className="hidden sm:inline w-14 text-right text-[11px]" style={{ color: 'var(--text-faint)' }}>{r.tjm}€/j</span>}
               </div>
-              <span className="w-9 text-right text-[12px] font-bold tabular" style={{ color: scoreHex(r.score) }}>{r.score}</span>
-              {r.tjm != null && <span className="hidden sm:inline w-14 text-right text-[11px]" style={{ color: 'var(--text-faint)' }}>{r.tjm}€/j</span>}
+              {i === recoK - 1 && i < rows.length - 1 && (
+                <div className="flex items-center gap-2 my-1.5">
+                  <div className="flex-1 border-t border-dashed" style={{ borderColor: 'var(--accent-text)' }} />
+                  <span className="text-[9px] uppercase tracking-wide" style={{ color: 'var(--accent-text)' }}>seuil de recommandation</span>
+                  <div className="flex-1 border-t border-dashed" style={{ borderColor: 'var(--accent-text)' }} />
+                </div>
+              )}
             </div>
           ))}
         </div>
