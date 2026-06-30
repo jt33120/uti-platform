@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState, useCallback } from 'react'
-import { Link } from 'react-router-dom'
-import { MapContainer, TileLayer, CircleMarker, Popup } from 'react-leaflet'
+import { Link, useSearchParams } from 'react-router-dom'
+import { MapContainer, TileLayer, CircleMarker, Popup, useMap } from 'react-leaflet'
 import 'leaflet/dist/leaflet.css'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
@@ -21,8 +21,21 @@ function LegendDot({ color }) {
   return <span className="inline-block w-2.5 h-2.5 rounded-full" style={{ background: color }} />
 }
 
+// Recentre/zoome la carte sur un point ciblé (deep-link ?focus=<consultantId>).
+function FocusFly({ point }) {
+  const map = useMap()
+  useEffect(() => {
+    if (point && point.latitude != null && point.longitude != null) {
+      map.flyTo([point.latitude, point.longitude], 12, { duration: 1.2 })
+    }
+  }, [point, map])
+  return null
+}
+
 export default function CartePage() {
   const { isAdmin } = useAuth()
+  const [searchParams] = useSearchParams()
+  const focusId = searchParams.get('focus')
   const [data, setData] = useState({ consultants: [], aos: [] })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -39,6 +52,11 @@ export default function CartePage() {
   }, [])
 
   useEffect(() => { load() }, [load])
+
+  const focusedConsultant = useMemo(
+    () => focusId ? (data.consultants || []).find(c => String(c.id) === String(focusId)) : null,
+    [focusId, data.consultants]
+  )
 
   const placedAos = useMemo(
     () => (data.aos || []).filter(a => a.latitude != null && a.longitude != null),
@@ -108,17 +126,28 @@ export default function CartePage() {
               url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
             />
 
-            {showConsultants && data.consultants.map(c => (
-              <CircleMarker key={`c-${c.id}`} center={[c.latitude, c.longitude]} radius={7}
-                pathOptions={{ color: COLORS.consultant, fillColor: COLORS.consultant, fillOpacity: 0.7, weight: 1 }}>
-                <Popup>
-                  <div className="text-[13px] font-semibold">{c.name}</div>
-                  {c.city && <div className="text-[12px] text-slate-500">{c.city}</div>}
-                  {c.skills && <div className="text-[11px] text-slate-500 mt-1">{c.skills}</div>}
-                  {c.tjm && <div className="text-[11px] text-slate-500">TJM {c.tjm} €/j</div>}
-                </Popup>
-              </CircleMarker>
-            ))}
+            <FocusFly point={focusedConsultant} />
+
+            {showConsultants && data.consultants.map(c => {
+              const focused = focusedConsultant && String(c.id) === String(focusedConsultant.id)
+              return (
+                <CircleMarker key={`c-${c.id}`} center={[c.latitude, c.longitude]} radius={focused ? 11 : 7}
+                  pathOptions={{
+                    color: focused ? '#1d1d1f' : COLORS.consultant,
+                    fillColor: COLORS.consultant,
+                    fillOpacity: focused ? 0.95 : 0.7,
+                    weight: focused ? 3 : 1,
+                  }}>
+                  <Popup>
+                    <div className="text-[13px] font-semibold">{c.name}</div>
+                    {c.city && <div className="text-[12px] text-slate-500">{c.city}</div>}
+                    {c.skills && <div className="text-[11px] text-slate-500 mt-1">{c.skills}</div>}
+                    {c.tjm && <div className="text-[11px] text-slate-500">TJM {c.tjm} €/j</div>}
+                    <Link to={`/consultants/${c.id}`} className="text-[12px] text-indigo-600 underline">Ouvrir la fiche →</Link>
+                  </Popup>
+                </CircleMarker>
+              )
+            })}
 
             {showAos && placedAos.map(a => {
               const color = a.work_mode === 'hybrid' ? COLORS.hybrid : COLORS.onsite

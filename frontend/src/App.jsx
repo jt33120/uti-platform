@@ -9,6 +9,7 @@ import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import ResetPasswordPage from './pages/ResetPasswordPage'
 import DashboardPage from './pages/DashboardPage'
 import ConsultantsPage from './pages/ConsultantsPage'
+import ConsultantDetailPage from './pages/ConsultantDetailPage'
 import AOSPage from './pages/AOSPage'
 import AODetailPage from './pages/AODetailPage'
 import NewConsultantPage from './pages/NewConsultantPage'
@@ -71,6 +72,7 @@ export default function App() {
           <Route path="/clients/:id" element={<ClientDetailPage />} />
           <Route path="/consultants" element={<ConsultantsPage />} />
           <Route path="/consultants/new" element={<NewConsultantPage />} />
+          <Route path="/consultants/:id" element={<ConsultantDetailPage />} />
           <Route path="/aos" element={<AOSPage />} />
           <Route path="/aos/new" element={<ProtectedRoute roles={STAFF}><NewAOPage /></ProtectedRoute>} />
           <Route path="/clients/new" element={<ProtectedRoute roles={ADMIN}><NewClientPage /></ProtectedRoute>} />

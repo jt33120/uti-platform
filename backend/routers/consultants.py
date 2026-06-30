@@ -5,6 +5,7 @@ from services.supabase_client import supabase
 from services.email import send_email, render_email_html
 from services.ratelimit import rate_limit
 from services.geocoding import geocode
+from services import storage
 from routers.auth import get_current_user, require_staff, is_staff
 
 router = APIRouter(prefix="/consultants", tags=["consultants"])
@@ -112,6 +113,126 @@ async def get_consultant(consultant_id: str, user: dict = Depends(get_current_us
         raise
     except Exception:
         raise HTTPException(status_code=404, detail="Consultant introuvable")
+
+
+@router.get("/{consultant_id}/history")
+async def consultant_history(consultant_id: str, user: dict = Depends(get_current_user)):
+    """Profil enrichi d'un consultant : parcours sur les AO (soumissions, score,
+    classement humain / retenu, contact), historique des CV et partenaire porteur.
+
+    Accès : staff voit tout ; un partenaire ne voit que ses propres consultants.
+    """
+    # 1) Consultant + contrôle d'accès
+    try:
+        consultant = supabase.table("consultants").select("*").eq("id", consultant_id).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="Consultant introuvable")
+    if user["role"] == "ao" and consultant.get("created_by") != user["sub"]:
+        raise HTTPException(status_code=403, detail="Accès interdit")
+
+    # 2) Partenaire porteur
+    owner = None
+    if consultant.get("created_by"):
+        try:
+            owner = supabase.table("profiles").select("id, name, email, role").eq(
+                "id", consultant["created_by"]
+            ).single().execute().data
+        except Exception:
+            owner = None
+
+    # 3) Soumissions (CV) du consultant
+    try:
+        subs = supabase.table("submissions").select(
+            "id, ao_id, submitted_at, cv_url, cv_filename"
+        ).eq("consultant_id", consultant_id).order("submitted_at", desc=True).execute().data or []
+    except Exception:
+        subs = []
+
+    # 4) État humain (classement / retenu / contact) par AO
+    state_by = {}
+    try:
+        for s in supabase.table("ao_consultant_state").select(
+            "ao_id, human_rank, contact_status, contacted_at"
+        ).eq("consultant_id", consultant_id).execute().data or []:
+            state_by[s["ao_id"]] = s
+    except Exception:
+        pass
+
+    # 5) Scores de matching par AO (consultant_id est stocké en TEXT)
+    match_by = {}
+    try:
+        for m in supabase.table("matchings").select(
+            "ao_id, score_total, score_hybride, rank, recommandation, created_at"
+        ).eq("consultant_id", str(consultant_id)).order("created_at", desc=True).execute().data or []:
+            match_by.setdefault(m["ao_id"], m)  # garde le plus récent
+    except Exception:
+        pass
+
+    # 6) Métadonnées des AO concernés (par soumission, état ou matching)
+    ao_ids = {s["ao_id"] for s in subs} | set(state_by) | set(match_by)
+    ao_by = {}
+    if ao_ids:
+        try:
+            rows = supabase.table("appels_offres").select(
+                "id, title, status, reference, client_id, clients(name)"
+            ).in_("id", list(ao_ids)).execute().data or []
+        except Exception:
+            try:
+                rows = supabase.table("appels_offres").select(
+                    "id, title, status, client_id"
+                ).in_("id", list(ao_ids)).execute().data or []
+            except Exception:
+                rows = []
+        ao_by = {r["id"]: r for r in rows}
+
+    # 7) Construction de l'historique : une entrée par AO
+    history = []
+    for aid in ao_ids:
+        ao = ao_by.get(aid) or {}
+        st = state_by.get(aid) or {}
+        mt = match_by.get(aid) or {}
+        sub = next((x for x in subs if x["ao_id"] == aid), None)
+        cv_url = None
+        if sub and sub.get("cv_url"):
+            try:
+                cv_url = storage.signed_cv_url(sub["cv_url"])
+            except Exception:
+                cv_url = None
+        history.append({
+            "ao_id": aid,
+            "ao_title": ao.get("title") or "Appel d'offres",
+            "ao_status": ao.get("status"),
+            "ao_reference": ao.get("reference"),
+            "client_name": (ao.get("clients") or {}).get("name") if isinstance(ao.get("clients"), dict) else None,
+            "submitted": sub is not None,
+            "submitted_at": sub.get("submitted_at") if sub else None,
+            "cv_url": cv_url,
+            "cv_filename": sub.get("cv_filename") if sub else None,
+            "score_total": mt.get("score_total"),
+            "score_hybride": mt.get("score_hybride"),
+            "rank": mt.get("rank"),
+            "human_rank": st.get("human_rank"),
+            "retained": st.get("human_rank") is not None,
+            "contact_status": st.get("contact_status") or "none",
+            "contacted_at": st.get("contacted_at"),
+        })
+
+    # Tri : retenus d'abord (par classement humain), puis les autres du + récent
+    retained = sorted([h for h in history if h["retained"]],
+                      key=lambda h: h["human_rank"] if h["human_rank"] is not None else 9999)
+    others = sorted([h for h in history if not h["retained"]],
+                    key=lambda h: h.get("submitted_at") or "", reverse=True)
+    history = retained + others
+
+    stats = {
+        "participations": len([h for h in history if h["submitted"]]),
+        "ao_total": len(history),
+        "retained": len([h for h in history if h["retained"]]),
+        "contacted": len([h for h in history if h["contact_status"] in ("contacted", "proposed")]),
+        "cv_count": len([s for s in subs if s.get("cv_url")]),
+    }
+
+    return {"consultant": consultant, "owner": owner, "history": history, "stats": stats}
 
 
 @router.patch("/{consultant_id}")
