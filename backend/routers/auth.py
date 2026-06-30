@@ -441,7 +441,9 @@ async def login(body: LoginRequest):
     # Si les colonnes MFA existent, un second facteur est exigé :
     #   - compte déjà enrôlé  -> on demande un code de vérification ;
     #   - pas encore enrôlé   -> enrôlement forcé (QR code) avant la session.
-    if "mfa_enabled" in profile:
+    # mfa_required (défaut true) : un admin peut exonérer un compte précis.
+    # Colonne absente → True (MFA obligatoire, comportement par défaut conservé).
+    if "mfa_enabled" in profile and profile.get("mfa_required", True):
         if profile.get("mfa_enabled") and profile.get("mfa_secret"):
             return {
                 "mfa": "verify",
@@ -512,6 +514,28 @@ async def mfa_reset(user_id: str, admin: dict = Depends(require_admin)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Échec de la réinitialisation MFA : {e}")
     return {"message": "MFA réinitialisée. L'utilisateur devra la reconfigurer à sa prochaine connexion."}
+
+
+class MfaRequiredRequest(BaseModel):
+    required: bool
+
+
+@router.post("/mfa/require/{user_id}")
+async def mfa_set_required(user_id: str, body: MfaRequiredRequest, admin: dict = Depends(require_admin)):
+    """Active/désactive l'obligation de MFA pour un compte (active par défaut).
+
+    Désactiver n'efface pas un éventuel secret déjà enrôlé : si on réactive plus
+    tard, l'utilisateur reprend sa MFA existante. Si on désactive, sa prochaine
+    connexion se fait sans second facteur.
+    """
+    try:
+        supabase.table("profiles").update({"mfa_required": body.required}).eq("id", user_id).execute()
+    except Exception:
+        raise HTTPException(
+            status_code=501,
+            detail="Colonne mfa_required absente : appliquez la migration supabase_migration_mfa_toggle.sql.",
+        )
+    return {"ok": True, "user_id": user_id, "mfa_required": body.required}
 
 
 @router.get("/me")

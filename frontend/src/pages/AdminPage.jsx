@@ -5,6 +5,7 @@ import { useConfirm } from '../contexts/ConfirmContext'
 import {
   Gauge, Users, FileText, Sparkles, UserPlus, X, Loader2,
   Shield, Briefcase, BadgePercent, Coins, Pencil, PauseCircle, Ban, KeyRound,
+  ShieldCheck, ShieldOff,
 } from 'lucide-react'
 import InviteModal from '../components/InviteModal'
 import AccountEditModal from '../components/AccountEditModal'
@@ -80,6 +81,7 @@ export default function AdminPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [deletingId, setDeletingId] = useState(null)
   const [mfaResetId, setMfaResetId] = useState(null)
+  const [mfaToggleId, setMfaToggleId] = useState(null)
   const [editing, setEditing] = useState(null)
 
   const load = async () => {
@@ -108,6 +110,28 @@ export default function AdminPage() {
       alert(e.response?.data?.detail || 'Erreur lors de la réinitialisation MFA')
     } finally {
       setMfaResetId(null)
+    }
+  }
+
+  // MFA active par défaut ; un admin peut l'exonérer pour un compte précis.
+  const toggleMfaRequired = async (acc) => {
+    const required = acc.mfa_required !== false
+    const next = !required
+    if (!(await confirm({
+      title: next ? 'Réactiver la MFA ?' : 'Désactiver la MFA ?',
+      message: next
+        ? `« ${acc.name} » devra de nouveau utiliser la double authentification à sa prochaine connexion.`
+        : `« ${acc.name} » pourra se connecter sans double authentification. À n'utiliser qu'en cas de nécessité — la MFA reste recommandée.`,
+      confirmLabel: next ? 'Réactiver' : 'Désactiver',
+    }))) return
+    setMfaToggleId(acc.id)
+    try {
+      await api.post(`/auth/mfa/require/${acc.id}`, { required: next })
+      setAccounts(p => p.map(a => a.id === acc.id ? { ...a, mfa_required: next } : a))
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Erreur lors du changement MFA')
+    } finally {
+      setMfaToggleId(null)
     }
   }
 
@@ -216,6 +240,16 @@ export default function AdminPage() {
                       title="Modifier le compte"
                     >
                       <Pencil size={14} />
+                    </button>
+                    <button
+                      onClick={() => toggleMfaRequired(acc)}
+                      disabled={mfaToggleId === acc.id}
+                      className={`p-1 rounded transition-colors ml-0.5 ${acc.mfa_required === false ? 'text-[var(--warning,#b45309)] hover:opacity-80' : 'text-[var(--text-faint)] hover:text-[var(--text)]'}`}
+                      title={acc.mfa_required === false ? 'MFA désactivée — cliquer pour réactiver' : 'MFA active — cliquer pour désactiver'}
+                    >
+                      {mfaToggleId === acc.id
+                        ? <Loader2 size={13} className="animate-spin" />
+                        : (acc.mfa_required === false ? <ShieldOff size={14} /> : <ShieldCheck size={14} />)}
                     </button>
                     <button
                       onClick={() => resetMfa(acc)}

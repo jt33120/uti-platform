@@ -99,13 +99,18 @@ async def list_accounts(user: dict = Depends(require_admin)):
     """All accounts (admin, commerce, partners) + pending invitations."""
     try:
         accounts = supabase.table("profiles").select(
-            "id, email, name, role, org, status, created_at, last_login_at, avatar_url"
+            "id, email, name, role, org, status, created_at, last_login_at, avatar_url, mfa_enabled, mfa_required"
         ).order("created_at", desc=True).execute().data or []
     except Exception:
-        # org / status / last_login_at columns not migrated yet — degrade gracefully
-        accounts = supabase.table("profiles").select(
-            "id, email, name, role, created_at, avatar_url"
-        ).order("created_at", desc=True).execute().data or []
+        # colonnes (org/status/last_login_at/mfa_*) pas encore migrées — dégrade proprement
+        try:
+            accounts = supabase.table("profiles").select(
+                "id, email, name, role, org, status, created_at, last_login_at, avatar_url"
+            ).order("created_at", desc=True).execute().data or []
+        except Exception:
+            accounts = supabase.table("profiles").select(
+                "id, email, name, role, created_at, avatar_url"
+            ).order("created_at", desc=True).execute().data or []
 
     pending = []
     try:
