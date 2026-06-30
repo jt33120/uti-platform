@@ -180,31 +180,28 @@ function TemplateCard({ tpl, onSaved }) {
         </div>
       </div>
 
-      {/* Envoi d'un email de test (contenu en cours d'édition, valeurs d'exemple) */}
-      <div className="rounded-lg border border-white/10 bg-navy-900/30 p-3">
-        <p className="text-[11px] text-slate-500 mb-2 flex items-center gap-1">
-          <Send size={12} /> Envoyer un test (le contenu actuel, avec des valeurs d'exemple)
-        </p>
-        <div className="flex flex-wrap items-center gap-2">
-          <input
-            type="email"
-            className="input flex-1 min-w-[200px]"
-            placeholder="adresse@email.com"
-            value={testEmail}
-            onChange={(e) => { setTestEmail(e.target.value); setTestMsg(null) }}
-          />
-          <button
-            onClick={sendTest}
-            disabled={testing || !testEmail}
-            className="btn-ghost text-sm gap-1.5 whitespace-nowrap"
-          >
-            {testing ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />} Envoyer un test
-          </button>
-        </div>
+      {/* Envoi d'un email de test — discret, une ligne. */}
+      <div className="flex items-center gap-2 pt-1">
+        <Send size={13} className="text-slate-500 shrink-0" />
+        <input
+          type="email"
+          className="input h-8 py-1 text-xs flex-1 min-w-[140px] max-w-xs"
+          placeholder="Envoyer un test à…"
+          title="Reçois le rendu réel (valeurs d'exemple) dans ta boîte"
+          value={testEmail}
+          onChange={(e) => { setTestEmail(e.target.value); setTestMsg(null) }}
+        />
+        <button
+          onClick={sendTest}
+          disabled={testing || !testEmail}
+          className="btn-ghost text-xs h-8 px-2.5 gap-1 whitespace-nowrap"
+        >
+          {testing ? <Loader2 size={13} className="animate-spin" /> : <Send size={13} />} Test
+        </button>
         {testMsg && (
-          <p className={`text-xs mt-2 inline-flex items-center gap-1 ${testMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>
-            {testMsg.ok ? <CheckCircle size={13} /> : <AlertCircle size={13} />} {testMsg.text}
-          </p>
+          <span className={`text-[11px] inline-flex items-center gap-1 ${testMsg.ok ? 'text-emerald-400' : 'text-red-400'}`}>
+            {testMsg.ok ? <CheckCircle size={12} /> : <AlertCircle size={12} />} {testMsg.text}
+          </span>
         )}
       </div>
 

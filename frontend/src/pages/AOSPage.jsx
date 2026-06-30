@@ -6,15 +6,47 @@ import { useConfirm } from '../contexts/ConfirmContext'
 import {
   FileText, Plus, Euro, MapPin, Clock, ArrowRight, Search,
   Building2, Users, Star, ListChecks, Calendar, CalendarClock,
-  Pencil, X, Loader2, ChevronDown, Check, Trash2,
+  Pencil, X, Loader2, ChevronDown, Check, Trash2, ArrowDownUp,
 } from 'lucide-react'
 
-const formatDate = (iso) => {
+// Parse date-only strings as local to avoid the UTC off-by-one.
+const parseDateLocal = (iso) => {
   if (!iso) return null
-  // Parse date-only strings as local to avoid the UTC off-by-one.
   const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso)
-  const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso)
+  return m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso)
+}
+
+const formatDate = (iso) => {
+  const d = parseDateLocal(iso)
+  if (!d) return null
   return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', year: 'numeric' }).format(d)
+}
+
+// Échéance : date formatée + temps restant + tonalité (urgence).
+const deadlineMeta = (iso) => {
+  const d = parseDateLocal(iso)
+  if (!d) return null
+  const today = new Date(); today.setHours(0, 0, 0, 0)
+  const days = Math.round((d - today) / 86400000)
+  let tone, rel
+  if (days < 0) { tone = 'past'; rel = 'Dépassée' }
+  else if (days === 0) { tone = 'today'; rel = "Aujourd'hui" }
+  else if (days === 1) { tone = 'soon'; rel = 'Demain' }
+  else if (days <= 7) { tone = 'soon'; rel = `Dans ${days} j` }
+  else { tone = 'far'; rel = `Dans ${days} j` }
+  return { date: formatDate(iso), days, tone, rel }
+}
+
+const DEADLINE_TONE = {
+  past:  { background: 'var(--danger-soft)', color: 'var(--danger)' },
+  today: { background: 'var(--danger-soft)', color: 'var(--danger)' },
+  soon:  { background: 'rgba(245,158,11,0.14)', color: '#f59e0b' },
+  far:   { background: 'rgba(99,102,241,0.12)', color: '#a5b4fc' },
+}
+
+const deadlineSortKey = (ao) => {
+  const d = parseDateLocal(ao.deadline)
+  return d ? d.getTime() : Infinity // AO sans échéance en dernier
 }
 import clsx from 'clsx'
 
@@ -235,14 +267,26 @@ function AOCard({ ao, isStaff, onEdit, onDelete, navigate, selected, onToggleSel
               {ao.ao_type}
             </span>
           )}
-          {ao.deadline && (
-            <span className="badge text-[10px]" style={{ background: 'var(--danger-soft)', color: 'var(--danger)' }}>
-              <CalendarClock size={9} /> {formatDate(ao.deadline)}
-            </span>
-          )}
           <TierBadge tier={ao.tier} />
         </div>
       </div>
+
+      {/* Échéance — mise en évidence (date + temps restant) */}
+      {(() => {
+        const dl = deadlineMeta(ao.deadline)
+        if (!dl) return null
+        return (
+          <div
+            className="flex items-center gap-1.5 mb-2.5 px-2.5 py-1.5 rounded-md text-[11px] font-semibold"
+            style={DEADLINE_TONE[dl.tone]}
+            title={`Date d'échéance : ${dl.date}`}
+          >
+            <CalendarClock size={12} className="shrink-0" />
+            <span>Échéance : {dl.date}</span>
+            <span className="ml-auto font-medium opacity-90">{dl.rel}</span>
+          </div>
+        )
+      })()}
 
       <p className="text-xs text-slate-500 mb-3 line-clamp-2">{ao.description}</p>
 
@@ -279,9 +323,9 @@ function AOCard({ ao, isStaff, onEdit, onDelete, navigate, selected, onToggleSel
           </span>
         )}
         {ao.created_at && (
-          <span className="flex items-center gap-1">
+          <span className="flex items-center gap-1" title="Date d'émission de l'AO">
             <Calendar size={10} />
-            {formatDate(ao.created_at)}
+            Émis le {formatDate(ao.created_at)}
           </span>
         )}
         {isStaff ? (
@@ -325,6 +369,7 @@ export default function AOSPage() {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState('all')
   const [groupBy, setGroupBy] = useState('client') // 'client' | 'none'
+  const [sortBy, setSortBy] = useState('created')  // 'created' (émission) | 'deadline' (échéance)
   const [editAo, setEditAo] = useState(null)
   const [deleting, setDeleting] = useState(null)
   const [selected, setSelected] = useState(() => new Set())
@@ -399,16 +444,23 @@ export default function AOSPage() {
     return matchSearch && matchFilter
   }), [aos, search, filter])
 
-  // Sort: list_1 first, then list_2, then by created_at desc (admin: just date)
+  // Sort: list_1 first, then list_2, then par le critère choisi.
+  // - 'created'  : émission la plus récente d'abord
+  // - 'deadline' : échéance la plus proche d'abord (AO sans échéance en dernier)
   const sorted = useMemo(() => {
     const tierRank = { list_1: 0, list_2: 1 }
+    const byCreated = (a, b) => new Date(b.created_at) - new Date(a.created_at)
     return [...filtered].sort((a, b) => {
       const ar = tierRank[a.tier] ?? 2
       const br = tierRank[b.tier] ?? 2
       if (ar !== br) return ar - br
-      return new Date(b.created_at) - new Date(a.created_at)
+      if (sortBy === 'deadline') {
+        const d = deadlineSortKey(a) - deadlineSortKey(b)
+        if (d !== 0) return d
+      }
+      return byCreated(a, b)
     })
-  }, [filtered])
+  }, [filtered, sortBy])
 
   const groupedByClient = useMemo(() => {
     if (groupBy !== 'client') return null
@@ -488,6 +540,24 @@ export default function AOSPage() {
               className={clsx(
                 'px-3 py-1 text-xs rounded-md font-medium transition-all',
                 groupBy === o.k ? 'seg-active' : 'text-slate-400 hover:text-slate-200'
+              )}
+            >
+              {o.l}
+            </button>
+          ))}
+        </div>
+        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1" title="Trier les appels d'offres">
+          <ArrowDownUp size={12} className="text-slate-500 ml-1.5 shrink-0" />
+          {[
+            { k: 'created', l: 'Émission' },
+            { k: 'deadline', l: 'Échéance' },
+          ].map(o => (
+            <button
+              key={o.k}
+              onClick={() => setSortBy(o.k)}
+              className={clsx(
+                'px-3 py-1 text-xs rounded-md font-medium transition-all',
+                sortBy === o.k ? 'seg-active' : 'text-slate-400 hover:text-slate-200'
               )}
             >
               {o.l}
