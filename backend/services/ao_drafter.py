@@ -118,8 +118,19 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
         "et/ou pièces jointes) en une fiche d'AO structurée, claire et "
         "professionnelle, en français. Tu extrais les informations présentes et tu "
         "les reformules proprement. N'invente jamais de donnée absente : laisse le "
-        "champ vide. Réponds UNIQUEMENT avec un objet JSON valide, sans texte "
-        "autour ni balises markdown."
+        "champ vide.\n"
+        "La source peut être un modèle de marché Excel (type AGIRC-ARRCO : "
+        "feuilles CCTP / CRT / AF). Dans ce cas les vraies données sont dans les "
+        "cellules renseignées par le prescripteur (Références de la consultation, "
+        "Objet de la consultation, Lieu/Site de la prestation, Durée du marché, "
+        "Valeur estimée, dates d'envoi / de remise des offres, Contexte du besoin, "
+        "Missions, Matrice de compétences). IGNORE les listes de référence et "
+        "valeurs de listes déroulantes (catalogues de catégories, d'UO, de sites) : "
+        "ce sont des options génériques, pas les données de CET AO. Ne retiens que "
+        "la catégorie / l'UO / le site EFFECTIVEMENT sélectionnés pour cette "
+        "consultation.\n"
+        "Réponds UNIQUEMENT avec un objet JSON valide, sans texte autour ni balises "
+        "markdown."
     )
     user = (
         "Génère la fiche AO à partir du contenu source ci-dessous.\n\n"
@@ -133,12 +144,16 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
         '"Architecte Cloud — secteur bancaire" · "Chef de projet MOA — télétravail partiel"\n'
         '- "reference": référence client / de la consultation si présente (ex. "Marché Spécifique n°23915SA230MS"), sinon ""\n'
         '- "description": description claire et professionnelle (3 à 6 phrases), reformulée\n'
-        '- "skills_required": compétences techniques clés, séparées par des virgules\n'
+        '- "skills_required": compétences techniques clés, séparées par des virgules. '
+        "Sur un modèle de marché, déduis-les de la « Matrice de compétences » "
+        "(compétences techniques ET fonctionnelles listées, ex. Clarity/OpenWorkBench, "
+        "Excel avancé, Power BI, Access, méthode ABC, gestion de projet)\n"
         f'- "ao_type": exactement l\'une de ces valeurs si pertinent, sinon "" : {", ".join(ao_types)}\n'
         '- "budget_max": nombre entier (budget max en €/jour) ou null\n'
         '- "location": localisation / télétravail\n'
         '- "duration": durée de la mission\n'
-        '- "deadline": date limite de réponse au format "YYYY-MM-DD", sinon ""\n'
+        '- "deadline": date limite de réponse au format "YYYY-MM-DD" (sur un modèle '
+        'de marché : la « Date de limite de remise des offres »), sinon ""\n'
         '- "context": éléments de contexte utiles (secteur, contraintes, urgence, environnement technique)\n'
         '- "importance": objet notant de 1 (accessoire) à 5 (critique) l\'importance '
         'RELATIVE de chaque critère DÉDUITE du texte, avec les clés exactes '
