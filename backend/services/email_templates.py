@@ -79,7 +79,7 @@ DEFAULTS = {
     },
     "ao_relance": {
         "label": "Relance des partenaires — AO resté sans réponse",
-        "subject": "Rappel — Appel d'offres : {title}",
+        "subject": "Rappel, appel d'offres : {title}",
         "body": _DEFAULT_RELANCE,
         "format": "html",
         "placeholders": ["title", "client", "reference", "location", "deadline", "link"],
@@ -89,7 +89,7 @@ DEFAULTS = {
     },
     "invite": {
         "label": "Invitation — création de compte (partenaire / commercial)",
-        "subject": "Invitation — GROUPEMENT-IT Plateforme",
+        "subject": "Invitation à la plateforme Groupement-IT",
         "body": _DEFAULT_INVITE,
         "format": "html",
         "placeholders": ["name", "role", "link"],
@@ -99,13 +99,13 @@ DEFAULTS = {
     },
     "password_reset": {
         "label": "Mot de passe oublié — lien de réinitialisation",
-        "subject": "Réinitialisation de votre mot de passe — Groupement-IT",
+        "subject": "Réinitialisation de votre mot de passe",
         "body": _DEFAULT_RESET,
         "format": "html",
         "placeholders": ["link"],
         "email_title": "Réinitialisation du mot de passe",
         "cta_label": "Réinitialiser mon mot de passe",
-        "footer": "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email — votre mot de passe reste inchangé.",
+        "footer": "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email, votre mot de passe reste inchangé.",
     },
 }
 

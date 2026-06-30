@@ -241,7 +241,7 @@ export default function AssistantWidget() {
                   style={{ background: 'var(--surface-2)', color: 'var(--text)' }}
                 >
                   Bonjour {user.name?.split(' ')[0]} 👋<br />
-                  Posez-moi une question sur vos données, demandez un graphique, ou dites-moi où aller —
+                  Posez-moi une question sur vos données, demandez un graphique, ou dites-moi où aller :
                   je vous guide et pré-remplis, mais je ne valide jamais à votre place.
                 </div>
                 <div className="flex flex-wrap gap-1.5">

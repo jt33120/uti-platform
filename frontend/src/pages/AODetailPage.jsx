@@ -226,11 +226,11 @@ function contactLabel(kind) {
 function buildMailto(result, ao) {
   const to = result.partner_email || ''
   const cli = ao?.clients?.name ? ` (client ${ao.clients.name})` : ''
-  const ref = ao?.reference ? ` — réf. ${ao.reference}` : ''
+  const ref = ao?.reference ? `, réf. ${ao.reference}` : ''
   const hi = `Bonjour${result.partner_name ? ' ' + result.partner_name : ''},`
   let subject, lines
   if (result.contact_kind === 'consultant') {
-    subject = `Proposition de mission — ${ao?.title || "appel d'offres"}${ref}`
+    subject = `Proposition de mission : ${ao?.title || "appel d'offres"}${ref}`
     lines = [
       hi, '',
       `Nous avons une mission « ${ao?.title || ''} »${cli} qui pourrait correspondre à votre profil.`,
@@ -239,7 +239,7 @@ function buildMailto(result, ao) {
       '', 'Merci d’avance,',
     ]
   } else {
-    subject = `Proposition de consultant — ${ao?.title || "appel d'offres"}${ref}`
+    subject = `Proposition de consultant : ${ao?.title || "appel d'offres"}${ref}`
     lines = [
       hi, '',
       `Nous souhaitons avancer sur le profil de ${result.consultant_name || 'votre consultant'} pour la mission « ${ao?.title || ''} »${cli}.`,
@@ -340,7 +340,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact, expanded: expan
               </p>
               {result.llm_global
                 ? <p className="text-sm text-slate-300 leading-relaxed whitespace-pre-line">{result.llm_global}</p>
-                : <p className="text-xs text-slate-500 italic">Avis IA indisponible pour ce profil — score déterministe seul (grille auditable).</p>}
+                : <p className="text-xs text-slate-500 italic">Avis IA indisponible pour ce profil : score déterministe seul (grille auditable).</p>}
             </div>
           </div>
 
@@ -395,7 +395,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact, expanded: expan
                 </div>
               ) : (!result.partner_email && (
                 <p className="text-[11px] text-amber-400/80">
-                  Aucun email de contact trouvé (ni partenaire, ni consultant) — le brouillon s'ouvrira sans destinataire (à compléter).
+                  Aucun email de contact trouvé (ni partenaire, ni consultant) : le brouillon s'ouvrira sans destinataire (à compléter).
                 </p>
               ))}
             </div>
@@ -971,7 +971,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
             </button>
           </div>
           {aiError && <p className="text-xs text-red-400 mt-2">{aiError}</p>}
-          {aiDone && !aiError && <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1.5"><CheckCircle size={12} /> Champs régénérés — vérifiez avant d'enregistrer.</p>}
+          {aiDone && !aiError && <p className="text-xs text-emerald-400 mt-2 flex items-center gap-1.5"><CheckCircle size={12} /> Champs régénérés : vérifiez avant d'enregistrer.</p>}
         </div>
 
         <form onSubmit={submit} className="space-y-4">
@@ -980,7 +980,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
               <label className="label">Client *</label>
               <div className="relative">
                 <select className="input appearance-none pr-9" value={form.client_id} onChange={set('client_id')} required>
-                  <option value="" className="bg-navy-900">— Choisir un client —</option>
+                  <option value="" className="bg-navy-900">Choisir un client</option>
                   {clients.map(c => <option key={c.id} value={c.id} className="bg-navy-900">{c.name}</option>)}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
@@ -1031,7 +1031,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
               <label className="label">Mode de travail</label>
               <div className="relative">
                 <select className="input appearance-none pr-9" value={form.work_mode} onChange={set('work_mode')}>
-                  <option value="" className="bg-navy-900">— Non précisé —</option>
+                  <option value="" className="bg-navy-900">Non précisé</option>
                   <option value="onsite" className="bg-navy-900">Sur site</option>
                   <option value="hybrid" className="bg-navy-900">Hybride</option>
                   <option value="remote" className="bg-navy-900">Remote</option>
@@ -1730,7 +1730,7 @@ export default function AODetailPage() {
                 </div>
               ) : (
                 <p className="text-xs text-slate-500 mt-1">
-                  Repliée — cliquez pour afficher les {submissions.length} CV{submissions.length > 1 ? 's' : ''}.
+                  Repliée : cliquez pour afficher les {submissions.length} CV{submissions.length > 1 ? 's' : ''}.
                 </p>
               )}
             </div>
@@ -1748,7 +1748,7 @@ export default function AODetailPage() {
             ) : (
               <div className="card p-4 border-dashed border-white/10 text-center">
                 <TrendingUp size={22} className="mx-auto text-slate-700 mb-2" />
-                <p className="text-xs text-slate-500">Scoring IA en attente — l'administrateur analysera vos CVs prochainement</p>
+                <p className="text-xs text-slate-500">Scoring IA en attente : l'administrateur analysera vos CVs prochainement</p>
               </div>
             )
           )}

@@ -162,7 +162,7 @@ export default function PartnerAccessPage() {
   const handleSuspendGlobally = async (partnerId) => {
     if (!(await confirm({
       title: "Suspendre l'accès de ce partenaire ?",
-      message: "L'accès du partenaire sera suspendu sur tous les clients qui lui sont attribués. (Ceci ne bloque pas la connexion — pour cela, suspendez le compte depuis Admin → Comptes.)",
+      message: "L'accès du partenaire sera suspendu sur tous les clients qui lui sont attribués. (Ceci ne bloque pas la connexion : pour cela, suspendez le compte depuis Admin → Comptes.)",
       confirmLabel: "Suspendre l'accès",
     }))) return
     setSuspending(partnerId)
@@ -209,7 +209,7 @@ export default function PartnerAccessPage() {
           </h1>
           <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
             {readOnly
-              ? 'Sélectionnez un client pour consulter les listes — lecture seule (modifications réservées aux administrateurs).'
+              ? 'Sélectionnez un client pour consulter les listes en lecture seule (modifications réservées aux administrateurs).'
               : 'Sélectionnez un client, puis glissez-déposez les partenaires entre les listes.'}
           </p>
         </div>

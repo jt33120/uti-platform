@@ -517,14 +517,14 @@ def _data_answer(q_last: str, q_full: str, snap: dict, agg: dict, role: str) -> 
     if wants_avg or "tjm" in topics:
         if "tjm" in topics or ("cons" in topics and wants_avg):
             if agg["tjm_avg"] is None:
-                return ChatResponse(reply="Aucun TJM renseigné dans le vivier pour le moment — je ne peux pas calculer de moyenne.")
+                return ChatResponse(reply="Aucun TJM renseigné dans le vivier pour le moment : je ne peux pas calculer de moyenne.")
             n = agg["cons_total"]
             return ChatResponse(
                 reply=f"Le TJM moyen du vivier est de {agg['tjm_avg']} €/jour ({n} {_plural(n, 'consultant')}).",
                 actions=nav("/consultants", "Voir le vivier"))
         if "budget" in topics and "ao" in topics:
             if agg["ao_budget_avg"] is None:
-                return ChatResponse(reply="Aucun budget renseigné sur les appels d'offres — je ne peux pas calculer de moyenne.")
+                return ChatResponse(reply="Aucun budget renseigné sur les appels d'offres : je ne peux pas calculer de moyenne.")
             return ChatResponse(
                 reply=f"Le budget (TJM max) moyen des appels d'offres est de {agg['ao_budget_avg']} €/jour, sur {agg['ao_total']} AO.",
                 actions=nav("/aos", "Voir les appels d'offres"))
@@ -715,9 +715,9 @@ def _fallback(messages: list[ChatMessage], role: str, snap: Optional[dict]) -> C
 
     # 5) Honest default — say what we can actually do instead of deflecting
     if snap is None:
-        return ChatResponse(reply="Je n'arrive pas à accéder aux données en ce moment. Je peux quand même vous guider vers une page — dites-moi laquelle.")
+        return ChatResponse(reply="Je n'arrive pas à accéder aux données en ce moment. Je peux quand même vous guider vers une page : dites-moi laquelle.")
     return ChatResponse(
-        reply="Je n'ai pas trouvé la réponse dans vos données — désolé. Je sais compter vos AOs, consultants, clients"
+        reply="Je n'ai pas trouvé la réponse dans vos données, désolé. Je sais compter vos AOs, consultants, clients"
               + (", partenaires, PACs et tickets" if role == "admin" else (" et partenaires" if role == "commerce" else ""))
               + ", calculer des moyennes (TJM, budget), afficher des répartitions, ou vous emmener sur une page. Reformulez ou précisez ?",
         actions=[],

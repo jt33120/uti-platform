@@ -32,7 +32,7 @@ export default function CookieBanner() {
       <Cookie size={16} className="shrink-0 mt-0.5" style={{ color: 'var(--accent-text)' }} />
       <div className="flex-1 text-[11px] leading-relaxed" style={{ color: 'var(--text-muted)' }}>
         Ce site n'utilise que des éléments de stockage <strong>strictement nécessaires</strong>
-        {' '}(session, thème) — aucun traçage publicitaire.{' '}
+        {' '}(session, thème). Aucun traçage publicitaire.{' '}
         <Link to="/legal/confidentialite" className="underline" style={{ color: 'var(--accent-text)' }}>
           En savoir plus
         </Link>.

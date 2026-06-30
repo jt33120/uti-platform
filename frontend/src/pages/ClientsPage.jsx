@@ -243,9 +243,9 @@ export default function ClientsPage() {
             Clients
             <span className="text-sm font-normal text-slate-500">({clients.length})</span>
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {isAdmin ? 'Gestion des comptes clients et Accès partenaires' : 'Vos clients accessibles'}
-          </p>
+          {!isAdmin && (
+            <p className="text-sm text-slate-500 mt-0.5">Vos clients accessibles</p>
+          )}
         </div>
         {isAdmin && (
           <div className="flex gap-2">

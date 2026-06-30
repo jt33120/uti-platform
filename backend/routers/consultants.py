@@ -180,12 +180,12 @@ async def contact_partner(consultant_id: str, body: ContactPartnerRequest, user:
             f'<div style="background:#f5f5f7;border-radius:8px;padding:16px;font-size:14px;'
             f'line-height:1.6;color:#1d1d1f;white-space:pre-wrap;">{body.message.strip()}</div>'
         ),
-        footer_note=f"Message envoyé par {sender_name} ({sender_email}) — répondez directement à cet email.",
+        footer_note=f"Message envoyé par {sender_name} ({sender_email}). Répondez directement à cet email.",
     )
     text = (
         f"À propos de votre consultant {consultant['name']}\n\n"
         f"{body.message.strip()}\n\n"
-        f"— {sender_name} ({sender_email}), Groupement-IT. Répondez directement à cet email."
+        f"{sender_name} ({sender_email}), Groupement-IT. Répondez directement à cet email."
     )
 
     ok, err = send_email(owner["email"], body.subject.strip(), html, text=text, reply_to=sender_email)

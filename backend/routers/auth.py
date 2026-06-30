@@ -113,13 +113,13 @@ def _parse_supabase_error(error_msg: str) -> tuple[int, str]:
         return 403, "Email non confirmé. Vérifiez votre boîte mail ou désactivez la confirmation email dans Supabase."
 
     if "invalid api key" in msg or "apikey" in msg:
-        return 500, "Clé API Supabase invalide — vérifiez SUPABASE_SERVICE_KEY dans votre .env."
+        return 500, "Clé API Supabase invalide : vérifiez SUPABASE_SERVICE_KEY dans votre .env."
 
     if "relation" in msg and "does not exist" in msg:
         return 500, "La table 'profiles' n'existe pas en base. Avez-vous exécuté supabase_schema.sql ?"
 
     if "violates foreign key" in msg:
-        return 500, "Erreur de contrainte base de données — l'utilisateur Auth n'a pas été créé avant le profil."
+        return 500, "Erreur de contrainte base de données : l'utilisateur Auth n'a pas été créé avant le profil."
 
     if "violates unique constraint" in msg:
         return 409, "Un compte existe déjà avec cet email."
@@ -347,7 +347,7 @@ async def login(body: LoginRequest):
     if not profile:
         raise HTTPException(
             status_code=404,
-            detail="Profil utilisateur introuvable. Votre compte est peut-être incomplet — réinscrivez-vous."
+            detail="Profil utilisateur introuvable. Votre compte est peut-être incomplet, réinscrivez-vous."
         )
 
     # Block suspended / disabled accounts (admin-managed status).

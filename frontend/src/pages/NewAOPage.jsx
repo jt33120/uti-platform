@@ -150,7 +150,7 @@ export default function NewAOPage() {
           <div>
             <h2 className="text-sm font-semibold text-white">Générer l'AO avec l'IA</h2>
             <p className="text-xs text-slate-400 mt-0.5 leading-relaxed">
-              Collez l'email reçu et/ou ajoutez la pièce jointe (PDF, DOCX, XLSX). L'IA pré-remplit le formulaire ci-dessous —
+              Collez l'email reçu et/ou ajoutez la pièce jointe (PDF, DOCX, XLSX). L'IA pré-remplit le formulaire ci-dessous,
               vous vérifiez et ajustez avant d'enregistrer.
             </p>
           </div>
@@ -195,7 +195,7 @@ export default function NewAOPage() {
         {aiError && <p className="text-xs text-red-400 mt-3">{aiError}</p>}
         {aiDone && !aiError && (
           <p className="text-xs text-emerald-400 mt-3 flex items-center gap-1.5">
-            <CheckCircle size={12} /> Champs pré-remplis — vérifiez et ajustez ci-dessous avant d'enregistrer.
+            <CheckCircle size={12} /> Champs pré-remplis : vérifiez et ajustez ci-dessous avant d'enregistrer.
           </p>
         )}
       </div>
@@ -219,7 +219,7 @@ export default function NewAOPage() {
                     value={form.client_id} onChange={set('client_id')} required
                     className="input appearance-none pr-9 text-base"
                   >
-                    <option value="" className="bg-navy-900">— Sélectionner un client —</option>
+                    <option value="" className="bg-navy-900">Sélectionner un client</option>
                     {clients.map(c => (
                       <option key={c.id} value={c.id} className="bg-navy-900">
                         {c.name}{c.sector ? ` · ${c.sector}` : ''}
@@ -230,7 +230,7 @@ export default function NewAOPage() {
                 </div>
                 {clients.length === 0 && (
                   <p className="text-[11px] text-amber-400 mt-1.5">
-                    Aucun client disponible — créez-en un d'abord depuis « Clients ».
+                    Aucun client disponible : créez-en un d'abord depuis « Clients ».
                   </p>
                 )}
               </div>
@@ -242,7 +242,7 @@ export default function NewAOPage() {
                     value={form.ao_type} onChange={set('ao_type')}
                     className="input appearance-none pr-9"
                   >
-                    <option value="" className="bg-navy-900">— Sélectionner un type —</option>
+                    <option value="" className="bg-navy-900">Sélectionner un type</option>
                     {AO_TYPES.map(t => (
                       <option key={t} value={t} className="bg-navy-900">{t}</option>
                     ))}
@@ -258,14 +258,14 @@ export default function NewAOPage() {
                   placeholder="ex: Marché Spécifique n°23915SA230MS"
                   value={form.reference} onChange={set('reference')}
                 />
-                <p className="text-[11px] text-slate-600 mt-1">Référence du marché / de la consultation — sert aussi à rechercher l'AO.</p>
+                <p className="text-[11px] text-slate-600 mt-1">Référence du marché / de la consultation. Sert aussi à rechercher l'AO.</p>
               </div>
 
               <div>
                 <label className="label">Titre de la mission *</label>
                 <input
                   type="text" className="input text-base" required
-                  placeholder="ex: Data Engineer Senior — Modernisation Data Platform"
+                  placeholder="ex: Data Engineer Senior - Modernisation Data Platform"
                   value={form.title} onChange={set('title')}
                 />
               </div>
@@ -324,7 +324,7 @@ export default function NewAOPage() {
                   <Target size={13} className="text-brand-400" /> Priorités de matching
                 </h2>
                 <p className="text-[11px] text-slate-600 mt-1">
-                  Notez l'importance de chaque critère — les poids s'équilibrent tout seuls.
+                  Notez l'importance de chaque critère : les poids s'équilibrent tout seuls.
                   {scoringTouched && aiDone ? ' Suggestion IA pré-remplie, ajustez si besoin.' : ''}
                 </p>
               </div>
@@ -375,7 +375,7 @@ export default function NewAOPage() {
                 <label className="label">Mode de travail</label>
                 <div className="relative">
                   <select className="input appearance-none pr-9" value={form.work_mode} onChange={set('work_mode')}>
-                    <option value="" className="bg-navy-900">— Non précisé —</option>
+                    <option value="" className="bg-navy-900">Non précisé</option>
                     <option value="onsite" className="bg-navy-900">Sur site</option>
                     <option value="hybrid" className="bg-navy-900">Hybride</option>
                     <option value="remote" className="bg-navy-900">Remote</option>

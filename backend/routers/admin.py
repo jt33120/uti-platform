@@ -202,7 +202,7 @@ async def update_account(account_id: str, body: AccountUpdate, user: dict = Depe
         profile_update.pop("org", None)
         profile_update.pop("status", None)
         if not profile_update:
-            raise HTTPException(status_code=500, detail="Colonnes org/status absentes — migration requise.")
+            raise HTTPException(status_code=500, detail="Colonnes org/status absentes : migration requise.")
         updated = supabase.table("profiles").update(profile_update).eq("id", account_id).execute()
 
     if not updated.data:

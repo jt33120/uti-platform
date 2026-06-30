@@ -125,7 +125,7 @@ function AOEditModal({ ao, onClose, onSaved }) {
               <label className="label">Client *</label>
               <div className="relative">
                 <select className="input appearance-none pr-9" value={form.client_id} onChange={set('client_id')} required>
-                  <option value="" className="bg-navy-900">— Choisir un client —</option>
+                  <option value="" className="bg-navy-900">Choisir un client</option>
                   {clients.map(c => <option key={c.id} value={c.id} className="bg-navy-900">{c.name}</option>)}
                 </select>
                 <ChevronDown size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
@@ -271,7 +271,7 @@ function AOCard({ ao, isStaff, onEdit, onDelete, navigate, selected, onToggleSel
         </div>
       </div>
 
-      {/* Échéance — mise en évidence (date + temps restant) */}
+      {/* Échéance : mise en évidence (date + temps restant) */}
       {(() => {
         const dl = deadlineMeta(ao.deadline)
         if (!dl) return null
@@ -483,11 +483,11 @@ export default function AOSPage() {
             Appels d'Offres
             <span className="text-sm font-normal text-slate-500">({aos.length})</span>
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {isStaff
-              ? 'Cliquez sur un AO — le matching IA se lance automatiquement'
-              : 'Cliquez sur un AO pour proposer un consultant'}
-          </p>
+          {!isStaff && (
+            <p className="text-sm text-slate-500 mt-0.5">
+              Cliquez sur un AO pour proposer un consultant
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {isStaff && selected.size > 0 && (

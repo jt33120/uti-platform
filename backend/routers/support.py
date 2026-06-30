@@ -59,7 +59,7 @@ def _send_support_email(
     )
     return send_email(
         settings.admin_email,
-        f"[Support] {type_label} — {subject}",
+        f"[Support] {type_label} : {subject}",
         html,
         text=text,
         reply_to=from_email,
