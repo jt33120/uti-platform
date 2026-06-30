@@ -44,7 +44,7 @@ export function MentionsLegales() {
       <p>Contact : via le formulaire de contact disponible sur la plateforme.</p>
 
       <H>Délégué à la protection des données (DPO)</H>
-      <p>Sullyvan BIJON — sullyvan.bijon@uti-group.com.</p>
+      <p>UTI Group - RGPD — DPO.GROUPE@uti-group.com.</p>
 
       <H>Hébergement</H>
       <p>
@@ -71,7 +71,7 @@ export function Confidentialite() {
       </p>
 
       <H>Responsable de traitement</H>
-      <p>UTI GROUP SA — 68 rue de Villiers, 92300 Levallois-Perret Cedex. DPO : Sullyvan BIJON — sullyvan.bijon@uti-group.com.</p>
+      <p>UTI GROUP SA — 68 rue de Villiers, 92300 Levallois-Perret Cedex. DPO : UTI Group - RGPD — DPO.GROUPE@uti-group.com.</p>
 
       <H>Données traitées & finalités</H>
       <ul className="list-disc pl-5 space-y-1">
@@ -116,7 +116,7 @@ export function Confidentialite() {
         Vous disposez des droits d'accès, de rectification, d'effacement,
         d'opposition, de limitation et de portabilité, ainsi que du droit à une
         intervention humaine sur les décisions assistées par IA. Pour les exercer :
-        sullyvan.bijon@uti-group.com. Vous pouvez introduire une réclamation auprès de
+        DPO.GROUPE@uti-group.com. Vous pouvez introduire une réclamation auprès de
         la CNIL (www.cnil.fr).
       </p>
 

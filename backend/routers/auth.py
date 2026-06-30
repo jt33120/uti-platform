@@ -16,7 +16,9 @@ router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
 
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_HOURS = 24 * 7  # 7 days
+# Déconnexion automatique après 3 h d'utilisation (durée de vie du jeton de
+# session). Le front applique en plus une coupure côté client (minuteur).
+ACCESS_TOKEN_EXPIRE_HOURS = 3
 
 
 class RegisterRequest(BaseModel):
