@@ -30,8 +30,7 @@ const CartePage = lazy(() => import('./pages/CartePage'))
 const AdminPage = lazy(() => import('./pages/AdminPage'))
 const TicketsPage = lazy(() => import('./pages/TicketsPage'))
 const ScoringSettingsPage = lazy(() => import('./pages/ScoringSettingsPage'))
-const EmailTemplatesPage = lazy(() => import('./pages/EmailTemplatesPage'))
-const NotificationsPage = lazy(() => import('./pages/NotificationsPage'))
+const EmailsPage = lazy(() => import('./pages/EmailsPage'))
 
 // roles: array of allowed roles; omitted = any authenticated user.
 function ProtectedRoute({ children, roles = null }) {
@@ -95,13 +94,15 @@ export default function App() {
             </ProtectedRoute>
           } />
           <Route path="/pacs" element={<ProtectedRoute roles={ADMIN}><PacsPage /></ProtectedRoute>} />
-          <Route path="/notifications" element={
+          <Route path="/emails" element={
             <ProtectedRoute roles={STAFF}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
-                <NotificationsPage />
+                <EmailsPage />
               </Suspense>
             </ProtectedRoute>
           } />
+          {/* Anciennes routes -> page Emails unifiée (préserve favoris & liens) */}
+          <Route path="/notifications" element={<Navigate to="/emails?tab=journal" replace />} />
           <Route path="/admin/scoring" element={
             <ProtectedRoute roles={ADMIN}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
@@ -109,13 +110,7 @@ export default function App() {
               </Suspense>
             </ProtectedRoute>
           } />
-          <Route path="/admin/email-templates" element={
-            <ProtectedRoute roles={ADMIN}>
-              <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>
-                <EmailTemplatesPage />
-              </Suspense>
-            </ProtectedRoute>
-          } />
+          <Route path="/admin/email-templates" element={<Navigate to="/emails?tab=modeles" replace />} />
           <Route path="/admin" element={
             <ProtectedRoute roles={ADMIN}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>

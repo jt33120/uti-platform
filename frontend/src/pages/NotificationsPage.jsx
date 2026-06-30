@@ -1,16 +1,14 @@
 import { useState, useEffect } from 'react'
 import api from '../lib/api'
-import { useAuth } from '../contexts/AuthContext'
-import NotificationSettings from '../components/NotificationSettings'
-import { Bell, RefreshCw, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { RefreshCw, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
 const KIND_LABEL = { list_1: 'Liste 1', list_2: 'Liste 2', relance: 'Relance', manual: 'Renvoi ciblé' }
 const fmt = (iso) => iso
   ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
   : '—'
 
-export default function NotificationsPage() {
-  const { isAdmin } = useAuth()
+// Panneau « Journal des envois » — réutilisé par la page Emails (onglet Journal).
+export function EmailLogPanel() {
   const [logs, setLogs] = useState(null)
   const [error, setError] = useState('')
   const [refreshing, setRefreshing] = useState(false)
@@ -25,27 +23,15 @@ export default function NotificationsPage() {
   useEffect(load, [])
 
   return (
-    <div className="animate-slide-up">
-      <div className="page-header">
-        <div>
-          <h1 className="section-title flex items-center gap-2">
-            <Bell size={20} strokeWidth={1.75} style={{ color: 'var(--accent-text)' }} />
-            Journal des emails
-          </h1>
-          <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-            Journal des emails envoyés aux partenaires (ouverture d'AO, relances, renvois ciblés).
-          </p>
-        </div>
-        <button onClick={load} disabled={refreshing} className="btn-ghost">
+    <div>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
+          Journal des emails envoyés aux partenaires (ouverture d'AO, relances, renvois ciblés).
+        </p>
+        <button onClick={load} disabled={refreshing} className="btn-ghost shrink-0">
           {refreshing ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />} Rafraîchir
         </button>
       </div>
-
-      {isAdmin && (
-        <div className="mb-8">
-          <NotificationSettings />
-        </div>
-      )}
 
       <h2 className="text-[11px] uppercase tracking-[0.08em] font-semibold mb-3" style={{ color: 'var(--text-faint)' }}>
         Derniers envois {logs ? `(${logs.length})` : ''}

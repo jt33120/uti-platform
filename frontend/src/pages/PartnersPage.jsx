@@ -2,9 +2,9 @@ import { useEffect, useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import {
-  Users, Search, Pencil, Trash2, X, Loader2, AlertCircle,
+  Users, Search, Pencil, X, Loader2, AlertCircle,
   ShieldOff, Star, ListChecks, UserPlus, Ban, CalendarDays,
-  Settings2,
+  Settings2, SlidersHorizontal, ChevronRight, RotateCcw,
 } from 'lucide-react'
 import clsx from 'clsx'
 import { useAuth } from '../contexts/AuthContext'
@@ -108,6 +108,13 @@ function AccessSummary({ summary }) {
   )
 }
 
+const SORTS = [
+  { k: 'name', l: 'Alphabétique' },
+  { k: 'recent', l: 'Plus récents' },
+]
+
+const EMPTY_FILTERS = { access: 'all', account: 'all' }
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 export default function PartnersPage() {
   const { isAdmin } = useAuth() // commerce: même vue, lecture seule
@@ -122,6 +129,9 @@ export default function PartnersPage() {
   const [inviteOpen, setInviteOpen] = useState(false)
   const [deleting, setDeleting] = useState(null)
   const [suspending, setSuspending] = useState(null)
+  const [advanced, setAdvanced] = useState(false)
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [sort, setSort] = useState('name')
 
   const fetchAll = async () => {
     setLoading(true)
@@ -142,12 +152,6 @@ export default function PartnersPage() {
 
   useEffect(() => { fetchAll() }, [])
 
-  const filtered = useMemo(() =>
-    partners.filter(p =>
-      p.name.toLowerCase().includes(search.toLowerCase()) ||
-      p.email.toLowerCase().includes(search.toLowerCase())
-    ), [partners, search])
-
   const getAccessSummary = (partnerId) => {
     const rows = access.filter(r => r.partner_id === partnerId)
     return {
@@ -157,6 +161,35 @@ export default function PartnersPage() {
       suspended: rows.filter(r => r.tier === 'suspended').length,
     }
   }
+
+  const isAccountBlocked = (p) => p.status && p.status !== 'active'
+
+  const filtered = useMemo(() => {
+    const q = search.toLowerCase()
+    const out = partners.filter(p => {
+      if (q && !(p.name.toLowerCase().includes(q) || p.email.toLowerCase().includes(q))) return false
+      if (filters.account !== 'all') {
+        const blocked = isAccountBlocked(p)
+        if (filters.account === 'blocked' && !blocked) return false
+        if (filters.account === 'active' && blocked) return false
+      }
+      if (filters.access !== 'all') {
+        const s = getAccessSummary(p.id)
+        if (filters.access === 'none' && s.total !== 0) return false
+        if (filters.access === 'list_1' && s.list_1 === 0) return false
+        if (filters.access === 'list_2' && s.list_2 === 0) return false
+        if (filters.access === 'suspended' && s.suspended === 0) return false
+      }
+      return true
+    })
+    out.sort((a, b) => {
+      if (sort === 'recent') return new Date(b.created_at) - new Date(a.created_at)
+      return a.name.localeCompare(b.name)
+    })
+    return out
+  }, [partners, access, search, filters, sort])
+
+  const activeFilterCount = (filters.access !== 'all' ? 1 : 0) + (filters.account !== 'all' ? 1 : 0)
 
   const handleDelete = async (partner) => {
     if (!(await confirm({
@@ -178,7 +211,7 @@ export default function PartnersPage() {
   const handleSuspend = async (partner) => {
     if (!(await confirm({
       title: "Suspendre l'accès de ce partenaire ?",
-      message: `L'accès de « ${partner.name} » sera suspendu sur tous les clients qui lui sont attribués. (Ceci ne bloque pas la connexion — pour cela, suspendez le compte depuis Admin → Comptes.)`,
+      message: `L'accès de « ${partner.name} » sera suspendu sur tous les clients qui lui sont attribués. (Ceci ne bloque pas la connexion : pour cela, suspendez le compte depuis Admin → Comptes.)`,
       confirmLabel: "Suspendre l'accès",
     }))) return
     setSuspending(partner.id)
@@ -194,7 +227,7 @@ export default function PartnersPage() {
 
   // ── Stat counters ─────────────────────────────────────────────────────────
   const totalSuspended = partners.filter(p => {
-    if (p.status && p.status !== 'active') return true  // compte bloqué
+    if (isAccountBlocked(p)) return true               // compte bloqué
     const s = getAccessSummary(p.id)
     return s.total > 0 && s.suspended === s.total       // ou accès suspendu partout
   }).length
@@ -224,6 +257,8 @@ export default function PartnersPage() {
     )
   }
 
+  const setF = (k) => (e) => setFilters(p => ({ ...p, [k]: e.target.value }))
+
   return (
     <div className="animate-slide-up">
       {/* Header */}
@@ -232,6 +267,7 @@ export default function PartnersPage() {
           <h1 className="section-title flex items-center gap-2">
             <Users size={20} className="text-brand-400" />
             Partenaires
+            <span className="text-sm font-normal text-slate-500">({partners.length})</span>
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
             {partners.length} inscrit{partners.length !== 1 ? 's' : ''}
@@ -270,132 +306,225 @@ export default function PartnersPage() {
         </div>
       )}
 
-      {/* Search */}
+      {/* Barre d'outils : recherche + recherche avancée + tri (mêmes codes que le Vivier) */}
       {partners.length > 0 && (
-        <div className="relative mb-4">
-          <Search size={13} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
-          <input
-            className="input pl-8 text-sm"
-            placeholder="Rechercher par nom ou email…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-          />
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          <div className="relative flex-1 min-w-[220px]">
+            <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 pointer-events-none" />
+            <input
+              className="input pl-9"
+              placeholder="Rechercher par nom ou email…"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+            />
+          </div>
+          <button
+            onClick={() => setAdvanced(v => !v)}
+            className={clsx('btn-ghost gap-1.5 text-sm', advanced && 'text-[var(--accent-text)]')}
+            style={advanced ? { background: 'var(--accent-soft)' } : undefined}
+            title="Filtres avancés"
+          >
+            <SlidersHorizontal size={14} /> Recherche avancée
+            {activeFilterCount > 0 && (
+              <span className="ml-0.5 inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full text-[10px] font-semibold"
+                    style={{ background: 'var(--accent)', color: '#fff' }}>
+                {activeFilterCount}
+              </span>
+            )}
+          </button>
+          <div className="relative">
+            <select
+              value={sort}
+              onChange={e => setSort(e.target.value)}
+              className="input appearance-none pr-8 text-sm h-9 py-0"
+              title="Trier"
+            >
+              {SORTS.map(s => <option key={s.k} value={s.k} className="bg-navy-900">{s.l}</option>)}
+            </select>
+          </div>
         </div>
       )}
 
-      {/* Empty state */}
-      {filtered.length === 0 ? (
-        <div className="card p-10 text-center">
-          <Users size={30} className="mx-auto text-slate-700 mb-3" />
-          <p className="text-slate-400 text-sm">
-            {search
-              ? 'Aucun résultat pour cette recherche.'
-              : 'Aucun partenaire inscrit. Utilisez le bouton « Inviter » pour en ajouter.'}
-          </p>
-        </div>
-      ) : (
-        <div className="space-y-2">
-          {filtered.map(partner => {
-            const summary = getAccessSummary(partner.id)
-            const isSuspendedEverywhere = summary.total > 0 && summary.suspended === summary.total
-            // Statut du COMPTE (bloque la connexion) — prioritaire sur l'accès par client.
-            const accountBlocked = partner.status && partner.status !== 'active'
-            const accountLabel = partner.status === 'disabled' ? 'Compte désactivé' : 'Compte suspendu'
+      <div className="flex gap-5 items-start">
+        {/* Filtres avancés (panneau gauche) */}
+        {advanced && partners.length > 0 && (
+          <aside className="w-60 shrink-0 card p-4 space-y-4 hidden md:block">
+            <div className="flex items-center justify-between">
+              <h2 className="text-xs font-semibold uppercase tracking-wide flex items-center gap-1.5" style={{ color: 'var(--text-faint)' }}>
+                <SlidersHorizontal size={13} /> Filtres
+              </h2>
+              {activeFilterCount > 0 && (
+                <button onClick={() => setFilters(EMPTY_FILTERS)}
+                        className="text-[11px] inline-flex items-center gap-1 text-slate-500 hover:text-slate-300">
+                  <RotateCcw size={11} /> Réinitialiser
+                </button>
+              )}
+            </div>
 
-            return (
-              <div
-                key={partner.id}
-                onClick={() => navigate(`/partners/${partner.id}`)}
-                className={clsx(
-                  'card p-4 flex items-center gap-4 hover:border-white/10 transition-all duration-150 cursor-pointer',
-                  (isSuspendedEverywhere || accountBlocked) && 'border-red-500/20 opacity-80'
-                )}
-              >
-                {/* Avatar */}
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-brand-500/40 to-emerald-500/40 border border-white/10 flex items-center justify-center text-sm font-bold text-white shrink-0">
-                  {partner.name?.charAt(0).toUpperCase() || '?'}
-                </div>
-
-                {/* Info */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-semibold text-white">{partner.name}</span>
-                    {accountBlocked && (
-                      <span className="badge bg-red-500/15 text-red-400 border border-red-500/30 text-[10px] flex items-center gap-1" title="Le compte est bloqué : ce partenaire ne peut pas se connecter, quels que soient ses accès clients.">
-                        <ShieldOff size={9} /> {accountLabel}
-                      </span>
-                    )}
-                    {isSuspendedEverywhere && (
-                      <span className="badge bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] flex items-center gap-1" title="Accès suspendu sur tous les clients qui lui sont attribués.">
-                        <ShieldOff size={9} /> Accès suspendu{summary.total ? ` (${summary.total})` : ''}
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-xs text-slate-500 mt-0.5">{partner.email}</p>
-                  <div className="mt-1.5">
-                    <AccessSummary summary={summary} />
-                  </div>
-                </div>
-
-                {/* Date */}
-                <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-600 shrink-0">
-                  <CalendarDays size={10} />
-                  {new Date(partner.created_at).toLocaleDateString('fr-FR')}
-                </div>
-
-                {/* Actions */}
-                <div className="flex items-center gap-1 shrink-0" onClick={e => e.stopPropagation()}>
-                  {/* Manage clients */}
-                  <button
-                    onClick={() => navigate(`/partners/${partner.id}`)}
-                    className="btn-ghost p-2 text-slate-400 hover:text-brand-300 transition-colors"
-                    title={isAdmin ? 'Gérer les clients de ce partenaire' : 'Voir les clients de ce partenaire'}
-                  >
-                    <Settings2 size={13} />
+            <div>
+              <label className="label">Accès clients</label>
+              <div className="flex flex-col gap-1">
+                {[
+                  { v: 'all', l: 'Tous' },
+                  { v: 'list_1', l: 'Liste 1' },
+                  { v: 'list_2', l: 'Liste 2' },
+                  { v: 'suspended', l: 'Accès suspendu' },
+                  { v: 'none', l: 'Sans accès' },
+                ].map(o => (
+                  <button key={o.v} onClick={() => setFilters(p => ({ ...p, access: o.v }))}
+                    className={clsx('text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-all',
+                      filters.access === o.v ? 'seg-active' : 'text-slate-400 hover:text-slate-200 bg-white/5')}>
+                    {o.l}
                   </button>
-
-                  {/* Write actions — admin only; commerce keeps the same view read-only */}
-                  {isAdmin && summary.total > 0 && !isSuspendedEverywhere && (
-                    <button
-                      onClick={() => handleSuspend(partner)}
-                      disabled={suspending === partner.id}
-                      className="btn-ghost p-2 text-slate-400 hover:text-red-400 transition-colors"
-                      title="Suspendre l'accès à tous ses clients (ne bloque pas la connexion)"
-                    >
-                      {suspending === partner.id
-                        ? <Loader2 size={13} className="animate-spin" />
-                        : <ShieldOff size={13} />}
-                    </button>
-                  )}
-
-                  {isAdmin && (
-                    <button
-                      onClick={() => setEditPartner(partner)}
-                      className="btn-ghost p-2"
-                      title="Modifier"
-                    >
-                      <Pencil size={13} />
-                    </button>
-                  )}
-
-                  {isAdmin && (
-                    <button
-                      onClick={() => handleDelete(partner)}
-                      disabled={deleting === partner.id}
-                      className="btn-ghost p-2 hover:text-red-400 transition-colors"
-                      title="Supprimer définitivement"
-                    >
-                      {deleting === partner.id
-                        ? <Loader2 size={13} className="animate-spin" />
-                        : <X size={13} />}
-                    </button>
-                  )}
-                </div>
+                ))}
               </div>
-            )
-          })}
+            </div>
+
+            <div>
+              <label className="label">Statut du compte</label>
+              <div className="flex flex-col gap-1">
+                {[
+                  { v: 'all', l: 'Tous' },
+                  { v: 'active', l: 'Actif' },
+                  { v: 'blocked', l: 'Bloqué' },
+                ].map(o => (
+                  <button key={o.v} onClick={() => setFilters(p => ({ ...p, account: o.v }))}
+                    className={clsx('text-left px-2.5 py-1.5 rounded-md text-xs font-medium transition-all',
+                      filters.account === o.v ? 'seg-active' : 'text-slate-400 hover:text-slate-200 bg-white/5')}>
+                    {o.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </aside>
+        )}
+
+        {/* Liste */}
+        <div className="flex-1 min-w-0">
+          {filtered.length === 0 ? (
+            <div className="card p-10 text-center">
+              <Users size={30} className="mx-auto text-slate-700 mb-3" />
+              <p className="text-slate-400 text-sm">
+                {search || activeFilterCount
+                  ? 'Aucun résultat pour cette recherche.'
+                  : 'Aucun partenaire inscrit. Utilisez le bouton « Inviter » pour en ajouter.'}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="text-[11px] mb-2 px-1" style={{ color: 'var(--text-faint)' }}>
+                {filtered.length} partenaire{filtered.length > 1 ? 's' : ''}
+              </div>
+              <div className="space-y-2">
+                {filtered.map(partner => {
+                  const summary = getAccessSummary(partner.id)
+                  const isSuspendedEverywhere = summary.total > 0 && summary.suspended === summary.total
+                  // Statut du COMPTE (bloque la connexion) : prioritaire sur l'accès par client.
+                  const accountBlocked = isAccountBlocked(partner)
+                  const accountLabel = partner.status === 'disabled' ? 'Compte désactivé' : 'Compte suspendu'
+
+                  return (
+                    <div
+                      key={partner.id}
+                      role="button"
+                      tabIndex={0}
+                      onClick={() => navigate(`/partners/${partner.id}`)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') navigate(`/partners/${partner.id}`) }}
+                      className={clsx(
+                        'card group flex items-center gap-3 sm:gap-4 px-3 sm:px-4 py-3 cursor-pointer hover:border-white/10 transition-all',
+                        (isSuspendedEverywhere || accountBlocked) && 'border-red-500/20 opacity-80'
+                      )}
+                    >
+                      {/* Avatar (style unifié avec le Vivier) */}
+                      <div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold shrink-0"
+                           style={{ background: 'var(--accent-soft)', color: 'var(--accent-text)' }}>
+                        {partner.name?.charAt(0).toUpperCase() || '?'}
+                      </div>
+
+                      {/* Info */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="text-sm font-semibold text-white">{partner.name}</span>
+                          {accountBlocked && (
+                            <span className="badge bg-red-500/15 text-red-400 border border-red-500/30 text-[10px] flex items-center gap-1" title="Le compte est bloqué : ce partenaire ne peut pas se connecter, quels que soient ses accès clients.">
+                              <ShieldOff size={9} /> {accountLabel}
+                            </span>
+                          )}
+                          {isSuspendedEverywhere && (
+                            <span className="badge bg-red-500/10 text-red-400 border border-red-500/20 text-[10px] flex items-center gap-1" title="Accès suspendu sur tous les clients qui lui sont attribués.">
+                              <ShieldOff size={9} /> Accès suspendu{summary.total ? ` (${summary.total})` : ''}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-slate-500 mt-0.5 truncate">{partner.email}</p>
+                        <div className="mt-1.5">
+                          <AccessSummary summary={summary} />
+                        </div>
+                      </div>
+
+                      {/* Date */}
+                      <div className="hidden sm:flex items-center gap-1 text-[10px] text-slate-600 shrink-0">
+                        <CalendarDays size={10} />
+                        {new Date(partner.created_at).toLocaleDateString('fr-FR')}
+                      </div>
+
+                      {/* Actions */}
+                      <div className="flex items-center gap-0.5 shrink-0" onClick={e => e.stopPropagation()}>
+                        <button
+                          onClick={() => navigate(`/partners/${partner.id}`)}
+                          className="p-1.5 rounded text-[var(--text-faint)] hover:text-[var(--accent-text)] transition-colors"
+                          title={isAdmin ? 'Gérer les clients de ce partenaire' : 'Voir les clients de ce partenaire'}
+                        >
+                          <Settings2 size={15} strokeWidth={1.75} />
+                        </button>
+
+                        {/* Write actions : admin only ; commerce garde la même vue en lecture seule */}
+                        {isAdmin && summary.total > 0 && !isSuspendedEverywhere && (
+                          <button
+                            onClick={() => handleSuspend(partner)}
+                            disabled={suspending === partner.id}
+                            className="p-1.5 rounded text-[var(--text-faint)] hover:text-red-400 transition-colors"
+                            title="Suspendre l'accès à tous ses clients (ne bloque pas la connexion)"
+                          >
+                            {suspending === partner.id
+                              ? <Loader2 size={15} className="animate-spin" />
+                              : <ShieldOff size={15} strokeWidth={1.75} />}
+                          </button>
+                        )}
+
+                        {isAdmin && (
+                          <button
+                            onClick={() => setEditPartner(partner)}
+                            className="p-1.5 rounded text-[var(--text-faint)] hover:text-[var(--accent-text)] transition-colors"
+                            title="Modifier"
+                          >
+                            <Pencil size={15} strokeWidth={1.75} />
+                          </button>
+                        )}
+
+                        {isAdmin && (
+                          <button
+                            onClick={() => handleDelete(partner)}
+                            disabled={deleting === partner.id}
+                            className="p-1.5 rounded text-[var(--text-faint)] hover:text-red-400 transition-colors opacity-0 group-hover:opacity-100"
+                            title="Supprimer définitivement"
+                          >
+                            {deleting === partner.id
+                              ? <Loader2 size={15} className="animate-spin" />
+                              : <X size={15} />}
+                          </button>
+                        )}
+
+                        <ChevronRight size={16} className="text-[var(--text-faint)] group-hover:text-[var(--accent-text)] transition-colors" />
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </div>
-      )}
+      </div>
 
       {/* Modals */}
       {editPartner && (

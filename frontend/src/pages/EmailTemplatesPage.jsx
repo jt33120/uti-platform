@@ -225,7 +225,8 @@ function TemplateCard({ tpl, onSaved }) {
   )
 }
 
-export default function EmailTemplatesPage() {
+// Panneau « Modèles » — réutilisé par la page Emails (onglet Modèles).
+export function EmailTemplatesPanel() {
   const [templates, setTemplates] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -239,16 +240,11 @@ export default function EmailTemplatesPage() {
   useEffect(load, [])
 
   return (
-    <div className="animate-slide-up w-full">
-      <div className="mb-5">
-        <h1 className="text-xl font-bold text-white flex items-center gap-2">
-          <Mail size={20} className="text-brand-400" /> Templates Mails
-        </h1>
-        <p className="text-sm text-slate-400 mt-1">
-          Éditeur visuel complet : mise en forme, couleurs, images, boutons…
-          Les variables entre accolades sont remplacées automatiquement à l'envoi.
-        </p>
-      </div>
+    <div className="w-full">
+      <p className="text-sm text-slate-400 mb-5">
+        Éditeur visuel complet : mise en forme, couleurs, images, boutons…
+        Les variables entre accolades sont remplacées automatiquement à l'envoi.
+      </p>
 
       {loading ? (
         <div className="flex items-center justify-center h-40">
