@@ -36,6 +36,26 @@ const daysUntil = (iso) => {
 }
 import clsx from 'clsx'
 
+// Cache de session des résultats de matching, par AO. Évite de relancer un
+// scoring LLM (15-30 s) à CHAQUE visite de la page quand la persistance serveur
+// est indisponible (table matchings non peuplée). TTL court ; invalidé dès qu'un
+// CV est ajouté ou l'AO modifié.
+const MATCH_CACHE_TTL = 30 * 60 * 1000
+const matchCacheKey = (aoId) => `uti_match_${aoId}`
+const readMatchCache = (aoId) => {
+  try {
+    const { ts, results } = JSON.parse(sessionStorage.getItem(matchCacheKey(aoId)) || 'null') || {}
+    if (!results?.length || Date.now() - ts > MATCH_CACHE_TTL) return null
+    return results
+  } catch { return null }
+}
+const writeMatchCache = (aoId, results) => {
+  try {
+    if (results?.length) sessionStorage.setItem(matchCacheKey(aoId), JSON.stringify({ ts: Date.now(), results }))
+  } catch { /* quota indisponible : non bloquant */ }
+}
+const clearMatchCache = (aoId) => { try { sessionStorage.removeItem(matchCacheKey(aoId)) } catch { /* noop */ } }
+
 // ─── Score visuals (same as before) ─────────────────────────────
 function ScoreRing({ score, size = 80 }) {
   const radius = (size / 2) - 8
@@ -49,9 +69,9 @@ function ScoreRing({ score, size = 80 }) {
       <circle cx={size/2} cy={size/2} r={radius} fill="none" stroke={color} strokeWidth={6}
         strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={offset}
         style={{ transition: 'stroke-dashoffset 1s ease-out' }} />
-      <text x={size/2} y={size/2} dominantBaseline="middle" textAnchor="middle"
-        className="fill-white font-bold text-base rotate-90"
-        style={{ transform: `rotate(90deg)`, transformOrigin: `${size/2}px ${size/2}px`, fontSize: size < 70 ? '13px' : '16px' }}>
+      <text x={size/2} y={size/2} dominantBaseline="central" textAnchor="middle"
+        fill={color}
+        style={{ transform: `rotate(90deg)`, transformOrigin: `${size/2}px ${size/2}px`, fontSize: size < 70 ? '18px' : '22px', fontWeight: 800 }}>
         {score}
       </text>
     </svg>
@@ -95,9 +115,10 @@ const SCORE_CATS = [
   { label: 'Compatibilité TJM', short: 'TJM', det: 'compatibilite_tjm', llm: 'tjm', wKey: 'w_tjm', dflt: 20 },
 ]
 
-// Radar — score hybride par critère (une seule série, normalisée en %),
-// avec le score hybride global affiché au centre.
-function ScoreRadar({ breakdown, hybridBreakdown, weights, score }) {
+// Radar — score hybride par critère (une seule série, normalisée en %).
+// Le score global n'est PAS répété au centre : il est affiché dans l'anneau
+// (ScoreRing) en tête de carte.
+function ScoreRadar({ breakdown, hybridBreakdown, weights }) {
   const data = SCORE_CATS.map(c => {
     const max = (weights && weights[c.wKey]) || c.dflt || 1
     // Priorité : hybrid > det (si pas encore de résultat hybride stocké)
@@ -107,20 +128,12 @@ function ScoreRadar({ breakdown, hybridBreakdown, weights, score }) {
   return (
     <div className="relative">
       <ResponsiveContainer width="100%" height={220}>
-        <RadarChart data={data} outerRadius="68%">
-          <PolarGrid stroke="rgba(255,255,255,0.12)" />
+        <RadarChart data={data} outerRadius="72%">
+          <PolarGrid stroke="rgba(120,120,140,0.20)" />
           <PolarAngleAxis dataKey="axis" tick={{ fill: 'var(--text-muted)', fontSize: 11 }} />
           <Radar dataKey="score" stroke="#6366f1" fill="#6366f1" fillOpacity={0.30} />
         </RadarChart>
       </ResponsiveContainer>
-      {score != null && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="flex flex-col items-center justify-center w-14 h-14 rounded-full bg-navy-900/80 backdrop-blur-sm border border-indigo-400/30">
-            <span className="text-xl font-bold text-indigo-300 leading-none tabular">{score}</span>
-            <span className="text-[8px] text-slate-500 uppercase tracking-wide mt-0.5">/100</span>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
@@ -331,7 +344,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact, expanded: expan
             {/* Radar : forme du profil — grille vs IA */}
             <div>
               <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Profil du candidat</p>
-              <ScoreRadar breakdown={bd} hybridBreakdown={hbd} weights={weights} score={headlineScore} />
+              <ScoreRadar breakdown={bd} hybridBreakdown={hbd} weights={weights} />
             </div>
             {/* Auto-justification rédigée par l'IA */}
             <div>
@@ -1316,6 +1329,7 @@ export default function AODetailPage() {
         if (data.results?.length) results = data.results
       } catch { /* relecture indisponible : on garde les résultats du run */ }
       setMatchResults(results)
+      writeMatchCache(id, results)
       if (results.length === 0) {
         setMatchError(
           "Le scoring n'a renvoyé aucun profil. Les CV soumis n'ont peut-être pas "
@@ -1418,15 +1432,21 @@ export default function AODetailPage() {
         if (isAdmin && subs.length > 0) {
           setLoading(false)
 
-          // CACHE-FIRST : on réutilise toujours le scoring stocké (pas d'appels
-          // LLM à chaque ouverture). Le serveur re-score déjà tout seul à chaque
-          // nouvelle soumission (auto_rescore_ao) ; pour le reste (modifs d'AO,
-          // ajustement de la grille…), le bouton « Relancer » est là.
+          // CACHE-FIRST : on réutilise toujours le scoring déjà calculé (aucun
+          // appel LLM à chaque ouverture). 1) cache de session (évite le re-scoring
+          // à chaque visite si la persistance serveur est indisponible) ; 2) cache
+          // serveur ; 3) à défaut seulement, premier scoring. « Relancer » force.
+          const sessionCached = readMatchCache(id)
+          if (sessionCached) {
+            setMatchResults(sessionCached)
+            return
+          }
           try {
             const cached = await api.get(`/matching/results/${id}`)
             const cachedResults = cached.data.results || []
             if (cachedResults.length) {
               setMatchResults(cachedResults)
+              writeMatchCache(id, cachedResults)
               return
             }
           } catch { /* pas de cache : on score pour la première fois ci-dessous */ }
@@ -1485,6 +1505,7 @@ export default function AODetailPage() {
     }))) return
     await api.delete(`/submissions/${sid}`)
     setSubmissions(p => p.filter(s => s.id !== sid))
+    clearMatchCache(id)  // le classement en cache n'est plus à jour
   }
 
   const handleSubmissionSuccess = async () => {
@@ -1884,7 +1905,9 @@ export default function AODetailPage() {
             setShowEditModal(false)
             await fetchAo()
             // Une modif d'AO (compétences, priorités, budget…) peut changer les
-            // scores → on re-score, mais SEULEMENT ici, pas à chaque ouverture.
+            // scores → on invalide le cache et on re-score, mais SEULEMENT ici,
+            // pas à chaque ouverture.
+            clearMatchCache(id)
             if (isAdmin && submissions.length > 0) await runMatching()
           }}
         />
