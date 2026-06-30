@@ -39,6 +39,25 @@ export default function NewAOPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const [aiDone, setAiDone] = useState(false)
+  const [dragOver, setDragOver] = useState(false)
+
+  // Formats acceptés pour la source (cohérent avec l'input fichier et le backend).
+  const ACCEPTED_EXT = ['.pdf', '.docx', '.xlsx', '.txt', '.csv']
+  const addFiles = (fileList) => {
+    const incoming = Array.from(fileList || []).filter(f =>
+      ACCEPTED_EXT.some(ext => f.name.toLowerCase().endsWith(ext))
+    )
+    if (incoming.length === 0) {
+      setAiError('Format non pris en charge. Acceptés : PDF, DOCX, XLSX, TXT, CSV.')
+      return
+    }
+    setAiFiles(prev => [...prev, ...incoming])
+  }
+  const onDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    if (e.dataTransfer?.files?.length) addFiles(e.dataTransfer.files)
+  }
 
   const generateFromSource = async () => {
     setAiError(''); setAiDone(false)
@@ -151,7 +170,11 @@ export default function NewAOPage() {
       </div>
 
       {/* AI generation step — paste an email / drop attachments → pre-fill the form */}
-      <div className="card p-6 mb-6 border border-violet-500/20 bg-gradient-to-br from-violet-500/[0.08] to-brand-500/[0.04]">
+      <div
+        onDragOver={e => { e.preventDefault(); setDragOver(true) }}
+        onDragLeave={e => { e.preventDefault(); setDragOver(false) }}
+        onDrop={onDrop}
+        className={`card p-6 mb-6 border bg-gradient-to-br from-violet-500/[0.08] to-brand-500/[0.04] transition-colors ${dragOver ? 'border-violet-400 ring-2 ring-violet-400/40' : 'border-violet-500/20'}`}>
         <div className="flex items-start gap-3 mb-4">
           <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-violet-500/30 to-brand-500/30 border border-violet-400/20 flex items-center justify-center shrink-0">
             <Sparkles size={17} className="text-violet-300" />
@@ -176,9 +199,12 @@ export default function NewAOPage() {
             <UploadCloud size={15} /> Ajouter un fichier
             <input
               type="file" multiple accept=".pdf,.docx,.xlsx,.txt,.csv" className="hidden"
-              onChange={e => { setAiFiles(prev => [...prev, ...Array.from(e.target.files)]); e.target.value = '' }}
+              onChange={e => { addFiles(e.target.files); e.target.value = '' }}
             />
           </label>
+          <span className="text-[11px] text-slate-500">
+            ou glissez-déposez le fichier ici
+          </span>
           {aiFiles.map((f, i) => (
             <span key={i} className="badge bg-white/5 border border-white/10 text-slate-300 text-xs">
               <FileText size={11} className="inline mr-1" />{f.name}
