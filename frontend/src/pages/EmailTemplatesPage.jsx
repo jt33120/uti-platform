@@ -68,7 +68,7 @@ function EmailPreview({ tplKey, subject, body }) {
       </div>
       {status === 'error' ? (
         <div className="p-4 text-xs text-amber-700 bg-amber-50">
-          Aperçu indisponible — le backend doit être redéployé pour activer le rendu fidèle.
+          Aperçu indisponible : le backend doit être redéployé pour activer le rendu fidèle.
         </div>
       ) : (
         <iframe
@@ -174,7 +174,7 @@ function TemplateCard({ tpl, onSaved }) {
         {/* Aperçu fidèle */}
         <div>
           <p className="label flex items-center gap-1">
-            <Eye size={12} /> Aperçu (valeurs d'exemple — remplacées à l'envoi)
+            <Eye size={12} /> Aperçu (valeurs d'exemple, remplacées à l'envoi)
           </p>
           <EmailPreview tplKey={tpl.key} subject={subject} body={body} />
         </div>

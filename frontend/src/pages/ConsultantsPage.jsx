@@ -69,7 +69,7 @@ function ContactPartnerModal({ consultant, onClose }) {
               Contacter le partenaire
             </h2>
             <p className="text-[12px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
-              {consultant.owner?.name} — à propos de {consultant.name}
+              {consultant.owner?.name} à propos de {consultant.name}
             </p>
           </div>
           <button onClick={onClose} className="p-1 rounded text-[var(--text-faint)] hover:text-[var(--text)]">
@@ -243,11 +243,11 @@ export default function ConsultantsPage() {
             Vivier de consultants
             <span className="text-sm font-normal text-slate-500">({consultants.length})</span>
           </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            {isStaff
-              ? 'Tous les consultants des partenaires — CV anonymisés (initiales / trigramme). Contactez le porteur en un clic.'
-              : 'Vos consultants. Soumettez-les en réponse à des AOs depuis la page de l\'AO.'}
-          </p>
+          {!isStaff && (
+            <p className="text-sm text-slate-500 mt-0.5">
+              Vos consultants. Soumettez-les en réponse à des AOs depuis la page de l'AO.
+            </p>
+          )}
         </div>
         {!isStaff && (
           <Link to="/consultants/new" className="btn-primary">

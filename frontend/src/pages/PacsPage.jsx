@@ -252,7 +252,7 @@ function PacEditor({ pacId, onClose, onChanged }) {
                           disabled={savingClient === c.id}
                           className="input appearance-none pr-6 text-[11px] py-1 w-full"
                         >
-                          <option value="" className="bg-navy-900">— Pas dans le PAC —</option>
+                          <option value="" className="bg-navy-900">Pas dans le PAC</option>
                           {TIER_OPTIONS.map(o => (
                             <option key={o.value} value={o.value} className="bg-navy-900">{o.label}</option>
                           ))}
@@ -337,7 +337,7 @@ export default function PacsPage() {
             <Package size={20} className="text-brand-400" /> PACs
           </h1>
           <p className="text-sm text-slate-500 mt-0.5">
-            Packages d'affectation client — listes prédéfinies à appliquer à un partenaire en un clic.
+            Packages d'affectation client : listes prédéfinies à appliquer à un partenaire en un clic.
           </p>
         </div>
         <button onClick={() => setShowCreate(true)} className="btn-primary text-xs flex items-center gap-1.5">

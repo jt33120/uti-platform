@@ -75,7 +75,7 @@ export default function ScoringSettingsPage() {
         <h1 className="text-xl font-bold" style={{ color: 'var(--text)' }}>Réglages du matching IA</h1>
       </div>
       <p className="text-sm mb-5" style={{ color: 'var(--text-muted)' }}>
-        Notez l'importance de chaque critère avec des étoiles — les poids se
+        Notez l'importance de chaque critère avec des étoiles : les poids se
         calculent et s'équilibrent tout seuls. Le scoring reste <strong>déterministe
         et explicable</strong>. Grille v{meta.grid_version}.
       </p>
@@ -84,7 +84,7 @@ export default function ScoringSettingsPage() {
         <Info size={16} className="shrink-0 mt-0.5" style={{ color: 'var(--accent-text)' }} />
         <p className="text-xs leading-relaxed" style={{ color: 'var(--text-muted)' }}>
           Conformité AI Act : toute modification est <strong>journalisée</strong> (Art. 12)
-          et s'applique aux scorings suivants. Ces valeurs servent de défaut — chaque AO
+          et s'applique aux scorings suivants. Ces valeurs servent de défaut ; chaque AO
           peut affiner ses propres priorités.
         </p>
       </div>

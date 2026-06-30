@@ -74,7 +74,7 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
   }
 
   const mailtoHref = inviteUrl
-    ? `mailto:${email}?subject=${encodeURIComponent('Invitation — GROUPEMENT-IT Plateforme')}&body=${encodeURIComponent(
+    ? `mailto:${email}?subject=${encodeURIComponent('Invitation à la plateforme Groupement-IT')}&body=${encodeURIComponent(
         `Bonjour ${name},\n\nVous êtes invité(e) à rejoindre la plateforme partenaires Groupement-IT.\n\nCliquez ici pour créer votre compte (lien valable 7 jours) :\n${inviteUrl}\n\nÀ bientôt.`
       )}`
     : '#'
@@ -150,7 +150,7 @@ export default function InviteModal({ onClose, defaultRole = 'ao' }) {
                 minLength={2}
               />
               <p className="text-[11px] text-[var(--text-faint)] mt-1">
-                Utilisé tel quel dans l'email (« Bonjour … ») — un prénom suffit. Modifiable ensuite côté admin.
+                Utilisé tel quel dans l'email (« Bonjour … »). Un prénom suffit. Modifiable ensuite côté admin.
               </p>
             </div>
 
