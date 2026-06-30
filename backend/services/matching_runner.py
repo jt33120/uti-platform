@@ -222,12 +222,24 @@ async def run_submission_matching(ao_id: str, ran_by: Optional[str], top_n: int 
         )
         print(f"[MATCHING] Warning: could not save results for AO {ao_id}: {e}")
 
+    # Tous les scores (léger) pour les analyses côté UI : distribution, classement
+    # complet, écart entre profils. On ne persiste que le Top N, mais on renvoie
+    # l'ensemble dans la réponse du run.
+    all_scores = [{
+        "consultant_id": r.get("consultant_id"),
+        "consultant_name": r.get("consultant_name"),
+        "score": r.get("score_hybride") if r.get("score_hybride") is not None else r.get("score_total"),
+        "score_total": r.get("score_total"),
+        "tjm": r.get("consultant_tjm"),
+    } for r in results]
+
     return {
         "ao_id": ao_id,
         "ao_title": ao["title"],
         "total_consultants_evaluated": len(items),
         "top_n": top_n,
         "results": top_results,
+        "all_scores": all_scores,
     }
 
 
