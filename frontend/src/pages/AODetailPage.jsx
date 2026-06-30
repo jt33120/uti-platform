@@ -1293,14 +1293,22 @@ export default function AODetailPage() {
     setMatchError('')
     try {
       const { data: run } = await api.post('/matching/run', { ao_id: id, top_n: 3 })
-      // Réhydrate via l'endpoint qui FUSIONNE l'email partenaire + l'état humain
-      // (classement, badges Contacté/Proposé) — POST /run ne renvoie que les
-      // scores bruts. Garantit un affichage cohérent juste après un scoring.
+      // Source de vérité = les résultats RENVOYÉS par le run (toujours calculés,
+      // même si l'enregistrement en base échoue). On tente ensuite une relecture
+      // qui FUSIONNE l'email partenaire + l'état humain (classement, badges), mais
+      // on ne l'utilise QUE si elle ramène quelque chose : un échec de persistance
+      // ne doit jamais faire disparaître un classement fraîchement calculé.
+      let results = run.results || []
       try {
         const { data } = await api.get(`/matching/results/${id}`)
-        setMatchResults(data.results)
-      } catch {
-        setMatchResults(run.results)  // repli : scores bruts du run
+        if (data.results?.length) results = data.results
+      } catch { /* relecture indisponible : on garde les résultats du run */ }
+      setMatchResults(results)
+      if (results.length === 0) {
+        setMatchError(
+          "Le scoring n'a renvoyé aucun profil. Les CV soumis n'ont peut-être pas "
+          + "de texte exploitable (CV non lisible / extraction vide)."
+        )
       }
     } catch (err) {
       setMatchError(err.response?.data?.detail || 'Erreur lors du matching IA')
