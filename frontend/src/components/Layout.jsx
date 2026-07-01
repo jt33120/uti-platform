@@ -108,17 +108,20 @@ const NavSection = ({ id, label, children, defaultOpen = true }) => {
 }
 
 // Bouton d'action « créer » (visuellement distinct des entrées de navigation).
-const ActionButton = ({ to, icon: Icon, label, tour }) => (
-  <NavLink
-    to={to}
-    data-tour={tour}
-    className="flex items-center justify-center gap-1.5 h-8 rounded-md text-[12px] font-medium transition-colors text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)]"
-    style={{ border: '1px solid var(--border)' }}
-  >
-    <Icon size={13} strokeWidth={1.75} className="shrink-0" />
-    <span className="truncate">{label}</span>
-  </NavLink>
-)
+// Rend un lien si `to` est fourni, sinon un bouton (`onClick`, ex. ouvrir une modale).
+const ActionButton = ({ to, onClick, icon: Icon, label, tour, className = '' }) => {
+  const cls = `flex items-center justify-center gap-1.5 h-8 rounded-md text-[12px] font-medium transition-colors text-[var(--text-muted)] hover:text-[var(--text)] hover:bg-[var(--surface-2)] ${className}`
+  const style = { border: '1px solid var(--border)' }
+  const inner = (
+    <>
+      <Icon size={13} strokeWidth={1.75} className="shrink-0" />
+      <span className="truncate">{label}</span>
+    </>
+  )
+  return to
+    ? <NavLink to={to} data-tour={tour} className={cls} style={style}>{inner}</NavLink>
+    : <button type="button" onClick={onClick} data-tour={tour} className={cls} style={style}>{inner}</button>
+}
 
 export default function Layout() {
   const { user, logout, isAdmin, isCommerce, isStaff } = useAuth()
@@ -225,9 +228,10 @@ export default function Layout() {
           {isAdmin && (
             <>
               <div className="grid grid-cols-2 gap-1 mt-3">
-                <ActionButton to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
+                <ActionButton to="/aos/new" icon={Plus} label="AO" tour="nav-new-ao" />
                 <ActionButton to="/clients/new" icon={Plus} label="Client" />
               </div>
+              <ActionButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" className="w-full mt-1" />
 
               <NavSection id="partenaires" label="Partenaires">
                 <NavItem to="/partners" icon={UserCheck} label="Partenaires" tour="nav-partners" />
@@ -244,7 +248,6 @@ export default function Layout() {
                 <NavItem to="/admin/scoring" icon={SlidersHorizontal} label="Réglages du matching IA" />
                 <NavItem to="/graph" icon={Compass} label="Graphe de connexions" />
                 <NavItem to="/tickets" icon={Ticket} label="Tickets support" />
-                <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
               </NavSection>
             </>
           )}
