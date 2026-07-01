@@ -727,6 +727,9 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill, clientName }
     // déjà présent au vivier pour ce consultant.
     if (!cvFile && mode !== 'existing') { setError('Veuillez joindre un CV PDF'); return }
     if (!consent) { setError('Vous devez accepter la notice de confidentialité (RGPD)'); return }
+    if (!pointsForts.trim() || !elementsDiff.trim()) {
+      setError('Merci de renseigner les points forts et les éléments différenciants du CV.'); return
+    }
     setLoading(true)
     try {
       const fd = new FormData()
@@ -906,12 +909,12 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill, clientName }
           {/* Évaluation renseignée par le partenaire (déplacée depuis Validation CV) */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label className="label">Points forts du CV</label>
+              <label className="label">Points forts du CV *</label>
               <textarea className="input h-20 resize-y text-sm" placeholder="Atouts, expériences clés…"
                 value={pointsForts} onChange={e => setPointsForts(e.target.value)} />
             </div>
             <div>
-              <label className="label">Éléments différenciants</label>
+              <label className="label">Éléments différenciants *</label>
               <textarea className="input h-20 resize-y text-sm" placeholder="Ce qui distingue ce profil…"
                 value={elementsDiff} onChange={e => setElementsDiff(e.target.value)} />
             </div>
