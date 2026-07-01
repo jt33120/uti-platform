@@ -30,7 +30,10 @@ api.interceptors.response.use(
       if (!onAuthPage) {
         localStorage.removeItem('token')
         localStorage.removeItem('user')
-        window.location.href = '/login'
+        localStorage.removeItem('session_expires')
+        // Session expirée / jeton invalide : on l'indique à la page de login
+        // pour afficher un message plutôt qu'un atterrissage brutal.
+        window.location.href = '/login?reason=expired'
       }
     }
     return Promise.reject(error)

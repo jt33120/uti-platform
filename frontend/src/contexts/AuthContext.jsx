@@ -87,7 +87,7 @@ export function AuthProvider({ children }) {
       const exp = parseInt(localStorage.getItem('session_expires') || '0', 10)
       if (Date.now() >= exp) {
         logout()
-        if (!window.location.pathname.startsWith('/login')) window.location.href = '/login'
+        if (!window.location.pathname.startsWith('/login')) window.location.href = '/login?reason=expired'
       }
     }
     check()
