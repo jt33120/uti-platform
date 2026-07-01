@@ -14,6 +14,8 @@ class ClientCreate(BaseModel):
     logo_url: Optional[str] = None
     contact_name: Optional[str] = None
     contact_email: Optional[str] = None
+    parent_client_id: Optional[str] = None
+    perimetre: Optional[str] = None
 
 
 class ClientUpdate(BaseModel):
@@ -23,6 +25,8 @@ class ClientUpdate(BaseModel):
     logo_url: Optional[str] = None
     contact_name: Optional[str] = None
     contact_email: Optional[str] = None
+    parent_client_id: Optional[str] = None
+    perimetre: Optional[str] = None
 
 
 @router.post("")
@@ -45,6 +49,8 @@ async def create_client(body: ClientCreate, user: dict = Depends(require_admin))
             "logo_url": body.logo_url,
             "contact_name": body.contact_name,
             "contact_email": body.contact_email,
+            "parent_client_id": body.parent_client_id,
+            "perimetre": (body.perimetre or "").strip() or None,
             "created_by": user["sub"],
         }).execute()
         return response.data[0]
@@ -121,6 +127,8 @@ async def get_client(client_id: str, user: dict = Depends(get_current_user)):
 async def update_client(client_id: str, body: ClientUpdate, user: dict = Depends(require_admin)):
     try:
         update_data = body.model_dump(exclude_none=True)
+        if "perimetre" in update_data:
+            update_data["perimetre"] = (update_data["perimetre"] or "").strip() or None
         if "name" in update_data:
             update_data["name"] = update_data["name"].strip()
             # Case-insensitive duplicate check, excluding this client
