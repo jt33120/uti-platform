@@ -16,7 +16,26 @@ remplace toutes les `{clé}` présentes dans le contexte fourni.
 """
 import re
 import html as _html
+from datetime import date, datetime
 from services.supabase_client import supabase
+
+
+def format_date_fr(value) -> str:
+    """Convertit une date ISO (YYYY-MM-DD ou datetime ISO) en JJ/MM/AAAA.
+
+    Renvoie la valeur d'origine inchangée si elle n'est pas parsable (on
+    n'altère jamais un texte libre qui ne serait pas une date).
+    """
+    if not value:
+        return value
+    if isinstance(value, (date, datetime)):
+        return value.strftime("%d/%m/%Y")
+    head = str(value).strip()[:10]  # partie date d'un éventuel datetime ISO
+    m = re.match(r"^(\d{4})-(\d{2})-(\d{2})$", head)
+    if m:
+        y, mo, d = m.groups()
+        return f"{d}/{mo}/{y}"
+    return value
 
 # Variables mises en évidence (gras) dans le rendu des anciens corps "texte".
 _BOLD = {"title", "client"}
@@ -249,6 +268,12 @@ def build_email(key: str, context: dict, subject: str = None, body: str = None) 
     """
     # Import local pour éviter toute dépendance circulaire au chargement.
     from services.email import render_email_html
+
+    # Normalise les dates au format français (JJ/MM/AAAA) — copie pour ne pas
+    # muter le contexte de l'appelant. Couvre le tableau méta ET les {deadline}.
+    context = dict(context)
+    if context.get("deadline"):
+        context["deadline"] = format_date_fr(context["deadline"])
 
     d = DEFAULTS.get(key, {})
 
