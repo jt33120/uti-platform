@@ -1286,30 +1286,39 @@ function DeadlineBanner({ deadline }) {
   const overdue = days < 0
   const urgent = days >= 0 && days <= 7
 
+  // Tonalité selon l'urgence réelle : rouge seulement si dépassée, ambre si
+  // l'échéance est proche (≤ 7 j), sinon un indigo calme (mise en évidence
+  // sans agressivité).
+  const tone = overdue
+    ? { fg: 'var(--danger)', bg: 'var(--danger-soft)', border: 'var(--danger)', icon: 'var(--danger)' }
+    : urgent
+      ? { fg: '#b45309', bg: 'rgba(245,158,11,0.12)', border: 'rgba(245,158,11,0.4)', icon: '#f59e0b' }
+      : { fg: 'var(--accent-text)', bg: 'var(--accent-soft)', border: 'var(--border)', icon: 'var(--accent)' }
+
   return (
     <div
       className="mb-5 rounded-lg border px-5 py-4 flex items-center gap-4"
-      style={{ background: 'var(--danger-soft)', borderColor: 'var(--danger)' }}
+      style={{ background: tone.bg, borderColor: tone.border }}
     >
       <div
         className="shrink-0 w-11 h-11 rounded-lg flex items-center justify-center"
-        style={{ background: 'var(--danger)', color: '#fff' }}
+        style={{ background: tone.icon, color: '#fff' }}
       >
         {overdue ? <AlertTriangle size={22} /> : <CalendarClock size={22} />}
       </div>
       <div className="flex-1 min-w-0">
-        <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: 'var(--danger)' }}>
+        <div className="text-[11px] uppercase tracking-wider font-semibold" style={{ color: tone.fg }}>
           Date limite de réponse
         </div>
-        <div className="text-2xl font-bold leading-tight" style={{ color: 'var(--danger)' }}>
+        <div className="text-2xl font-bold leading-tight" style={{ color: tone.fg }}>
           {formatDate(deadline)}
         </div>
       </div>
       <div className="text-right shrink-0">
-        <div className="text-2xl font-extrabold tabular" style={{ color: 'var(--danger)' }}>
+        <div className="text-2xl font-extrabold tabular" style={{ color: tone.fg }}>
           {overdue ? 'Dépassée' : days === 0 ? "Aujourd'hui" : `J-${days}`}
         </div>
-        <div className="text-[11px]" style={{ color: 'var(--danger)' }}>
+        <div className="text-[11px]" style={{ color: tone.fg }}>
           {overdue
             ? `depuis ${Math.abs(days)} j`
             : days === 0 ? 'dernier jour' : urgent ? 'échéance proche' : 'restants'}
