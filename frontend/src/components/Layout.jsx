@@ -236,7 +236,6 @@ export default function Layout() {
 
               <NavSection id="outils" label="Outils">
                 <NavItem to="/carte" icon={Map} label="Carte géographique" />
-                <NavItem to="/graph" icon={Compass} label="Graphe de connexions" />
                 <NavItem to="/emails" icon={Mail} label="Emails" />
                 <NavItem to="/pacs" icon={Package} label="PACs" />
               </NavSection>
@@ -244,6 +243,7 @@ export default function Layout() {
               <NavSection id="administration" label="Administration" defaultOpen={false}>
                 <NavItem to="/admin" icon={Gauge} label="Comptes & utilisateurs" />
                 <NavItem to="/admin/scoring" icon={SlidersHorizontal} label="Réglages du matching IA" />
+                <NavItem to="/graph" icon={Compass} label="Graphe de connexions" />
                 <NavItem to="/tickets" icon={Ticket} label="Tickets support" />
                 <NavButton onClick={() => setInviteOpen(true)} icon={UserPlus} label="Inviter un compte" />
               </NavSection>
@@ -263,7 +263,6 @@ export default function Layout() {
 
               <NavSection id="c_outils" label="Outils">
                 <NavItem to="/carte" icon={Map} label="Carte géographique" />
-                <NavItem to="/graph" icon={Compass} label="Graphe de connexions" />
                 <NavItem to="/emails" icon={Mail} label="Emails" />
               </NavSection>
 
