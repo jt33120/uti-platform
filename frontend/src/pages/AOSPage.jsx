@@ -1,12 +1,12 @@
 import { useState, useEffect, useMemo } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useConfirm } from '../contexts/ConfirmContext'
 import {
   FileText, Plus, Euro, MapPin, Clock, ArrowRight, Search,
   Building2, Users, Star, ListChecks, Calendar, CalendarClock,
-  Pencil, X, Loader2, ChevronDown, Check, Trash2, ArrowDownUp,
+  Pencil, X, Loader2, ChevronDown, Check, Trash2, ArrowDownUp, Sparkles,
 } from 'lucide-react'
 
 // Parse date-only strings as local to avoid the UTC off-by-one.
@@ -371,6 +371,9 @@ export default function AOSPage() {
   const { isStaff } = useAuth()
   const confirm = useConfirm()
   const navigate = useNavigate()
+  const [searchParams, setSearchParams] = useSearchParams()
+  const matchedOnly = searchParams.get('matched') === '1'
+  const [matchedIds, setMatchedIds] = useState(null) // Set des ao_id ayant un profil potentiel
   const [aos, setAos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -442,6 +445,15 @@ export default function AOSPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // Filtre « AOs avec profil potentiel » (venant du tableau de bord) :
+  // on récupère la liste des ao_id ayant au moins un consultant potentiel.
+  useEffect(() => {
+    if (!matchedOnly || !isStaff) { setMatchedIds(null); return }
+    api.get('/matching/stats')
+      .then(r => setMatchedIds(new Set(r.data.matched_ao_ids || [])))
+      .catch(() => setMatchedIds(new Set()))
+  }, [matchedOnly, isStaff])
+
   const filtered = useMemo(() => aos.filter(ao => {
     const matchSearch = !search ||
       ao.title.toLowerCase().includes(search.toLowerCase()) ||
@@ -449,8 +461,9 @@ export default function AOSPage() {
       ao.reference?.toLowerCase().includes(search.toLowerCase()) ||
       ao.clients?.name?.toLowerCase().includes(search.toLowerCase())
     const matchFilter = filter === 'all' || ao.status === filter
-    return matchSearch && matchFilter
-  }), [aos, search, filter])
+    const matchPotential = !matchedOnly || (matchedIds && matchedIds.has(ao.id))
+    return matchSearch && matchFilter && matchPotential
+  }), [aos, search, filter, matchedOnly, matchedIds])
 
   // Sort: list_1 first, then list_2, then par le critère choisi.
   // - 'created'  : émission la plus récente d'abord
@@ -512,6 +525,21 @@ export default function AOSPage() {
           )}
         </div>
       </div>
+
+      {matchedOnly && (
+        <div className="flex items-center justify-between gap-3 mb-4 px-4 py-2.5 rounded-lg text-sm"
+          style={{ background: 'var(--accent-soft)', color: 'var(--accent-text)', border: '1px solid var(--border)' }}>
+          <span className="flex items-center gap-2">
+            <Sparkles size={14} />
+            AOs ayant trouvé un consultant potentiel
+            {matchedIds && <span className="opacity-70">· {filtered.length}</span>}
+          </span>
+          <button onClick={() => setSearchParams({}, { replace: true })}
+            className="text-xs font-medium underline underline-offset-2 hover:opacity-80">
+            Réinitialiser
+          </button>
+        </div>
+      )}
 
       <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 min-w-[240px]">

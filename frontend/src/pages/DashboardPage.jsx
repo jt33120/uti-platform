@@ -81,7 +81,7 @@ export default function DashboardPage() {
       if (subs.ok) setSubmissions(subs.data.length)
       // Le coût IA n'est volontairement pas exposé ici : ce n'est pas une
       // métrique commerciale. Il est réservé aux admins (page /admin).
-      if (m.ok) setAi({ matchings: m.data.total_matchings, model: m.data.extraction_model })
+      if (m.ok) setAi({ matchings: m.data.total_matchings, model: m.data.extraction_model, aosMatched: m.data.aos_matched })
       setLoading(false)
     }
     run()
@@ -148,8 +148,8 @@ export default function DashboardPage() {
         <Kpi icon={Building2} label="Clients" value={loading ? <span className="uti-skel" /> : clients.length} to="/clients"
           sub={!loading && d.sectors.length ? `${d.sectors.length} secteurs` : null} />
         {isStaff
-          ? <Kpi icon={Sparkles} label="Matchings IA" value={loading ? <span className="uti-skel" /> : ai.matchings}
-              sub={!loading && ai.model ? ai.model : null} />
+          ? <Kpi icon={Sparkles} label="AOs avec profil" value={loading ? <span className="uti-skel" /> : (ai.aosMatched ?? 0)}
+              sub={loading ? null : 'consultant potentiel trouvé'} to="/aos?matched=1" />
           : <Kpi icon={FileText} label="CVs soumis" value={loading ? <span className="uti-skel" /> : submissions} />}
       </div>
 
