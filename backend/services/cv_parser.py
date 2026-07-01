@@ -64,6 +64,17 @@ _XLSX_REFERENCE_HINTS = (
 )
 _XLSX_REF_MAX_CHARS = 1500
 
+# Cellules/lignes de boilerplate des gabarits de marché (instructions de saisie,
+# indices de listes déroulantes) : ce ne sont PAS des données de l'AO — on les
+# retire pour ne pas polluer l'extraction envoyée au LLM.
+_XLSX_CELL_NOISE = {"liste déroulante", "liste deroulante"}
+_XLSX_LINE_NOISE = (
+    "cellules à renseigner obligatoirement",
+    "ce planning sera à confirmer",
+    "ce n'est pas obligatoire de le diffuser",
+    "il est obligatoire d'indiquer ce montant",
+)
+
 
 def extract_text_from_xlsx(file_bytes: bytes) -> str:
     """
@@ -88,9 +99,17 @@ def extract_text_from_xlsx(file_bytes: bytes) -> str:
             is_ref = any(h in title for h in _XLSX_REFERENCE_HINTS)
             lines: list[str] = []
             for row in ws.iter_rows(values_only=True):
-                cells = [str(c).strip() for c in row if c is not None and str(c).strip()]
-                if cells:
-                    lines.append(" | ".join(cells))
+                cells = [
+                    str(c).strip() for c in row
+                    if c is not None and str(c).strip()
+                    and str(c).strip().lower() not in _XLSX_CELL_NOISE
+                ]
+                if not cells:
+                    continue
+                line = " | ".join(cells)
+                if any(n in line.lower() for n in _XLSX_LINE_NOISE):
+                    continue
+                lines.append(line)
             if not lines:
                 continue
             block = f"[Feuille : {ws.title}]\n" + "\n".join(lines)
