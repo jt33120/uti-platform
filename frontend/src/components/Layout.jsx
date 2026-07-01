@@ -3,7 +3,7 @@ import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import {
   LayoutDashboard, Users, FileText, LogOut, Plus,
-  Building2, Network, Sun, Moon, UserPlus, UserCheck, Package, Settings,
+  Building2, Network, Sun, Moon, UserPlus, UserCheck, Settings,
   HelpCircle, Mail, Compass, Gauge, Ticket, SlidersHorizontal, ChevronDown, Map,
   Menu, X
 } from 'lucide-react'
@@ -237,7 +237,6 @@ export default function Layout() {
               <NavSection id="outils" label="Outils">
                 <NavItem to="/carte" icon={Map} label="Carte géographique" />
                 <NavItem to="/emails" icon={Mail} label="Emails" />
-                <NavItem to="/pacs" icon={Package} label="PACs" />
               </NavSection>
 
               <NavSection id="administration" label="Administration" defaultOpen={false}>

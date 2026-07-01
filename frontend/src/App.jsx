@@ -17,10 +17,9 @@ import NewAOPage from './pages/NewAOPage'
 import NewClientPage from './pages/NewClientPage'
 import ClientsPage from './pages/ClientsPage'
 import ClientDetailPage from './pages/ClientDetailPage'
-import PartnerAccessPage from './pages/PartnerAccessPage'
+import PartnersAccessHub from './pages/PartnersAccessHub'
 import PartnersPage from './pages/PartnersPage'
 import PartnerDetailPage from './pages/PartnerDetailPage'
-import PacsPage from './pages/PacsPage'
 import CookieBanner from './components/CookieBanner'
 import { MentionsLegales, Confidentialite, CGU } from './pages/LegalPages'
 
@@ -78,7 +77,7 @@ export default function App() {
           <Route path="/aos/:id" element={<AODetailPage />} />
           <Route path="/partners" element={<ProtectedRoute roles={STAFF}><PartnersPage /></ProtectedRoute>} />
           <Route path="/partners/:id" element={<ProtectedRoute roles={STAFF}><PartnerDetailPage /></ProtectedRoute>} />
-          <Route path="/partners-access" element={<ProtectedRoute roles={STAFF}><PartnerAccessPage /></ProtectedRoute>} />
+          <Route path="/partners-access" element={<ProtectedRoute roles={STAFF}><PartnersAccessHub /></ProtectedRoute>} />
           <Route path="/graph" element={
             <ProtectedRoute roles={ADMIN}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement de la cartographie…</div>}>
@@ -93,7 +92,8 @@ export default function App() {
               </Suspense>
             </ProtectedRoute>
           } />
-          <Route path="/pacs" element={<ProtectedRoute roles={ADMIN}><PacsPage /></ProtectedRoute>} />
+          {/* Ancien lien PACs → onglet Modèles de la page Habilitations */}
+          <Route path="/pacs" element={<Navigate to="/partners-access?tab=pacs" replace />} />
           <Route path="/emails" element={
             <ProtectedRoute roles={STAFF}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement…</div>}>

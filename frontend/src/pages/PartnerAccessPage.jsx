@@ -83,7 +83,7 @@ function Column({ col, partners, onDrop, onDragOver, onDragLeave, isTarget, read
   )
 }
 
-export default function PartnerAccessPage() {
+export default function PartnerAccessPage({ embedded = false }) {
   const { isAdmin } = useAuth() // commerce : même vue, lecture seule
   const confirm = useConfirm()
   const readOnly = !isAdmin
@@ -201,24 +201,39 @@ export default function PartnerAccessPage() {
 
   return (
     <div>
-      <div className="page-header">
-        <div>
-          <h1 className="section-title flex items-center gap-2">
-            <Users size={19} strokeWidth={2} style={{ color: 'var(--accent-text)' }} />
-            Habilitations partenaires
-          </h1>
-          <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+      {embedded ? (
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <p className="text-[13px]" style={{ color: 'var(--text-muted)' }}>
             {readOnly
               ? 'Sélectionnez un client pour consulter les listes en lecture seule (modifications réservées aux administrateurs).'
               : 'Sélectionnez un client, puis glissez-déposez les partenaires entre les listes.'}
           </p>
+          {saving && (
+            <div className="text-xs flex items-center gap-1.5 shrink-0" style={{ color: 'var(--accent-text)' }}>
+              <Loader2 size={12} className="animate-spin" /> Enregistrement…
+            </div>
+          )}
         </div>
-        {saving && (
-          <div className="text-xs flex items-center gap-1.5" style={{ color: 'var(--accent-text)' }}>
-            <Loader2 size={12} className="animate-spin" /> Enregistrement…
+      ) : (
+        <div className="page-header">
+          <div>
+            <h1 className="section-title flex items-center gap-2">
+              <Users size={19} strokeWidth={2} style={{ color: 'var(--accent-text)' }} />
+              Habilitations partenaires
+            </h1>
+            <p className="text-[13px] mt-0.5" style={{ color: 'var(--text-muted)' }}>
+              {readOnly
+                ? 'Sélectionnez un client pour consulter les listes en lecture seule (modifications réservées aux administrateurs).'
+                : 'Sélectionnez un client, puis glissez-déposez les partenaires entre les listes.'}
+            </p>
           </div>
-        )}
-      </div>
+          {saving && (
+            <div className="text-xs flex items-center gap-1.5" style={{ color: 'var(--accent-text)' }}>
+              <Loader2 size={12} className="animate-spin" /> Enregistrement…
+            </div>
+          )}
+        </div>
+      )}
 
       {clients.length === 0 ? (
         <div className="card p-8 text-center">
