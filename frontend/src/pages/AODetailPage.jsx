@@ -476,7 +476,7 @@ function MatchCard({ result, rank, aoId, isAdmin, ao, onContact, expanded: expan
               </span>
             )}
           </div>
-          <p className="text-[11px] text-slate-500 mt-1">Score d'adéquation · grille + IA</p>
+          <p className="text-[11px] text-slate-500 mt-1">Score d'adéquation</p>
           {result.consultant_tjm && (
             <span className="text-xs text-emerald-400 mt-1 inline-flex items-center gap-0.5">
               <Euro size={10} />{result.consultant_tjm}€/j
@@ -1974,7 +1974,7 @@ export default function AODetailPage() {
                   <div>
                     <p className="text-sm font-semibold text-white flex items-center gap-2">
                       <Zap size={15} className="text-brand-400" />
-                      Scoring hybride (grille + IA)
+                      Scoring automatique
                     </p>
                     <p className="text-xs text-slate-500 mt-0.5">
                       {submissions.length === 0
