@@ -27,15 +27,20 @@ ALTER TABLE public.profiles ADD COLUMN IF NOT EXISTS last_login_at TIMESTAMPTZ;
 --    Dimension de cloisonnement : chaque AO et chaque partenaire
 --    sont rattachés à un ou plusieurs clients.
 CREATE TABLE IF NOT EXISTS public.clients (
-  id            UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  name          TEXT NOT NULL,
-  description   TEXT,
-  sector        TEXT,
-  logo_url      TEXT,
-  contact_name  TEXT,
-  contact_email TEXT,
-  created_by    UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
-  created_at    TIMESTAMPTZ DEFAULT NOW()
+  id               UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name             TEXT NOT NULL,
+  description      TEXT,
+  sector           TEXT,
+  logo_url         TEXT,
+  contact_name     TEXT,
+  contact_email    TEXT,
+  -- Hiérarchie : un périmètre de référencement (ex. « AGIRC ARRCO : AMOA »)
+  -- se rattache à son organisation parente (ex. « AGIRC ARRCO »).
+  -- Voir supabase_migration_client_hierarchy.sql.
+  parent_client_id UUID REFERENCES public.clients(id) ON DELETE SET NULL,
+  perimetre        TEXT,                -- Libellé du périmètre (AMOA, SAD, SI, ...)
+  created_by       UUID REFERENCES public.profiles(id) ON DELETE SET NULL,
+  created_at       TIMESTAMPTZ DEFAULT NOW()
 );
 
 -- 3. Appels d'Offres

@@ -1,35 +1,34 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import api from '../lib/api'
-import { ArrowLeft, Building2, Loader2, Briefcase, FileText, CheckCircle, UserCircle2, Mail, AlertTriangle } from 'lucide-react'
+import { ArrowLeft, Building2, Loader2, Briefcase, FileText, CheckCircle, UserCircle2, Mail, AlertTriangle, Layers } from 'lucide-react'
+import { findSimilarClients } from '../lib/similarity'
 
 export default function NewClientPage() {
   const navigate = useNavigate()
-  const [form, setForm] = useState({ name: '', sector: '', description: '', contact_name: '', contact_email: '' })
+  const [form, setForm] = useState({ name: '', sector: '', description: '', contact_name: '', contact_email: '', parent_client_id: '', perimetre: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [existingClients, setExistingClients] = useState([])
-  const [nameSuggestions, setNameSuggestions] = useState([])
   const [showSuggestions, setShowSuggestions] = useState(false)
 
   useEffect(() => {
     api.get('/clients').then(({ data }) => setExistingClients(data)).catch(() => {})
   }, [])
 
+  // Organisations parentes possibles : clients « racine » (sans parent)
+  const parentOptions = existingClients.filter(c => !c.parent_client_id)
+
+  // Garde-fou anti-frappe : noms ressemblants (Groupama ↔ Groupma)
+  const nameSuggestions = useMemo(
+    () => findSimilarClients(form.name, existingClients),
+    [form.name, existingClients]
+  )
+
   const handleNameChange = (e) => {
     const val = e.target.value
     setForm(p => ({ ...p, name: val }))
-    const trimmed = val.trim()
-    if (trimmed.length >= 2) {
-      const matches = existingClients.filter(c =>
-        c.name.toLowerCase().includes(trimmed.toLowerCase())
-      )
-      setNameSuggestions(matches)
-      setShowSuggestions(matches.length > 0)
-    } else {
-      setNameSuggestions([])
-      setShowSuggestions(false)
-    }
+    setShowSuggestions(val.trim().length >= 2)
   }
 
   const exactMatch = existingClients.find(
@@ -43,7 +42,7 @@ export default function NewClientPage() {
     setError('')
     setLoading(true)
     try {
-      await api.post('/clients', form)
+      await api.post('/clients', { ...form, parent_client_id: form.parent_client_id || null })
       navigate('/clients')
     } catch (err) {
       setError(err.response?.data?.detail || 'Erreur lors de la création')
@@ -96,7 +95,7 @@ export default function NewClientPage() {
                     onFocus={() => nameSuggestions.length > 0 && setShowSuggestions(true)}
                     autoComplete="off"
                   />
-                  {showSuggestions && (
+                  {showSuggestions && nameSuggestions.length > 0 && (
                     <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden">
                       <div className="px-3 py-1.5 text-[10px] text-slate-500 uppercase tracking-widest border-b border-white/5">
                         Clients existants similaires
@@ -121,6 +120,27 @@ export default function NewClientPage() {
                     Un client nommé « {exactMatch.name} » existe déjà.
                   </div>
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="label flex items-center gap-1.5">
+                    <Layers size={12} className="text-slate-500" /> Organisation parente
+                  </label>
+                  <select className="input" value={form.parent_client_id} onChange={set('parent_client_id')}>
+                    <option value="">— Aucune (organisation racine) —</option>
+                    {parentOptions.map(c => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                  <p className="text-[11px] text-slate-500 mt-1">Rattachez ce périmètre à une organisation existante (ex. AGIRC ARRCO).</p>
+                </div>
+                <div>
+                  <label className="label">Périmètre</label>
+                  <input type="text" className="input" placeholder="ex: AMOA, SAD, SI, DATA + IA..."
+                    value={form.perimetre} onChange={set('perimetre')} />
+                  <p className="text-[11px] text-slate-500 mt-1">Type de référencement / prestation.</p>
+                </div>
               </div>
 
               <div>

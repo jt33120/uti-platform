@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import api from '../lib/api'
 import { useAuth } from '../contexts/AuthContext'
 import { useConfirm } from '../contexts/ConfirmContext'
-import { Building2, Plus, Pencil, Trash2, Search, Briefcase, UserCircle2, Mail, ArrowRight, AlertTriangle } from 'lucide-react'
+import { Building2, Plus, Pencil, Trash2, Search, Briefcase, UserCircle2, Mail, ArrowRight, AlertTriangle, ChevronRight, Layers } from 'lucide-react'
 import clsx from 'clsx'
+import { findSimilarClients } from '../lib/similarity'
 
 function TierBadge({ tier }) {
   const map = {
@@ -17,20 +18,39 @@ function TierBadge({ tier }) {
   return <span className={clsx('badge text-[10px]', map[tier])}>{label[tier]}</span>
 }
 
-function ClientRow({ client, isAdmin, onEdit, onDelete, navigate }) {
+// Puce périmètre (AMOA, SAD, SI, ...)
+function PerimetreBadge({ perimetre }) {
+  if (!perimetre) return null
+  return (
+    <span className="badge text-[10px] bg-white/5 text-slate-300 border border-white/10">
+      {perimetre}
+    </span>
+  )
+}
+
+// Ligne cliquable pour un client « feuille » (autonome ou enfant d'une organisation)
+function ClientRow({ client, isAdmin, onEdit, onDelete, navigate, asChild = false, labelOverride }) {
   return (
     <div
-      className="card p-4 flex items-center gap-4 hover:border-white/10 transition-all duration-150 group cursor-pointer"
+      className={clsx(
+        'card flex items-center gap-4 hover:border-white/10 transition-all duration-150 group cursor-pointer',
+        asChild ? 'p-3 bg-white/[0.02]' : 'p-4'
+      )}
       onClick={() => navigate(`/clients/${client.id}`)}
     >
-      <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-500/30 to-emerald-500/30 border border-white/10 flex items-center justify-center text-sm font-bold text-white shrink-0">
-        {client.name.charAt(0).toUpperCase()}
-      </div>
+      {!asChild && (
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-500/30 to-emerald-500/30 border border-white/10 flex items-center justify-center text-sm font-bold text-white shrink-0">
+          {client.name.charAt(0).toUpperCase()}
+        </div>
+      )}
       <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2 flex-wrap">
-          <div className="text-sm font-semibold text-white group-hover:text-brand-300 transition-colors">{client.name}</div>
+          <div className={clsx('font-semibold text-white group-hover:text-brand-300 transition-colors', asChild ? 'text-[13px]' : 'text-sm')}>
+            {labelOverride || client.name}
+          </div>
+          <PerimetreBadge perimetre={asChild ? null : client.perimetre} />
           <TierBadge tier={client.tier} />
-          {client.sector && (
+          {!asChild && client.sector && (
             <span className="text-[10px] text-slate-500 inline-flex items-center gap-1">
               <Briefcase size={10} /> {client.sector}
             </span>
@@ -63,6 +83,60 @@ function ClientRow({ client, isAdmin, onEdit, onDelete, navigate }) {
   )
 }
 
+// Organisation parente : en-tête repliable + périmètres enfants
+function ClientGroup({ parent, children, isAdmin, onEdit, onDelete, navigate, forceOpen }) {
+  const [open, setOpen] = useState(false)
+  const expanded = forceOpen || open
+
+  return (
+    <div className="card overflow-hidden">
+      <div
+        className="p-4 flex items-center gap-4 hover:bg-white/[0.02] transition-colors cursor-pointer group"
+        onClick={() => setOpen(o => !o)}
+      >
+        <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-brand-500/30 to-emerald-500/30 border border-white/10 flex items-center justify-center text-sm font-bold text-white shrink-0">
+          {parent.name.charAt(0).toUpperCase()}
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="text-sm font-semibold text-white">{parent.name}</div>
+            <span className="badge text-[10px] bg-brand-500/10 text-brand-300 border border-brand-500/20 inline-flex items-center gap-1">
+              <Layers size={9} /> {children.length} périmètre{children.length > 1 ? 's' : ''}
+            </span>
+            {parent.sector && (
+              <span className="text-[10px] text-slate-500 inline-flex items-center gap-1">
+                <Briefcase size={10} /> {parent.sector}
+              </span>
+            )}
+          </div>
+        </div>
+        <div className="flex items-center gap-1">
+          {isAdmin && (
+            <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+              <button onClick={e => { e.stopPropagation(); onEdit(parent) }} className="btn-ghost p-2" title="Modifier l'organisation">
+                <Pencil size={13} />
+              </button>
+              <button onClick={e => { e.stopPropagation(); onDelete(parent.id) }} className="btn-danger p-2" title="Supprimer l'organisation">
+                <Trash2 size={13} />
+              </button>
+            </div>
+          )}
+          <ChevronRight size={16} className={clsx('text-slate-500 transition-transform', expanded && 'rotate-90')} />
+        </div>
+      </div>
+      {expanded && (
+        <div className="px-3 pb-3 space-y-2 border-t border-white/5 pt-3">
+          {children.map(c => (
+            <ClientRow key={c.id} client={c} isAdmin={isAdmin} asChild
+              labelOverride={c.perimetre || c.name}
+              onEdit={onEdit} onDelete={onDelete} navigate={navigate} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ClientModal({ client, onClose, onSaved, existingClients = [] }) {
   const isEdit = !!client?.id
   const [form, setForm] = useState({
@@ -71,29 +145,22 @@ function ClientModal({ client, onClose, onSaved, existingClients = [] }) {
     sector: client?.sector || '',
     contact_name: client?.contact_name || '',
     contact_email: client?.contact_email || '',
+    perimetre: client?.perimetre || '',
+    parent_client_id: client?.parent_client_id || '',
   })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [nameSuggestions, setNameSuggestions] = useState([])
-  const [showSuggestions, setShowSuggestions] = useState(false)
 
-  const handleNameChange = (e) => {
-    const val = e.target.value
-    setForm(p => ({ ...p, name: val }))
-    const trimmed = val.trim()
-    if (trimmed.length >= 2) {
-      const matches = existingClients.filter(c =>
-        c.id !== client?.id &&
-        c.name.toLowerCase().includes(trimmed.toLowerCase())
-      )
-      setNameSuggestions(matches)
-      setShowSuggestions(matches.length > 0)
-    } else {
-      setNameSuggestions([])
-      setShowSuggestions(false)
-    }
-  }
+  // Organisations parentes possibles : les clients « racine » (sans parent), hors soi-même
+  const parentOptions = existingClients.filter(
+    c => c.id !== client?.id && !c.parent_client_id
+  )
 
+  // Garde-fou anti-frappe : noms ressemblants (Groupama ↔ Groupma)
+  const similar = useMemo(
+    () => findSimilarClients(form.name, existingClients, { excludeId: client?.id }),
+    [form.name, existingClients, client?.id]
+  )
   const exactMatch = existingClients.find(
     c => c.id !== client?.id && c.name.toLowerCase() === form.name.trim().toLowerCase()
   )
@@ -103,10 +170,11 @@ function ClientModal({ client, onClose, onSaved, existingClients = [] }) {
     setLoading(true)
     setError('')
     try {
+      const payload = { ...form, parent_client_id: form.parent_client_id || null }
       if (isEdit) {
-        await api.patch(`/clients/${client.id}`, form)
+        await api.patch(`/clients/${client.id}`, payload)
       } else {
-        await api.post('/clients', form)
+        await api.post('/clients', payload)
       }
       onSaved()
     } catch (err) {
@@ -118,41 +186,56 @@ function ClientModal({ client, onClose, onSaved, existingClients = [] }) {
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="card p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+      <div className="card p-6 w-full max-w-md max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
         <h2 className="text-lg font-semibold text-white mb-4">
           {isEdit ? 'Modifier le client' : 'Nouveau client'}
         </h2>
         <form onSubmit={submit} className="space-y-4">
           <div>
             <label className="label">Nom *</label>
-            <div className="relative">
-              <input className="input" required value={form.name}
-                onChange={handleNameChange}
-                onBlur={() => setTimeout(() => setShowSuggestions(false), 150)}
-                onFocus={() => nameSuggestions.length > 0 && setShowSuggestions(true)}
-                autoComplete="off"
-              />
-              {showSuggestions && (
-                <div className="absolute top-full left-0 right-0 mt-1 z-50 bg-slate-800 border border-white/10 rounded-lg shadow-xl overflow-hidden">
-                  <div className="px-3 py-1.5 text-[10px] text-slate-500 uppercase tracking-widest border-b border-white/5">
-                    Clients existants similaires
-                  </div>
-                  {nameSuggestions.map(c => (
-                    <div key={c.id} className="px-4 py-2.5 text-sm text-slate-200 flex items-center gap-2">
-                      <Building2 size={13} className="text-brand-400 shrink-0" />
-                      <span>{c.name}</span>
-                      {c.sector && <span className="text-slate-500 text-xs ml-auto">{c.sector}</span>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-            {exactMatch && (
+            <input className="input" required value={form.name}
+              onChange={e => setForm(p => ({ ...p, name: e.target.value }))}
+              autoComplete="off"
+            />
+            {exactMatch ? (
               <div className="mt-2 flex items-center gap-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
                 <AlertTriangle size={13} className="shrink-0" />
                 Un client nommé « {exactMatch.name} » existe déjà.
               </div>
+            ) : similar.length > 0 && (
+              <div className="mt-2 text-xs text-amber-400 bg-amber-500/10 border border-amber-500/20 rounded-lg px-3 py-2">
+                <div className="flex items-center gap-2 mb-1">
+                  <AlertTriangle size={13} className="shrink-0" />
+                  Noms ressemblants — évitez un doublon :
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {similar.slice(0, 4).map(c => (
+                    <button key={c.id} type="button"
+                      onClick={() => setForm(p => ({ ...p, parent_client_id: c.parent_client_id ? c.parent_client_id : c.id }))}
+                      className="px-2 py-0.5 rounded bg-white/5 border border-white/10 text-slate-200 hover:border-brand-400/40">
+                      {c.name}
+                    </button>
+                  ))}
+                </div>
+              </div>
             )}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="label flex items-center gap-1"><Layers size={11} /> Organisation parente</label>
+              <select className="input" value={form.parent_client_id}
+                onChange={e => setForm(p => ({ ...p, parent_client_id: e.target.value }))}>
+                <option value="">— Aucune (racine) —</option>
+                {parentOptions.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="label">Périmètre</label>
+              <input className="input" placeholder="AMOA, SAD, SI..." value={form.perimetre}
+                onChange={e => setForm(p => ({ ...p, perimetre: e.target.value }))} />
+            </div>
           </div>
           <div>
             <label className="label">Secteur</label>
@@ -229,10 +312,30 @@ export default function ClientsPage() {
     }
   }
 
-  const filtered = clients.filter(c =>
-    !search || c.name.toLowerCase().includes(search.toLowerCase()) ||
-    c.sector?.toLowerCase().includes(search.toLowerCase())
-  )
+  // Construction de l'arbre : organisations parentes + périmètres enfants
+  const { roots, childrenOf } = useMemo(() => {
+    const byId = Object.fromEntries(clients.map(c => [c.id, c]))
+    const childrenOf = {}
+    clients.forEach(c => {
+      if (c.parent_client_id && byId[c.parent_client_id]) {
+        (childrenOf[c.parent_client_id] ||= []).push(c)
+      }
+    })
+    Object.values(childrenOf).forEach(arr => arr.sort((a, b) => (a.perimetre || a.name).localeCompare(b.perimetre || b.name)))
+    // Racine = client sans parent OU dont le parent n'est pas visible (partenaire)
+    const roots = clients
+      .filter(c => !c.parent_client_id || !byId[c.parent_client_id])
+      .sort((a, b) => a.name.localeCompare(b.name))
+    return { roots, childrenOf }
+  }, [clients])
+
+  const q = search.toLowerCase()
+  const matches = (c) => !q ||
+    c.name.toLowerCase().includes(q) ||
+    c.sector?.toLowerCase().includes(q) ||
+    c.perimetre?.toLowerCase().includes(q)
+
+  const filteredRoots = roots.filter(r => matches(r) || (childrenOf[r.id] || []).some(matches))
 
   return (
     <div>
@@ -241,7 +344,7 @@ export default function ClientsPage() {
           <h1 className="section-title flex items-center gap-2">
             <Building2 size={20} className="text-brand-400" />
             Clients
-            <span className="text-sm font-normal text-slate-500">({clients.length})</span>
+            <span className="text-sm font-normal text-slate-500">({roots.length})</span>
           </h1>
           {!isAdmin && (
             <p className="text-sm text-slate-500 mt-0.5">Vos clients accessibles</p>
@@ -259,7 +362,7 @@ export default function ClientsPage() {
 
       <div className="relative mb-5">
         <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500" />
-        <input type="text" className="input pl-9" placeholder="Rechercher par nom, secteur..."
+        <input type="text" className="input pl-9" placeholder="Rechercher par nom, secteur, périmètre..."
           value={search} onChange={e => setSearch(e.target.value)} />
       </div>
 
@@ -271,7 +374,7 @@ export default function ClientsPage() {
 
       {loading ? (
         <div className="text-center py-16 text-slate-500 text-sm">Chargement...</div>
-      ) : filtered.length === 0 ? (
+      ) : filteredRoots.length === 0 ? (
         <div className="text-center py-16">
           <Building2 size={32} className="mx-auto text-slate-700 mb-3" />
           <p className="text-slate-500 text-sm">
@@ -285,10 +388,20 @@ export default function ClientsPage() {
         </div>
       ) : (
         <div className="space-y-2">
-          {filtered.map(c => (
-            <ClientRow key={c.id} client={c} isAdmin={isAdmin}
-              onEdit={(c) => setModal(c)} onDelete={handleDelete} navigate={navigate} />
-          ))}
+          {filteredRoots.map(r => {
+            const kids = childrenOf[r.id] || []
+            if (kids.length > 0) {
+              return (
+                <ClientGroup key={r.id} parent={r} children={kids} isAdmin={isAdmin}
+                  forceOpen={!!search}
+                  onEdit={(c) => setModal(c)} onDelete={handleDelete} navigate={navigate} />
+              )
+            }
+            return (
+              <ClientRow key={r.id} client={r} isAdmin={isAdmin}
+                onEdit={(c) => setModal(c)} onDelete={handleDelete} navigate={navigate} />
+            )
+          })}
         </div>
       )}
 
