@@ -1,6 +1,6 @@
 from datetime import datetime, timezone
 from typing import Optional
-from fastapi import APIRouter, HTTPException, Depends
+from fastapi import APIRouter, HTTPException, Depends, BackgroundTasks
 from pydantic import BaseModel
 from services.supabase_client import supabase
 from services.matching_runner import run_submission_matching
@@ -274,8 +274,19 @@ class ValidationRequest(BaseModel):
     notify: bool = False                        # True → notifie le partenaire par email
 
 
+def _notify_events_bg(ao_id: str, consultant_id: str, events: list, actor: str) -> None:
+    """Envoi des notifications partenaire en tâche de fond (jamais bloquant, jamais
+    d'erreur remontée à l'utilisateur ; journalisé dans partner_email_log)."""
+    from services import cv_notifications
+    for ev in events:
+        try:
+            cv_notifications.notify_event(ao_id, consultant_id, ev, sent_by=actor)
+        except Exception as e:  # noqa: BLE001
+            print(f"[MATCHING] notif {ev} échouée (AO {ao_id}, {consultant_id}): {e}")
+
+
 @router.post("/{ao_id}/validation")
-async def set_cv_validation(ao_id: str, body: ValidationRequest, user: dict = Depends(require_staff)):
+async def set_cv_validation(ao_id: str, body: ValidationRequest, background_tasks: BackgroundTasks, user: dict = Depends(require_staff)):
     """Met à jour le cycle de vie d'un CV sur un AO : retenu / non retenu GRP-IT,
     envoi au client, échange commercial, affaire gagnée / perdue.
 
@@ -329,16 +340,17 @@ async def set_cv_validation(ao_id: str, body: ValidationRequest, user: dict = De
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Erreur mise à jour validation: {e}")
 
-    audit.log_event(
-        "cv_validation", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
-        payload={"consultant_id": body.consultant_id, **changed},
-    )
+    try:
+        audit.log_event(
+            "cv_validation", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
+            payload={"consultant_id": body.consultant_id, **changed},
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"[MATCHING] audit cv_validation échoué: {e}")
 
-    # Notifications au partenaire (auto, après confirmation côté UI). Best-effort :
-    # un échec d'email ne casse pas la mise à jour d'état.
-    notified = []
+    # Notifications au partenaire (auto, après confirmation côté UI) → tâche de
+    # fond : jamais bloquant, la réponse ne dépend pas de l'envoi d'emails.
     if body.notify:
-        from services import cv_notifications
         events = []
         if changed.get("validation") in ("retenu", "non_retenu"):
             events.append(changed["validation"])
@@ -346,11 +358,10 @@ async def set_cv_validation(ao_id: str, body: ValidationRequest, user: dict = De
             events.append("echange_commercial")
         if changed.get("deal_status") in ("gagnee", "perdue"):
             events.append(changed["deal_status"])
-        for ev in events:
-            ok, err = cv_notifications.notify_event(ao_id, body.consultant_id, ev)
-            notified.append({"event": ev, "sent": ok, "error": err})
+        if events:
+            background_tasks.add_task(_notify_events_bg, ao_id, body.consultant_id, events, user["sub"])
 
-    return {**row, "_notified": notified}
+    return row
 
 
 class SendCvClientRequest(BaseModel):
@@ -368,7 +379,7 @@ async def send_cv_to_client(ao_id: str, body: SendCvClientRequest, user: dict = 
         raise HTTPException(status_code=422, detail="Email du client invalide.")
 
     from services import cv_notifications
-    ok, err = cv_notifications.send_cv_to_client(ao_id, body.consultant_id, to, body.message)
+    ok, err = cv_notifications.send_cv_to_client(ao_id, body.consultant_id, to, body.message, sent_by=user["sub"])
     if not ok:
         raise HTTPException(status_code=502, detail=f"Échec d'envoi au client : {err}")
 
@@ -413,10 +424,19 @@ class BulkValidationRequest(BaseModel):
     notify: bool = False
 
 
+def _bulk_notify_bg(ao_id: str, consultant_ids: list, event: str, actor: str) -> None:
+    from services import cv_notifications
+    for cid in consultant_ids:
+        try:
+            cv_notifications.notify_event(ao_id, cid, event, sent_by=actor)
+        except Exception as e:  # noqa: BLE001
+            print(f"[MATCHING] notif bulk {event} échouée (AO {ao_id}, {cid}): {e}")
+
+
 @router.post("/{ao_id}/validation-bulk")
-async def set_cv_validation_bulk(ao_id: str, body: BulkValidationRequest, user: dict = Depends(require_staff)):
-    """Marque plusieurs CV d'un coup (ex. « Non retenu » en masse). Notifie
-    éventuellement chaque partenaire porteur (best-effort)."""
+async def set_cv_validation_bulk(ao_id: str, body: BulkValidationRequest, background_tasks: BackgroundTasks, user: dict = Depends(require_staff)):
+    """Marque plusieurs CV d'un coup (ex. « Non retenu » en masse). Les
+    notifications partenaires partent en tâche de fond (jamais bloquant)."""
     if body.validation not in VALID_VALIDATION:
         raise HTTPException(status_code=422, detail=f"validation doit être l'un de {VALID_VALIDATION}")
     ids = [c for c in (body.consultant_ids or []) if c]
@@ -436,16 +456,15 @@ async def set_cv_validation_bulk(ao_id: str, body: BulkValidationRequest, user: 
         except Exception:
             pass
 
-    notified = 0
     if body.notify and val in ("retenu", "non_retenu"):
-        from services import cv_notifications
-        for cid in ids:
-            ok, _err = cv_notifications.notify_event(ao_id, cid, val)
-            if ok:
-                notified += 1
+        background_tasks.add_task(_bulk_notify_bg, ao_id, ids, val, user["sub"])
 
-    audit.log_event(
-        "cv_validation_bulk", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
-        payload={"count": updated, "validation": val, "notified": notified},
-    )
-    return {"updated": updated, "notified": notified, "validation": val}
+    try:
+        audit.log_event(
+            "cv_validation_bulk", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
+            payload={"count": updated, "validation": val},
+        )
+    except Exception as e:  # noqa: BLE001
+        print(f"[MATCHING] audit cv_validation_bulk échoué: {e}")
+
+    return {"updated": updated, "validation": val}

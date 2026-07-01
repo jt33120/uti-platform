@@ -2,7 +2,14 @@ import { useState, useEffect } from 'react'
 import api from '../lib/api'
 import { RefreshCw, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
-const KIND_LABEL = { list_1: 'Liste 1', list_2: 'Liste 2', relance: 'Relance', manual: 'Renvoi ciblé' }
+const KIND_LABEL = {
+  list_1: 'Liste 1', list_2: 'Liste 2', relance: 'Relance', manual: 'Renvoi ciblé',
+  // Notifications « Validation CV »
+  cv_retenu: 'CV retenu', cv_non_retenu: 'CV non retenu',
+  cv_envoye_client: 'CV transmis au client', echange_commercial: 'Échange commercial',
+  affaire_gagnee: 'Affaire gagnée', affaire_perdue: 'Affaire perdue',
+  cv_client: 'CV → client',
+}
 const fmt = (iso) => iso
   ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' }).format(new Date(iso))
   : '—'

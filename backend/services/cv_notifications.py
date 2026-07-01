@@ -41,8 +41,27 @@ def _latest_submission(ao_id: str, consultant_id: str) -> Optional[dict]:
         return None
 
 
-def notify_partner(ao_id: str, consultant_id: str, key: str) -> tuple[bool, Optional[str]]:
-    """Envoie une notification au partenaire porteur du CV pour cet AO."""
+def _log_email(ao_id, recipient_email, recipient_id, kind, status, error, sent_by):
+    """Trace un envoi dans partner_email_log (best-effort — même journal que les
+    notifications d'AO, pour que les emails « Validation CV » soient visibles)."""
+    try:
+        supabase.table("partner_email_log").insert({
+            "ao_id": ao_id,
+            "recipient_id": recipient_id,
+            "recipient_email": recipient_email,
+            "kind": kind,
+            "status": status,
+            "error": (error or None),
+            "sent_by": sent_by,
+        }).execute()
+    except Exception as e:  # noqa: BLE001
+        print(f"[CV_NOTIF] log non écrit (AO {ao_id}): {e}")
+
+
+def notify_partner(ao_id: str, consultant_id: str, key: str,
+                   sent_by: Optional[str] = None) -> tuple[bool, Optional[str]]:
+    """Envoie une notification au partenaire porteur du CV pour cet AO, et la
+    journalise dans partner_email_log."""
     sub = _latest_submission(ao_id, consultant_id)
     if not sub:
         return False, "Soumission introuvable"
@@ -54,7 +73,10 @@ def notify_partner(ao_id: str, consultant_id: str, key: str) -> tuple[bool, Opti
     consultant = (sub.get("consultants") or {}).get("name") or "le consultant"
     context = {**ctx, "consultant": consultant, "partner": partner.get("name") or ""}
     subject, html, text = email_templates.build_email(key, context)
-    return send_email(to, subject, html, text=text)
+    ok, err = send_email(to, subject, html, text=text)
+    _log_email(ao_id, to, partner.get("id"), key,
+               "sent" if ok else "failed", err, sent_by)
+    return ok, err
 
 
 # Événement (transition d'état) → clé de template partenaire.
@@ -68,18 +90,20 @@ EVENT_TEMPLATE = {
 }
 
 
-def notify_event(ao_id: str, consultant_id: str, event: str) -> tuple[bool, Optional[str]]:
+def notify_event(ao_id: str, consultant_id: str, event: str,
+                 sent_by: Optional[str] = None) -> tuple[bool, Optional[str]]:
     key = EVENT_TEMPLATE.get(event)
     if not key:
         return False, f"Événement inconnu: {event}"
     try:
-        return notify_partner(ao_id, consultant_id, key)
+        return notify_partner(ao_id, consultant_id, key, sent_by=sent_by)
     except Exception as e:  # noqa: BLE001
         return False, str(e)
 
 
 def send_cv_to_client(ao_id: str, consultant_id: str, to_email: str,
-                      message: Optional[str] = None) -> tuple[bool, Optional[str]]:
+                      message: Optional[str] = None,
+                      sent_by: Optional[str] = None) -> tuple[bool, Optional[str]]:
     """Envoi RÉEL du CV au client (lien sécurisé) + notification du partenaire."""
     sub = _latest_submission(ao_id, consultant_id)
     if not sub:
@@ -97,10 +121,12 @@ def send_cv_to_client(ao_id: str, consultant_id: str, to_email: str,
     context = {**ctx, "link": cv_link, "message": (message or "").strip()}
     subject, html, text = email_templates.build_email("cv_client", context)
     ok, err = send_email(to_email, subject, html, text=text)
+    _log_email(ao_id, to_email, None, "cv_client",
+               "sent" if ok else "failed", err, sent_by)
     if ok:
         # Informe le partenaire que son CV a été transmis au client (best-effort).
         try:
-            notify_partner(ao_id, consultant_id, "cv_envoye_client")
+            notify_partner(ao_id, consultant_id, "cv_envoye_client", sent_by=sent_by)
         except Exception:
             pass
     return ok, err
