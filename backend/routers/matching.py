@@ -269,6 +269,7 @@ class ValidationRequest(BaseModel):
     sent_to_client: Optional[bool] = None      # True → horodate l'envoi client
     commercial_exchange: Optional[bool] = None  # échange commercial Oui/Non
     deal_status: Optional[str] = None          # 'gagnee' | 'perdue' | 'none'
+    notify: bool = False                        # True → notifie le partenaire par email
 
 
 @router.post("/{ao_id}/validation")
@@ -322,7 +323,62 @@ async def set_cv_validation(ao_id: str, body: ValidationRequest, user: dict = De
         "cv_validation", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
         payload={"consultant_id": body.consultant_id, **changed},
     )
-    return row
+
+    # Notifications au partenaire (auto, après confirmation côté UI). Best-effort :
+    # un échec d'email ne casse pas la mise à jour d'état.
+    notified = []
+    if body.notify:
+        from services import cv_notifications
+        events = []
+        if changed.get("validation") in ("retenu", "non_retenu"):
+            events.append(changed["validation"])
+        if changed.get("commercial_exchange") is True:
+            events.append("echange_commercial")
+        if changed.get("deal_status") in ("gagnee", "perdue"):
+            events.append(changed["deal_status"])
+        for ev in events:
+            ok, err = cv_notifications.notify_event(ao_id, body.consultant_id, ev)
+            notified.append({"event": ev, "sent": ok, "error": err})
+
+    return {**row, "_notified": notified}
+
+
+class SendCvClientRequest(BaseModel):
+    consultant_id: str
+    to_email: str
+    message: Optional[str] = None
+
+
+@router.post("/{ao_id}/send-cv-to-client")
+async def send_cv_to_client(ao_id: str, body: SendCvClientRequest, user: dict = Depends(require_staff)):
+    """Envoi RÉEL du CV au client (lien sécurisé) + notif partenaire, puis marque
+    le CV comme « envoyé au client » (date + traçabilité)."""
+    to = (body.to_email or "").strip()
+    if "@" not in to:
+        raise HTTPException(status_code=422, detail="Email du client invalide.")
+
+    from services import cv_notifications
+    ok, err = cv_notifications.send_cv_to_client(ao_id, body.consultant_id, to, body.message)
+    if not ok:
+        raise HTTPException(status_code=502, detail=f"Échec d'envoi au client : {err}")
+
+    now = _now_iso()
+    try:
+        row = supabase.table("ao_consultant_state").upsert({
+            "ao_id": ao_id,
+            "consultant_id": body.consultant_id,
+            "sent_to_client_at": now,
+            "decided_by": user["sub"],
+            "updated_at": now,
+        }, on_conflict="ao_id,consultant_id").execute().data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Email envoyé mais état non mis à jour: {e}")
+
+    audit.log_event(
+        "cv_sent_client", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
+        payload={"consultant_id": body.consultant_id, "to": to},
+    )
+    return {**row, "sent": True}
 
 
 @router.get("/{ao_id}/states")

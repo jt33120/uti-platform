@@ -996,9 +996,64 @@ const TONE = {
   off: { borderColor: 'var(--border)', color: 'var(--text-muted)' },
 }
 
-function ValidationTab({ aoId, submissions }) {
+function ClientSendModal({ aoId, sub, clientId, onClose, onSent }) {
+  const [email, setEmail] = useState('')
+  const [message, setMessage] = useState('')
+  const [sending, setSending] = useState(false)
+  const [error, setError] = useState('')
+
+  // Pré-remplit l'email depuis le contact de la fiche client (best-effort).
+  useEffect(() => {
+    if (!clientId) return
+    api.get(`/clients/${clientId}`).then(r => setEmail(r.data?.contact_email || '')).catch(() => {})
+  }, [clientId])
+
+  const send = async () => {
+    setSending(true); setError('')
+    try {
+      await api.post(`/matching/${aoId}/send-cv-to-client`, {
+        consultant_id: sub.consultant_id, to_email: email.trim(), message,
+      })
+      onSent()
+    } catch (e) {
+      setError(e.response?.data?.detail || "Échec de l'envoi")
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
+      <div className="card p-6 w-full max-w-md" onClick={e => e.stopPropagation()}>
+        <h2 className="text-sm font-semibold text-white flex items-center gap-2 mb-1">
+          <Send size={14} className="text-brand-400" /> Envoyer le CV au client
+        </h2>
+        <p className="text-xs text-slate-500 mb-4">
+          Un email contenant un <strong>lien sécurisé</strong> vers le CV de {sub.consultants?.name || 'ce profil'} sera envoyé au client. Le partenaire porteur en sera informé.
+        </p>
+        <label className="label">Email du client *</label>
+        <input className="input" type="email" value={email} placeholder="contact@client.fr"
+          onChange={e => setEmail(e.target.value)} autoComplete="off" />
+        <label className="label mt-3">Message (optionnel)</label>
+        <textarea className="input h-24 resize-none" value={message}
+          placeholder="Mot d'accompagnement…" onChange={e => setMessage(e.target.value)} />
+        {error && <div className="text-sm text-red-400 bg-red-500/10 border border-red-500/20 rounded-lg px-3 py-2 mt-3">{error}</div>}
+        <div className="flex gap-2 justify-end mt-4">
+          <button onClick={onClose} className="btn-ghost">Annuler</button>
+          <button onClick={send} disabled={sending || !email.includes('@')} className="btn-primary">
+            {sending ? <><Loader2 size={14} className="animate-spin" /> Envoi…</> : <><Send size={14} /> Envoyer</>}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function ValidationTab({ aoId, submissions, clientId }) {
+  const confirm = useConfirm()
   const [states, setStates] = useState({})
   const [busy, setBusy] = useState(null)
+  const [clientModalSub, setClientModalSub] = useState(null)
 
   useEffect(() => {
     api.get(`/matching/${aoId}/states`)
@@ -1010,12 +1065,24 @@ function ValidationTab({ aoId, submissions }) {
     setBusy(consultantId)
     try {
       const { data } = await api.post(`/matching/${aoId}/validation`, { consultant_id: consultantId, ...patch })
-      setStates(s => ({ ...s, [consultantId]: { ...(s[consultantId] || {}), ...data } }))
+      const { _notified, ...row } = data
+      setStates(s => ({ ...s, [consultantId]: { ...(s[consultantId] || {}), ...row } }))
     } catch (e) {
       alert(e.response?.data?.detail || 'Erreur lors de la mise à jour')
     } finally {
       setBusy(null)
     }
+  }
+
+  // Action qui notifie le partenaire : confirmation avant envoi (décision « auto + confirmation »).
+  const act = async (consultantId, patch, confirmTitle) => {
+    const ok = await confirm({
+      title: confirmTitle,
+      message: 'Le partenaire porteur du profil sera notifié par email.',
+      confirmLabel: 'Confirmer et notifier',
+    })
+    if (!ok) return
+    update(consultantId, { ...patch, notify: true })
   }
 
   // Un consultant peut avoir plusieurs soumissions : on ne garde que la 1re.
@@ -1077,32 +1144,42 @@ function ValidationTab({ aoId, submissions }) {
               {/* Actions de validation */}
               <div className="flex items-center gap-2 flex-wrap mt-3 sm:pl-9">
                 <button disabled={busyRow} className={PILL} style={retained ? TONE.green : TONE.off}
-                  onClick={() => update(s.consultant_id, { validation: retained ? 'none' : 'retenu' })}>
+                  onClick={() => retained
+                    ? update(s.consultant_id, { validation: 'none' })
+                    : act(s.consultant_id, { validation: 'retenu' }, 'Marquer « Retenu GRP-IT » ?')}>
                   <CheckCircle size={12} /> Retenu GRP-IT
                 </button>
                 <button disabled={busyRow} className={PILL} style={rejected ? TONE.red : TONE.off}
-                  onClick={() => update(s.consultant_id, { validation: rejected ? 'none' : 'non_retenu' })}>
+                  onClick={() => rejected
+                    ? update(s.consultant_id, { validation: 'none' })
+                    : act(s.consultant_id, { validation: 'non_retenu' }, 'Marquer « Non retenu » ?')}>
                   <X size={12} /> Non retenu
                 </button>
                 {retained && (
                   <button disabled={busyRow} className={PILL} style={st.sent_to_client_at ? TONE.accent : TONE.off}
-                    onClick={() => update(s.consultant_id, { sent_to_client: !st.sent_to_client_at })}>
-                    <Send size={12} /> {st.sent_to_client_at ? 'Envoyé au client' : 'Envoi au client'}
+                    onClick={() => setClientModalSub(s)}>
+                    <Send size={12} /> {st.sent_to_client_at ? 'Renvoyer au client' : 'Envoi au client'}
                   </button>
                 )}
 
                 <span className="w-px h-4 mx-1" style={{ background: 'var(--border)' }} />
 
                 <button disabled={busyRow} className={PILL} style={st.commercial_exchange ? TONE.amber : TONE.off}
-                  onClick={() => update(s.consultant_id, { commercial_exchange: !st.commercial_exchange })}>
+                  onClick={() => st.commercial_exchange
+                    ? update(s.consultant_id, { commercial_exchange: false })
+                    : act(s.consultant_id, { commercial_exchange: true }, 'Marquer un échange commercial en cours ?')}>
                   Échange commercial : {st.commercial_exchange ? 'Oui' : 'Non'}
                 </button>
                 <button disabled={busyRow} className={PILL} style={st.deal_status === 'gagnee' ? TONE.green : TONE.off}
-                  onClick={() => update(s.consultant_id, { deal_status: st.deal_status === 'gagnee' ? 'none' : 'gagnee' })}>
+                  onClick={() => st.deal_status === 'gagnee'
+                    ? update(s.consultant_id, { deal_status: 'none' })
+                    : act(s.consultant_id, { deal_status: 'gagnee' }, "Marquer l'affaire comme gagnée ?")}>
                   <Award size={12} /> Affaire gagnée
                 </button>
                 <button disabled={busyRow} className={PILL} style={st.deal_status === 'perdue' ? TONE.red : TONE.off}
-                  onClick={() => update(s.consultant_id, { deal_status: st.deal_status === 'perdue' ? 'none' : 'perdue' })}>
+                  onClick={() => st.deal_status === 'perdue'
+                    ? update(s.consultant_id, { deal_status: 'none' })
+                    : act(s.consultant_id, { deal_status: 'perdue' }, "Marquer l'affaire comme perdue ?")}>
                   Affaire perdue
                 </button>
               </div>
@@ -1110,6 +1187,19 @@ function ValidationTab({ aoId, submissions }) {
           )
         })}
       </div>
+      {clientModalSub && (
+        <ClientSendModal
+          aoId={aoId}
+          sub={clientModalSub}
+          clientId={clientId}
+          onClose={() => setClientModalSub(null)}
+          onSent={() => {
+            const cid = clientModalSub.consultant_id
+            setStates(s => ({ ...s, [cid]: { ...(s[cid] || {}), sent_to_client_at: new Date().toISOString() } }))
+            setClientModalSub(null)
+          }}
+        />
+      )}
     </div>
   )
 }
@@ -2027,7 +2117,7 @@ export default function AODetailPage() {
       {/* ── Onglet Analyse & CV : top profils, CVs, couverture, diffusion (ordre adaptatif) ── */}
       {tab === 'validation' && isAdmin && (
         <div className="mb-5">
-          <ValidationTab aoId={id} submissions={submissions} />
+          <ValidationTab aoId={id} submissions={submissions} clientId={ao.client_id} />
         </div>
       )}
 
