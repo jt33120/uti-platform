@@ -21,6 +21,7 @@ import PartnersAccessHub from './pages/PartnersAccessHub'
 import PartnersPage from './pages/PartnersPage'
 import PartnerDetailPage from './pages/PartnerDetailPage'
 import CookieBanner from './components/CookieBanner'
+import ContactPage from './pages/ContactPage'
 import { MentionsLegales, Confidentialite, CGU } from './pages/LegalPages'
 
 // Lazy — keeps the graph library out of the main bundle
@@ -58,6 +59,9 @@ export default function App() {
         <Route path="/register" element={<GuestRoute><RegisterPage /></GuestRoute>} />
         <Route path="/forgot-password" element={<GuestRoute><ForgotPasswordPage /></GuestRoute>} />
         <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+        {/* Contact public — futurs partenaires (accessible avant connexion) */}
+        <Route path="/contact" element={<ContactPage />} />
 
         {/* Pages légales — publiques (lisibles avant connexion) */}
         <Route path="/legal/mentions" element={<MentionsLegales />} />

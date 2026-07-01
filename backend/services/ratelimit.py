@@ -56,3 +56,33 @@ def rate_limit(max_calls: int, per_seconds: int):
         return user
 
     return _dep
+
+
+def rate_limit_public(max_calls: int, per_seconds: int):
+    """Variante SANS authentification : limite par IP. Pour les endpoints
+    publics (ex. formulaire de contact des futurs partenaires)."""
+    async def _dep(request: Request):
+        now = time.time()
+        key = f"pub:{_client_ip(request)}:{id(_dep)}"
+
+        if len(_HITS) > _MAX_KEYS:
+            for k in [k for k, d in list(_HITS.items()) if not d]:
+                _HITS.pop(k, None)
+
+        hits = _HITS[key]
+        cutoff = now - per_seconds
+        while hits and hits[0] < cutoff:
+            hits.popleft()
+
+        if len(hits) >= max_calls:
+            retry = int(hits[0] + per_seconds - now) + 1
+            raise HTTPException(
+                status_code=429,
+                detail="Trop de requêtes — patientez un instant avant de réessayer.",
+                headers={"Retry-After": str(max(retry, 1))},
+            )
+
+        hits.append(now)
+        return None
+
+    return _dep
