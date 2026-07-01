@@ -269,6 +269,8 @@ class ValidationRequest(BaseModel):
     sent_to_client: Optional[bool] = None      # True → horodate l'envoi client
     commercial_exchange: Optional[bool] = None  # échange commercial Oui/Non
     deal_status: Optional[str] = None          # 'gagnee' | 'perdue' | 'none'
+    eval_points_forts: Optional[str] = None     # commentaire libre « Points forts »
+    eval_differenciants: Optional[str] = None   # commentaire libre « Éléments différenciants »
     notify: bool = False                        # True → notifie le partenaire par email
 
 
@@ -308,6 +310,14 @@ async def set_cv_validation(ao_id: str, body: ValidationRequest, user: dict = De
             raise HTTPException(status_code=422, detail=f"deal_status doit être l'un de {VALID_DEAL}")
         payload["deal_status"] = None if body.deal_status == "none" else body.deal_status
         changed["deal_status"] = payload["deal_status"]
+
+    # Commentaires d'évaluation libres (aucune notification).
+    if body.eval_points_forts is not None:
+        payload["eval_points_forts"] = body.eval_points_forts.strip() or None
+        changed["eval_points_forts"] = True
+    if body.eval_differenciants is not None:
+        payload["eval_differenciants"] = body.eval_differenciants.strip() or None
+        changed["eval_differenciants"] = True
 
     if not changed:
         raise HTTPException(status_code=422, detail="Aucun champ à mettre à jour.")
@@ -389,7 +399,8 @@ async def get_ao_states(ao_id: str, user: dict = Depends(require_staff)):
     try:
         rows = supabase.table("ao_consultant_state").select(
             "consultant_id, human_rank, contact_status, validation, "
-            "sent_to_client_at, commercial_exchange, deal_status"
+            "sent_to_client_at, commercial_exchange, deal_status, "
+            "eval_points_forts, eval_differenciants"
         ).eq("ao_id", ao_id).execute().data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))

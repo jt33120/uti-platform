@@ -1096,6 +1096,14 @@ function ValidationTab({ aoId, submissions, clientId }) {
     }
   }
 
+  // Commentaire d'évaluation libre : édition locale immédiate + sauvegarde au blur.
+  const setEvalLocal = (cid, key, val) =>
+    setStates(s => ({ ...s, [cid]: { ...(s[cid] || {}), [key]: val } }))
+  const saveEval = async (cid, patch) => {
+    try { await api.post(`/matching/${aoId}/validation`, { consultant_id: cid, ...patch }) }
+    catch { /* champ libre : on n'interrompt pas la saisie sur erreur réseau */ }
+  }
+
   // Action qui notifie le partenaire : confirmation avant envoi (décision « auto + confirmation »).
   const act = async (consultantId, patch, confirmTitle) => {
     const ok = await confirm({
@@ -1221,6 +1229,28 @@ function ValidationTab({ aoId, submissions, clientId }) {
                     : act(s.consultant_id, { deal_status: 'perdue' }, "Marquer l'affaire comme perdue ?")}>
                   Affaire perdue
                 </button>
+              </div>
+
+              {/* Commentaires d'évaluation — libres, toujours éditables (Sullyvan) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 sm:pl-9">
+                <div>
+                  <label className="text-[11px] font-medium text-slate-400">Points forts du CV</label>
+                  <textarea rows={2}
+                    className="input mt-1 text-xs resize-y"
+                    placeholder="Atouts, expériences clés…"
+                    value={st.eval_points_forts || ''}
+                    onChange={e => setEvalLocal(s.consultant_id, 'eval_points_forts', e.target.value)}
+                    onBlur={e => saveEval(s.consultant_id, { eval_points_forts: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-slate-400">Éléments différenciants</label>
+                  <textarea rows={2}
+                    className="input mt-1 text-xs resize-y"
+                    placeholder="Ce qui distingue ce profil…"
+                    value={st.eval_differenciants || ''}
+                    onChange={e => setEvalLocal(s.consultant_id, 'eval_differenciants', e.target.value)}
+                    onBlur={e => saveEval(s.consultant_id, { eval_differenciants: e.target.value })} />
+                </div>
               </div>
             </div>
           )
