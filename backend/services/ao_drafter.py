@@ -179,9 +179,13 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
         "(compétences techniques ET fonctionnelles listées, ex. Clarity/OpenWorkBench, "
         "Excel avancé, Power BI, Access, méthode ABC, gestion de projet)\n"
         f'- "ao_type": exactement l\'une de ces valeurs si pertinent, sinon "" : {", ".join(ao_types)}\n'
-        '- "budget_max": nombre entier (budget max en €/jour) ou null\n'
-        '- "location": localisation / télétravail\n'
-        '- "duration": durée de la mission\n'
+        '- "budget_max": UNIQUEMENT un taux journalier max en €/jour (TJM), sinon null. '
+        '⚠️ Sur un modèle de marché, les montants « Valeur estimée du marché », '
+        '« Montant maximum pour la durée du contrat » (ex. 320 000€ HT) sont des '
+        'TOTAUX, PAS un TJM : ne les mets JAMAIS dans budget_max (laisse null) et '
+        'reporte plutôt cette information dans "context".\n'
+        '- "location": localisation / télétravail (sur un modèle de marché : le « Lieu de la prestation »)\n'
+        '- "duration": durée de la mission (durée du marché ET volumétrie en jours si indiquée)\n'
         '- "deadline": date limite de réponse au format "YYYY-MM-DD" (sur un modèle '
         'de marché : la « Date de limite de remise des offres »), sinon ""\n'
         '- "context": éléments de contexte utiles (secteur, contraintes, urgence, environnement technique)\n'
@@ -208,7 +212,13 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
             data = _extract_json(resp.choices[0].message.content or "")
             if data is None:
                 continue
-            return _sanitize(data, ao_types)
+            result = _sanitize(data, ao_types)
+            # Traçabilité : quel fournisseur/modèle a réellement généré la fiche
+            # (utile pour repérer un repli sur le modèle faible).
+            result["_ai_provider"] = provider
+            result["_ai_model"] = model
+            result["_ai_fallback"] = (provider != "OpenRouter")
+            return result
         except Exception as e:  # noqa: BLE001
             last_err = e
             print(f"[AO_DRAFTER] {provider} échec ({model}): {e}")
