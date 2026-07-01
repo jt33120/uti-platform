@@ -225,7 +225,7 @@ export default function Layout() {
           {isAdmin && (
             <>
               <div className="grid grid-cols-2 gap-1 mt-3">
-                <ActionButton to="/aos/new" icon={Plus} label="Nouvel AO" tour="nav-new-ao" />
+                <ActionButton to="/aos/new" icon={Plus} label="AO" tour="nav-new-ao" />
                 <ActionButton to="/clients/new" icon={Plus} label="Client" />
               </div>
 
