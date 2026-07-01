@@ -705,6 +705,8 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill, clientName }
   const [consent, setConsent] = useState(false)
   const [workedAtClient, setWorkedAtClient] = useState(false)
   const [exitDate, setExitDate] = useState('')
+  const [pointsForts, setPointsForts] = useState('')
+  const [elementsDiff, setElementsDiff] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -744,6 +746,8 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill, clientName }
       }
       fd.append('worked_at_client', workedAtClient ? 'true' : 'false')
       if (workedAtClient && exitDate) fd.append('worked_at_client_exit_date', exitDate)
+      if (pointsForts.trim()) fd.append('points_forts', pointsForts)
+      if (elementsDiff.trim()) fd.append('elements_differenciants', elementsDiff)
       await api.post('/submissions', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       onSubmitted()
     } catch (err) {
@@ -848,12 +852,12 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill, clientName }
                 onChange={e => setWorkedAtClient(e.target.checked)}
                 className="mt-0.5 w-4 h-4 shrink-0" style={{ accentColor: 'var(--accent)' }} />
               <span className="text-xs text-slate-300">
-                Le candidat est-il déjà intervenu en prestation chez <strong>{clientName || 'ce client'}</strong> ?
+                Merci d'indiquer si votre candidat est déjà intervenu en prestation chez <strong>{clientName || 'ce client'}</strong>.
               </span>
             </label>
             {workedAtClient && (
               <div className="mt-2 pl-6">
-                <label className="label">Dernière date de sortie</label>
+                <label className="label">Dernière date de fin de mission</label>
                 <input type="date" className="input" value={exitDate}
                   onChange={e => setExitDate(e.target.value)} />
               </div>
@@ -897,6 +901,20 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill, clientName }
                        onChange={e => handleFile(e.target.files[0])} />
               </div>
             )}
+          </div>
+
+          {/* Évaluation renseignée par le partenaire (déplacée depuis Validation CV) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label className="label">Points forts du CV</label>
+              <textarea className="input h-20 resize-y text-sm" placeholder="Atouts, expériences clés…"
+                value={pointsForts} onChange={e => setPointsForts(e.target.value)} />
+            </div>
+            <div>
+              <label className="label">Éléments différenciants</label>
+              <textarea className="input h-20 resize-y text-sm" placeholder="Ce qui distingue ce profil…"
+                value={elementsDiff} onChange={e => setElementsDiff(e.target.value)} />
+            </div>
           </div>
 
           <label className="flex items-start gap-2 text-xs text-slate-400 cursor-pointer">
@@ -1126,14 +1144,6 @@ function ValidationTab({ aoId, submissions, clientId }) {
     }
   }
 
-  // Commentaire d'évaluation libre : édition locale immédiate + sauvegarde au blur.
-  const setEvalLocal = (cid, key, val) =>
-    setStates(s => ({ ...s, [cid]: { ...(s[cid] || {}), [key]: val } }))
-  const saveEval = async (cid, patch) => {
-    try { await api.post(`/matching/${aoId}/validation`, { consultant_id: cid, ...patch }) }
-    catch { /* champ libre : on n'interrompt pas la saisie sur erreur réseau */ }
-  }
-
   // Action qui notifie le partenaire : confirmation avant envoi (décision « auto + confirmation »).
   const act = async (consultantId, patch, confirmTitle) => {
     const ok = await confirm({
@@ -1266,27 +1276,23 @@ function ValidationTab({ aoId, submissions, clientId }) {
                 </button>
               </div>
 
-              {/* Commentaires d'évaluation — libres, toujours éditables (Sullyvan) */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 sm:pl-9">
-                <div>
-                  <label className="text-[11px] font-medium text-slate-400">Points forts du CV</label>
-                  <textarea rows={2}
-                    className="input mt-1 text-xs resize-y"
-                    placeholder="Atouts, expériences clés…"
-                    value={st.eval_points_forts || ''}
-                    onChange={e => setEvalLocal(s.consultant_id, 'eval_points_forts', e.target.value)}
-                    onBlur={e => saveEval(s.consultant_id, { eval_points_forts: e.target.value })} />
+              {/* Évaluation renseignée par le partenaire à la soumission (lecture seule) */}
+              {(s.points_forts || s.elements_differenciants) && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 sm:pl-9">
+                  {s.points_forts && (
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-400">Points forts du CV</div>
+                      <p className="text-xs text-slate-300 whitespace-pre-wrap mt-0.5">{s.points_forts}</p>
+                    </div>
+                  )}
+                  {s.elements_differenciants && (
+                    <div>
+                      <div className="text-[11px] font-medium text-slate-400">Éléments différenciants</div>
+                      <p className="text-xs text-slate-300 whitespace-pre-wrap mt-0.5">{s.elements_differenciants}</p>
+                    </div>
+                  )}
                 </div>
-                <div>
-                  <label className="text-[11px] font-medium text-slate-400">Éléments différenciants</label>
-                  <textarea rows={2}
-                    className="input mt-1 text-xs resize-y"
-                    placeholder="Ce qui distingue ce profil…"
-                    value={st.eval_differenciants || ''}
-                    onChange={e => setEvalLocal(s.consultant_id, 'eval_differenciants', e.target.value)}
-                    onBlur={e => saveEval(s.consultant_id, { eval_differenciants: e.target.value })} />
-                </div>
-              </div>
+              )}
             </div>
           )
         })}
