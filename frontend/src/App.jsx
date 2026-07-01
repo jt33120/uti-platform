@@ -80,7 +80,7 @@ export default function App() {
           <Route path="/partners/:id" element={<ProtectedRoute roles={STAFF}><PartnerDetailPage /></ProtectedRoute>} />
           <Route path="/partners-access" element={<ProtectedRoute roles={STAFF}><PartnerAccessPage /></ProtectedRoute>} />
           <Route path="/graph" element={
-            <ProtectedRoute roles={STAFF}>
+            <ProtectedRoute roles={ADMIN}>
               <Suspense fallback={<div className="p-10 text-center text-sm" style={{ color: 'var(--text-faint)' }}>Chargement de la cartographie…</div>}>
                 <GraphPage />
               </Suspense>
