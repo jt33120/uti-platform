@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Depends
 from pydantic import BaseModel
 from services.supabase_client import supabase
@@ -183,6 +184,11 @@ async def get_matching_results(ao_id: str, user: dict = Depends(get_current_user
                 r["partner_name"] = t.get("name")
                 r["partner_email"] = t.get("email")
                 r["contact_kind"] = t.get("kind")  # 'partner' | 'consultant' | 'owner'
+                # Cycle de vie « Validation CV » (interne GRP-IT, staff only).
+                r["validation"] = st.get("validation")
+                r["sent_to_client_at"] = st.get("sent_to_client_at")
+                r["commercial_exchange"] = bool(st.get("commercial_exchange"))
+                r["deal_status"] = st.get("deal_status")
 
         # L'humain a le dernier mot : son classement prime, sinon le rang IA.
         results.sort(key=lambda r: (r.get("human_rank") is None, r.get("human_rank") or 0, r.get("rank") or 0))
@@ -247,5 +253,73 @@ async def set_contact_status(ao_id: str, body: ContactRequest, user: dict = Depe
     audit.log_event(
         "contact", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
         payload={"consultant_id": body.consultant_id, "status": body.status},
+    )
+    return row
+
+
+# ── Cycle de vie « Validation CV » (demande Sullyvan) ────────────────────────
+VALID_VALIDATION = ("retenu", "non_retenu", "none")
+VALID_DEAL = ("gagnee", "perdue", "none")
+
+
+class ValidationRequest(BaseModel):
+    consultant_id: str
+    # Chaque champ est optionnel : on ne met à jour que ce qui est fourni.
+    validation: Optional[str] = None           # 'retenu' | 'non_retenu' | 'none'
+    sent_to_client: Optional[bool] = None      # True → horodate l'envoi client
+    commercial_exchange: Optional[bool] = None  # échange commercial Oui/Non
+    deal_status: Optional[str] = None          # 'gagnee' | 'perdue' | 'none'
+
+
+@router.post("/{ao_id}/validation")
+async def set_cv_validation(ao_id: str, body: ValidationRequest, user: dict = Depends(require_staff)):
+    """Met à jour le cycle de vie d'un CV sur un AO : retenu / non retenu GRP-IT,
+    envoi au client, échange commercial, affaire gagnée / perdue.
+
+    Mise à jour partielle : seuls les champs fournis sont modifiés. Les valeurs
+    « none » remettent le champ à NULL.
+    """
+    now = _now_iso()
+    payload = {
+        "ao_id": ao_id,
+        "consultant_id": body.consultant_id,
+        "decided_by": user["sub"],
+        "updated_at": now,
+    }
+    changed = {}
+
+    if body.validation is not None:
+        if body.validation not in VALID_VALIDATION:
+            raise HTTPException(status_code=422, detail=f"validation doit être l'un de {VALID_VALIDATION}")
+        payload["validation"] = None if body.validation == "none" else body.validation
+        changed["validation"] = payload["validation"]
+
+    if body.sent_to_client is not None:
+        payload["sent_to_client_at"] = now if body.sent_to_client else None
+        changed["sent_to_client"] = body.sent_to_client
+
+    if body.commercial_exchange is not None:
+        payload["commercial_exchange"] = bool(body.commercial_exchange)
+        changed["commercial_exchange"] = payload["commercial_exchange"]
+
+    if body.deal_status is not None:
+        if body.deal_status not in VALID_DEAL:
+            raise HTTPException(status_code=422, detail=f"deal_status doit être l'un de {VALID_DEAL}")
+        payload["deal_status"] = None if body.deal_status == "none" else body.deal_status
+        changed["deal_status"] = payload["deal_status"]
+
+    if not changed:
+        raise HTTPException(status_code=422, detail="Aucun champ à mettre à jour.")
+
+    try:
+        row = supabase.table("ao_consultant_state").upsert(
+            payload, on_conflict="ao_id,consultant_id"
+        ).execute().data[0]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Erreur mise à jour validation: {e}")
+
+    audit.log_event(
+        "cv_validation", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
+        payload={"consultant_id": body.consultant_id, **changed},
     )
     return row
