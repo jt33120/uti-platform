@@ -12,6 +12,7 @@ import {
   UploadCloud, Download, Target, Hash, Send, Bell, Mail, MessageSquareWarning
 } from 'lucide-react'
 import ScoringPriorities, { DEFAULT_STARS } from '../components/ScoringPriorities'
+import HarmonizedCvModal from '../components/HarmonizedCvModal'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, ResponsiveContainer } from 'recharts'
 
 // Parse date-only strings ("YYYY-MM-DD") as *local* dates to avoid the UTC
@@ -1082,6 +1083,7 @@ function ValidationTab({ aoId, submissions, clientId }) {
   const [states, setStates] = useState({})
   const [busy, setBusy] = useState(null)
   const [clientModalSub, setClientModalSub] = useState(null)
+  const [cvModalSub, setCvModalSub] = useState(null)
   const [selected, setSelected] = useState(() => new Set())
   const toggleSel = (cid) => setSelected(p => { const n = new Set(p); n.has(cid) ? n.delete(cid) : n.add(cid); return n })
 
@@ -1211,6 +1213,11 @@ function ValidationTab({ aoId, submissions, clientId }) {
                         <FileText size={12} /> CV
                       </a>
                     )}
+                    <button onClick={() => setCvModalSub(s)}
+                      className="text-xs text-brand-300 hover:text-brand-200 inline-flex items-center gap-1"
+                      title="Régénérer au format Groupement-IT (FR / EN)">
+                      <Sparkles size={12} /> CV GRP-IT
+                    </button>
                   </div>
                 </div>
                 {busyRow && <Loader2 size={13} className="animate-spin text-slate-500 shrink-0" />}
@@ -1295,6 +1302,13 @@ function ValidationTab({ aoId, submissions, clientId }) {
             setStates(s => ({ ...s, [cid]: { ...(s[cid] || {}), sent_to_client_at: new Date().toISOString() } }))
             setClientModalSub(null)
           }}
+        />
+      )}
+      {cvModalSub && (
+        <HarmonizedCvModal
+          submissionId={cvModalSub.id}
+          name={cvModalSub.consultants?.name}
+          onClose={() => setCvModalSub(null)}
         />
       )}
     </div>
