@@ -323,3 +323,18 @@ async def set_cv_validation(ao_id: str, body: ValidationRequest, user: dict = De
         payload={"consultant_id": body.consultant_id, **changed},
     )
     return row
+
+
+@router.get("/{ao_id}/states")
+async def get_ao_states(ao_id: str, user: dict = Depends(require_staff)):
+    """État par consultant pour un AO (classement humain, contact et cycle de
+    vie « Validation CV »). Renvoie une map consultant_id → état pour que l'onglet
+    Validation CV puisse afficher tous les CV reçus avec leur statut."""
+    try:
+        rows = supabase.table("ao_consultant_state").select(
+            "consultant_id, human_rank, contact_status, validation, "
+            "sent_to_client_at, commercial_exchange, deal_status"
+        ).eq("ao_id", ao_id).execute().data or []
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+    return {"states": {r["consultant_id"]: r for r in rows if r.get("consultant_id")}}

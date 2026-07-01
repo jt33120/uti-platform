@@ -983,6 +983,137 @@ function SubmissionRow({ sub, onDelete, canDelete, isAdmin, aoSkillsRequired }) 
   )
 }
 
+// ─── Onglet « Validation CV » (demande Sullyvan) ────────────────
+// Reprend la liste des CV reçus, remplace le lien CV par les actions de
+// validation commerciale : retenu / non retenu GRP-IT → envoi client, +
+// indicateurs échange commercial / affaire gagnée-perdue.
+const PILL = 'text-[11px] px-2.5 py-1 rounded-md border inline-flex items-center gap-1 transition-colors disabled:opacity-50'
+const TONE = {
+  green: { background: 'rgba(16,185,129,0.12)', color: '#10b981', borderColor: 'rgba(16,185,129,0.45)' },
+  red: { background: 'rgba(220,38,38,0.12)', color: '#dc2626', borderColor: 'rgba(220,38,38,0.45)' },
+  amber: { background: 'rgba(245,158,11,0.12)', color: '#f59e0b', borderColor: 'rgba(245,158,11,0.45)' },
+  accent: { background: 'var(--accent-soft)', color: 'var(--accent-text)', borderColor: 'var(--accent)' },
+  off: { borderColor: 'var(--border)', color: 'var(--text-muted)' },
+}
+
+function ValidationTab({ aoId, submissions }) {
+  const [states, setStates] = useState({})
+  const [busy, setBusy] = useState(null)
+
+  useEffect(() => {
+    api.get(`/matching/${aoId}/states`)
+      .then(r => setStates(r.data.states || {}))
+      .catch(() => setStates({}))
+  }, [aoId])
+
+  const update = async (consultantId, patch) => {
+    setBusy(consultantId)
+    try {
+      const { data } = await api.post(`/matching/${aoId}/validation`, { consultant_id: consultantId, ...patch })
+      setStates(s => ({ ...s, [consultantId]: { ...(s[consultantId] || {}), ...data } }))
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Erreur lors de la mise à jour')
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  // Un consultant peut avoir plusieurs soumissions : on ne garde que la 1re.
+  const rows = []
+  const seen = new Set()
+  for (const s of submissions) {
+    if (s.consultant_id && !seen.has(s.consultant_id)) { seen.add(s.consultant_id); rows.push(s) }
+  }
+
+  if (rows.length === 0) {
+    return <div className="card p-8 text-center text-sm text-slate-500">Aucun CV reçu pour cet AO.</div>
+  }
+
+  return (
+    <div className="card p-4">
+      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
+        Validation CV ({rows.length})
+      </div>
+      <div className="space-y-2">
+        {rows.map(s => {
+          const c = s.consultants || {}
+          const st = states[s.consultant_id] || {}
+          const busyRow = busy === s.consultant_id
+          const retained = st.validation === 'retenu'
+          const rejected = st.validation === 'non_retenu'
+          return (
+            <div key={s.consultant_id} className="p-3 rounded-lg bg-white/3 border border-white/5">
+              <div className="flex items-center gap-3 flex-wrap">
+                <UserCircle2 size={26} className="text-slate-500 shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {s.submitter?.name && (
+                      <span className="text-sm font-semibold text-brand-300 inline-flex items-center gap-1">
+                        <Building2 size={12} /> {s.submitter.name}
+                      </span>
+                    )}
+                    <span className="text-sm font-medium text-white truncate">
+                      {s.submitter?.name && <span className="text-slate-600">· </span>}{c.name || 'Inconnu'}
+                    </span>
+                    {c.employment_type && (
+                      <span className="badge bg-white/5 text-slate-400 text-[10px]">
+                        {c.employment_type === 'salarie' ? 'Salarié' : 'Indépendant'}
+                      </span>
+                    )}
+                    {c.tjm && (
+                      <span className="text-[10px] text-emerald-400 inline-flex items-center gap-0.5"><Euro size={9} />{c.tjm}/j</span>
+                    )}
+                    {s.cv_url && (
+                      <a href={s.cv_url} target="_blank" rel="noopener noreferrer"
+                         className="text-xs text-slate-400 hover:text-brand-400 inline-flex items-center gap-1">
+                        <FileText size={12} /> CV
+                      </a>
+                    )}
+                  </div>
+                </div>
+                {busyRow && <Loader2 size={13} className="animate-spin text-slate-500 shrink-0" />}
+              </div>
+
+              {/* Actions de validation */}
+              <div className="flex items-center gap-2 flex-wrap mt-3 sm:pl-9">
+                <button disabled={busyRow} className={PILL} style={retained ? TONE.green : TONE.off}
+                  onClick={() => update(s.consultant_id, { validation: retained ? 'none' : 'retenu' })}>
+                  <CheckCircle size={12} /> Retenu GRP-IT
+                </button>
+                <button disabled={busyRow} className={PILL} style={rejected ? TONE.red : TONE.off}
+                  onClick={() => update(s.consultant_id, { validation: rejected ? 'none' : 'non_retenu' })}>
+                  <X size={12} /> Non retenu
+                </button>
+                {retained && (
+                  <button disabled={busyRow} className={PILL} style={st.sent_to_client_at ? TONE.accent : TONE.off}
+                    onClick={() => update(s.consultant_id, { sent_to_client: !st.sent_to_client_at })}>
+                    <Send size={12} /> {st.sent_to_client_at ? 'Envoyé au client' : 'Envoi au client'}
+                  </button>
+                )}
+
+                <span className="w-px h-4 mx-1" style={{ background: 'var(--border)' }} />
+
+                <button disabled={busyRow} className={PILL} style={st.commercial_exchange ? TONE.amber : TONE.off}
+                  onClick={() => update(s.consultant_id, { commercial_exchange: !st.commercial_exchange })}>
+                  Échange commercial : {st.commercial_exchange ? 'Oui' : 'Non'}
+                </button>
+                <button disabled={busyRow} className={PILL} style={st.deal_status === 'gagnee' ? TONE.green : TONE.off}
+                  onClick={() => update(s.consultant_id, { deal_status: st.deal_status === 'gagnee' ? 'none' : 'gagnee' })}>
+                  <Award size={12} /> Affaire gagnée
+                </button>
+                <button disabled={busyRow} className={PILL} style={st.deal_status === 'perdue' ? TONE.red : TONE.off}
+                  onClick={() => update(s.consultant_id, { deal_status: st.deal_status === 'perdue' ? 'none' : 'perdue' })}>
+                  Affaire perdue
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 // ─── AO edit modal ──────────────────────────────────────────────
 function AOEditModal({ ao, onClose, onSaved }) {
   const AO_TYPES = ['Assurance', 'Banque / Finance', 'IT / Dev', 'Énergie', 'Retail', 'Public', 'Santé', 'Autre']
@@ -1748,6 +1879,7 @@ export default function AODetailPage() {
           { key: 'presentation', label: 'Présentation', icon: FileText },
           ...(isAdmin ? [{ key: 'envoi', label: 'Envoi des e-mails', icon: Send }] : []),
           { key: 'analyse', label: isAdmin ? 'Analyse & CV' : 'Ma candidature', icon: BarChart3 },
+          ...(isAdmin ? [{ key: 'validation', label: 'Validation CV', icon: CheckCircle }] : []),
         ].map(t => (
           <button
             key={t.key}
@@ -1893,6 +2025,12 @@ export default function AODetailPage() {
       )}
 
       {/* ── Onglet Analyse & CV : top profils, CVs, couverture, diffusion (ordre adaptatif) ── */}
+      {tab === 'validation' && isAdmin && (
+        <div className="mb-5">
+          <ValidationTab aoId={id} submissions={submissions} />
+        </div>
+      )}
+
       {tab === 'analyse' && (
       <div className="flex flex-col gap-4 mb-5">
           {/* Partner view: submit a CV */}
