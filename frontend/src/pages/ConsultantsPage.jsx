@@ -7,7 +7,7 @@ import ContactPartnerModal from '../components/ContactPartnerModal'
 import {
   Users, Plus, X, Search, Euro, Clock, MapPin, Map as MapIcon,
   Mail, SlidersHorizontal,
-  ChevronRight, RotateCcw,
+  ChevronRight, RotateCcw, Sparkles, Loader2,
 } from 'lucide-react'
 import clsx from 'clsx'
 
@@ -22,7 +22,7 @@ function EmploymentBadge({ type }) {
 }
 
 // Une ligne d'annuaire (l'ensemble est cliquable -> fiche profil).
-function ConsultantRow({ consultant, onOpen, onMap, onContact, onDelete, canDelete, canContact }) {
+function ConsultantRow({ consultant, onOpen, onMap, onContact, onDelete, onDeduce, canDelete, canContact, canDeduce, deducing }) {
   const c = consultant
   const skills = c.skills?.split(',').map(s => s.trim()).filter(Boolean) || []
   const ownerIsPartner = c.owner?.role === 'ao'
@@ -64,9 +64,22 @@ function ConsultantRow({ consultant, onOpen, onMap, onContact, onDelete, canDele
           )}
         </div>
         {skills.length === 0 && (
-          <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-faint)' }}>
-            Compétences non renseignées
-          </div>
+          canDeduce ? (
+            <button
+              onClick={(e) => { e.stopPropagation(); onDeduce(c.id) }}
+              disabled={deducing}
+              className="text-xs mt-0.5 inline-flex items-center gap-1 font-medium disabled:opacity-60 hover:underline underline-offset-2"
+              style={{ color: 'var(--accent-text)' }}
+              title="Analyser le CV le plus récent pour en déduire les compétences"
+            >
+              {deducing ? <Loader2 size={11} className="animate-spin" /> : <Sparkles size={11} />}
+              {deducing ? 'Analyse du CV…' : 'Déduire les compétences du CV'}
+            </button>
+          ) : (
+            <div className="text-xs mt-0.5 truncate" style={{ color: 'var(--text-faint)' }}>
+              Compétences non renseignées
+            </div>
+          )
         )}
       </div>
 
@@ -177,6 +190,19 @@ export default function ConsultantsPage() {
   const [advanced, setAdvanced] = useState(false)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [sort, setSort] = useState('name')
+  const [deducing, setDeducing] = useState(() => new Set())
+
+  const handleDeduce = async (id) => {
+    setDeducing(p => new Set(p).add(id))
+    try {
+      const { data } = await api.post(`/consultants/${id}/extract-skills`)
+      setConsultants(p => p.map(c => (c.id === id ? { ...c, skills: data.skills } : c)))
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Extraction impossible')
+    } finally {
+      setDeducing(p => { const n = new Set(p); n.delete(id); return n })
+    }
+  }
 
   const fetchConsultants = async () => {
     try {
@@ -424,8 +450,11 @@ export default function ConsultantsPage() {
                     onMap={(id) => navigate(`/carte?focus=${id}`)}
                     onContact={setContactFor}
                     onDelete={handleDelete}
+                    onDeduce={handleDeduce}
                     canDelete={isAdmin || (!isStaff && !isCommerce)}
                     canContact={isStaff}
+                    canDeduce={isStaff}
+                    deducing={deducing.has(c.id)}
                   />
                 ))}
               </div>

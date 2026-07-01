@@ -101,6 +101,28 @@ async def list_consultants(user: dict = Depends(get_current_user)):
         raise HTTPException(status_code=500, detail=str(e))
 
 
+@router.post("/{consultant_id}/extract-skills")
+async def extract_consultant_skills(consultant_id: str, user: dict = Depends(get_current_user)):
+    """Déduit les compétences du CV le plus récent du consultant et les fusionne
+    dans son champ `skills` (sans écraser la saisie manuelle). Staff ou porteur."""
+    from services.consultant_skills import extract_and_store_skills
+    try:
+        consultant = supabase.table("consultants").select("id, created_by").eq(
+            "id", consultant_id
+        ).single().execute().data
+    except Exception:
+        raise HTTPException(status_code=404, detail="Consultant introuvable")
+    if not is_staff(user) and consultant.get("created_by") != user["sub"]:
+        raise HTTPException(status_code=403, detail="Accès interdit")
+    try:
+        skills = await extract_and_store_skills(consultant_id)
+        return {"skills": skills}
+    except ValueError as e:
+        raise HTTPException(status_code=422, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=502, detail=f"Extraction impossible : {e}")
+
+
 @router.get("/{consultant_id}")
 async def get_consultant(consultant_id: str, user: dict = Depends(get_current_user)):
     try:
