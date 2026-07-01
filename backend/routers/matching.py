@@ -63,8 +63,27 @@ async def get_matching_stats(user: dict = Depends(require_staff)):
         from services.ai_matching import EXTRACTION_MODEL
         from services.scoring import GRID_VERSION
 
+        # AOs « traités » : ceux qui ont au moins un profil potentiel (score ≥ 50,
+        # le seuil « à considérer »). C'est la métrique métier affichée sur le
+        # tableau de bord (« X AOs ayant trouvé un consultant potentiel »).
+        POTENTIAL_THRESHOLD = 50
+        try:
+            scored = supabase.table("matchings").select("ao_id, score_total").execute().data or []
+            matched_ao_ids = sorted({
+                r["ao_id"] for r in scored
+                if r.get("ao_id") and (r.get("score_total") or 0) >= POTENTIAL_THRESHOLD
+            })
+            analyzed_ao_ids = {r["ao_id"] for r in scored if r.get("ao_id")}
+        except Exception:
+            matched_ao_ids, analyzed_ao_ids = [], set()
+
         return {
             "total_matchings": len(matchings),
+            # AOs ayant trouvé au moins un consultant potentiel
+            "aos_matched": len(matched_ao_ids),
+            "matched_ao_ids": matched_ao_ids,
+            "aos_analyzed": len(analyzed_ao_ids),
+            "potential_threshold": POTENTIAL_THRESHOLD,
             # Architecture hybride : le LLM extrait, le score est déterministe.
             "extraction_model": EXTRACTION_MODEL,
             "scoring": "déterministe",

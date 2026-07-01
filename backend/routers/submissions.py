@@ -4,6 +4,7 @@ from services.supabase_client import supabase
 from services import storage
 from services.cv_parser import extract_text_from_pdf
 from services.matching_runner import auto_rescore_ao
+from services.consultant_skills import auto_extract_skills
 from routers.auth import get_current_user, is_staff
 import uuid
 
@@ -174,6 +175,9 @@ async def create_submission(
     # Auto-pipeline: every new CV triggers a re-score of the AO so the
     # ranking stays current without anyone pressing a button.
     background_tasks.add_task(auto_rescore_ao, ao_id, user["sub"])
+    # Enrichissement du vivier : déduire les compétences du CV si le consultant
+    # n'en a pas encore (best-effort, ne bloque pas la soumission).
+    background_tasks.add_task(auto_extract_skills, consultant_id)
 
     sub["consultant"] = consultant
     return sub
