@@ -126,6 +126,88 @@ DEFAULTS = {
         "cta_label": "Réinitialiser mon mot de passe",
         "footer": "Si vous n'êtes pas à l'origine de cette demande, ignorez cet email, votre mot de passe reste inchangé.",
     },
+    # ── Notifications « Validation CV » (demande Sullyvan) ────────────────────
+    "cv_retenu": {
+        "label": "Validation CV — CV retenu par GRP-IT (→ partenaire)",
+        "subject": "Profil retenu : {consultant} — {title}",
+        "body": "<p>Bonne nouvelle : le profil <strong>{consultant}</strong> que vous avez proposé a été "
+                "<strong>retenu</strong> par le Groupement-IT pour l'appel d'offres « {title} » ({client}).</p>"
+                "<p>Nous revenons vers vous pour la suite.</p>",
+        "format": "html",
+        "placeholders": ["consultant", "title", "client", "reference", "link"],
+        "email_title": "Profil retenu",
+        "cta_label": "Voir l'appel d'offres",
+        "footer": "Vous recevez cet email en tant que partenaire porteur de ce profil.",
+    },
+    "cv_non_retenu": {
+        "label": "Validation CV — CV non retenu par GRP-IT (→ partenaire)",
+        "subject": "Profil non retenu — {title}",
+        "body": "<p>Le profil <strong>{consultant}</strong> proposé pour l'appel d'offres « {title} » ({client}) "
+                "n'a pas été retenu par le Groupement-IT.</p>"
+                "<p>Merci pour votre proposition — n'hésitez pas à nous soumettre d'autres profils.</p>",
+        "format": "html",
+        "placeholders": ["consultant", "title", "client", "reference", "link"],
+        "email_title": "Profil non retenu",
+        "cta_label": "Voir l'appel d'offres",
+        "footer": "Vous recevez cet email en tant que partenaire porteur de ce profil.",
+    },
+    "cv_envoye_client": {
+        "label": "Validation CV — CV envoyé au client (→ partenaire)",
+        "subject": "Profil transmis au client — {title}",
+        "body": "<p>Le CV de <strong>{consultant}</strong> a été <strong>transmis au client</strong> "
+                "pour l'appel d'offres « {title} » ({client}).</p>"
+                "<p>Nous vous tiendrons informé des suites.</p>",
+        "format": "html",
+        "placeholders": ["consultant", "title", "client", "reference", "link"],
+        "email_title": "Profil transmis au client",
+        "cta_label": "Voir l'appel d'offres",
+        "footer": "Vous recevez cet email en tant que partenaire porteur de ce profil.",
+    },
+    "echange_commercial": {
+        "label": "Validation CV — Échange commercial en cours (→ partenaire)",
+        "subject": "Échange commercial en cours — {title}",
+        "body": "<p>Un <strong>échange commercial</strong> est en cours concernant le profil "
+                "<strong>{consultant}</strong> pour l'appel d'offres « {title} » ({client}).</p>",
+        "format": "html",
+        "placeholders": ["consultant", "title", "client", "reference", "link"],
+        "email_title": "Échange commercial",
+        "cta_label": "Voir l'appel d'offres",
+        "footer": "Vous recevez cet email en tant que partenaire porteur de ce profil.",
+    },
+    "affaire_gagnee": {
+        "label": "Validation CV — Affaire gagnée (→ partenaire)",
+        "subject": "Affaire gagnée — {title}",
+        "body": "<p>🎉 L'affaire « {title} » ({client}) est <strong>gagnée</strong> avec le profil "
+                "<strong>{consultant}</strong>. Félicitations et merci pour votre collaboration !</p>",
+        "format": "html",
+        "placeholders": ["consultant", "title", "client", "reference", "link"],
+        "email_title": "Affaire gagnée",
+        "cta_label": "Voir l'appel d'offres",
+        "footer": "Vous recevez cet email en tant que partenaire porteur de ce profil.",
+    },
+    "affaire_perdue": {
+        "label": "Validation CV — Affaire perdue (→ partenaire)",
+        "subject": "Affaire non aboutie — {title}",
+        "body": "<p>L'affaire « {title} » ({client}) proposée avec le profil <strong>{consultant}</strong> "
+                "n'a malheureusement pas abouti. Merci pour votre implication.</p>",
+        "format": "html",
+        "placeholders": ["consultant", "title", "client", "reference", "link"],
+        "email_title": "Affaire non aboutie",
+        "cta_label": "Voir l'appel d'offres",
+        "footer": "Vous recevez cet email en tant que partenaire porteur de ce profil.",
+    },
+    "cv_client": {
+        "label": "Validation CV — Envoi du CV au client (→ client)",
+        "subject": "Proposition de profil — {title}",
+        "body": "<p>Bonjour,</p>"
+                "<p>Dans le cadre de « {title} », veuillez trouver ci-dessous le CV du profil que nous vous proposons.</p>"
+                "<p>{message}</p>",
+        "format": "html",
+        "placeholders": ["title", "reference", "message", "link"],
+        "email_title": "Proposition de profil",
+        "cta_label": "Consulter le CV",
+        "footer": "Email envoyé par le Groupement-IT.",
+    },
 }
 
 
