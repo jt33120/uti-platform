@@ -502,7 +502,9 @@ export default function AOSPage() {
           <h1 className="section-title flex items-center gap-2">
             <FileText size={20} strokeWidth={1.75} style={{ color: 'var(--accent-text)' }} />
             Appels d'Offres
-            <span className="text-sm font-normal text-slate-500">({aos.length})</span>
+            <span className="text-sm font-normal text-slate-500">
+              ({filtered.length}{filtered.length !== aos.length ? ` / ${aos.length}` : ''})
+            </span>
           </h1>
           {!isStaff && (
             <p className="text-sm text-slate-500 mt-0.5">
@@ -614,12 +616,22 @@ export default function AOSPage() {
         <div className="text-center py-16">
           <FileText size={32} className="mx-auto text-slate-700 mb-3" />
           <p className="text-slate-500 text-sm">
-            {search ? 'Aucun résultat' : 'Aucun appel d\'offres accessible pour le moment'}
+            {matchedOnly
+              ? "Aucun AO n'a encore trouvé de consultant potentiel."
+              : search
+                ? 'Aucun résultat'
+                : 'Aucun appel d\'offres accessible pour le moment'}
           </p>
-          {isStaff && (
+          {/* Ne proposer « créer » que sur un vrai état vide (pas un filtre). */}
+          {isStaff && !search && !matchedOnly && (
             <Link to="/aos/new" className="btn-primary mt-4 mx-auto">
               <Plus size={14} /> Créer le premier AO
             </Link>
+          )}
+          {matchedOnly && (
+            <button onClick={() => setSearchParams({}, { replace: true })} className="btn-ghost mt-4 mx-auto">
+              Voir tous les AOs
+            </button>
           )}
         </div>
       ) : groupBy === 'client' && groupedByClient ? (

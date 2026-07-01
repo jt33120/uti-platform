@@ -119,7 +119,11 @@ export default function DashboardPage() {
     const tjms = consultants.map(c => c.tjm).filter(Boolean)
     const avgTjm = tjms.length ? Math.round(tjms.reduce((x, y) => x + y, 0) / tjms.length) : null
 
-    return { open, aoStatus, aoTypes, sectors, seniority, topSkills, avgTjm }
+    // Nb d'organisations clientes (racines) — cohérent avec la page Clients,
+    // qui regroupe les périmètres sous leur organisation parente.
+    const clientOrgs = clients.filter(c => !c.parent_client_id).length
+
+    return { open, aoStatus, aoTypes, sectors, seniority, topSkills, avgTjm, clientOrgs }
   }, [aos, consultants, clients])
 
   const recentAOs = aos.slice(0, 5)
@@ -145,7 +149,7 @@ export default function DashboardPage() {
           sub={!loading && d.avgTjm ? `TJM moy. ${d.avgTjm} €` : null} />
         <Kpi icon={Briefcase} label={isStaff ? "Appels d'offres" : 'Mes AOs'} value={loading ? <span className="uti-skel" /> : aos.length} to="/aos"
           sub={loading ? null : `${d.open} ouvert${d.open > 1 ? 's' : ''}`} />
-        <Kpi icon={Building2} label="Clients" value={loading ? <span className="uti-skel" /> : clients.length} to="/clients"
+        <Kpi icon={Building2} label="Clients" value={loading ? <span className="uti-skel" /> : d.clientOrgs} to="/clients"
           sub={!loading && d.sectors.length ? `${d.sectors.length} secteurs` : null} />
         {isStaff
           ? <Kpi icon={Sparkles} label="AOs avec profil" value={loading ? <span className="uti-skel" /> : (ai.aosMatched ?? 0)}

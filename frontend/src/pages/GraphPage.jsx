@@ -73,11 +73,24 @@ export default function GraphPage() {
         bump(`c:${c.id}`); bump(`p:${c.created_by}`)
       }
     })
-    if (show.client) raw.access.forEach(r => {
-      const t = TIER[r.tier]; if (!t) return
-      links.push({ source: `p:${r.partner_id}`, target: `cl:${r.client_id}`, kind: r.tier, color: t.color + 'aa' })
-      bump(`p:${r.partner_id}`); bump(`cl:${r.client_id}`)
-    })
+    if (show.client) {
+      const clientIds = new Set(raw.clients.map(c => c.id))
+      raw.access.forEach(r => {
+        const t = TIER[r.tier]; if (!t) return
+        // Ne relie que des nœuds réellement présents : une habilitation peut
+        // référencer un partenaire/client absent (supprimé, non renvoyé par
+        // l'API…) → sans ce garde-fou, la lib force-graph plante (« node not found »).
+        if (!partnerIds.has(r.partner_id) || !clientIds.has(r.client_id)) return
+        links.push({ source: `p:${r.partner_id}`, target: `cl:${r.client_id}`, kind: r.tier, color: t.color + 'aa' })
+        bump(`p:${r.partner_id}`); bump(`cl:${r.client_id}`)
+      })
+    }
+
+    // Filet de sécurité : on écarte tout lien dont une extrémité n'a pas de nœud.
+    const nodeIds = new Set(nodes.map(n => n.id))
+    const safeLinks = links.filter(l => nodeIds.has(idOf(l.source)) && nodeIds.has(idOf(l.target)))
+    links.length = 0
+    links.push(...safeLinks)
 
     nodes.forEach(n => {
       n.size = (n.type === 'partner' ? 5 : 3.5) + Math.min(deg[n.id] || 0, 8) * 0.8
