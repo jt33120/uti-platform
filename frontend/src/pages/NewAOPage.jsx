@@ -40,6 +40,7 @@ export default function NewAOPage() {
   const [aiLoading, setAiLoading] = useState(false)
   const [aiError, setAiError] = useState('')
   const [aiDone, setAiDone] = useState(false)
+  const [aiModel, setAiModel] = useState(null) // { model, fallback }
   const [dragOver, setDragOver] = useState(false)
 
   // Formats acceptés pour la source (cohérent avec l'input fichier et le backend).
@@ -88,6 +89,7 @@ export default function NewAOPage() {
         setStars(p => ({ ...p, ...data.scoring_stars }))
         setScoringTouched(true)
       }
+      setAiModel(data._ai_model ? { model: data._ai_model, fallback: !!data._ai_fallback } : null)
       setAiDone(true)
     } catch (err) {
       setAiError(err.response?.data?.detail || 'Échec de la génération. Réessayez.')
@@ -232,6 +234,11 @@ export default function NewAOPage() {
         {aiDone && !aiError && (
           <p className="text-xs text-emerald-400 mt-3 flex items-center gap-1.5">
             <CheckCircle size={12} /> Champs pré-remplis : vérifiez et ajustez ci-dessous avant d'enregistrer.
+          </p>
+        )}
+        {aiDone && aiModel && (
+          <p className="text-[10px] mt-1" style={{ color: aiModel.fallback ? '#f59e0b' : 'var(--text-faint)' }}>
+            {aiModel.fallback ? '⚠️ ' : ''}Généré par {aiModel.model}{aiModel.fallback ? ' (modèle de repli)' : ''}
           </p>
         )}
       </div>

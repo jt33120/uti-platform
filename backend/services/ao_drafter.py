@@ -212,7 +212,13 @@ async def draft_ao_fields(source: str, ao_types: list[str]) -> Optional[dict]:
             data = _extract_json(resp.choices[0].message.content or "")
             if data is None:
                 continue
-            return _sanitize(data, ao_types)
+            result = _sanitize(data, ao_types)
+            # Traçabilité : quel fournisseur/modèle a réellement généré la fiche
+            # (utile pour repérer un repli sur le modèle faible).
+            result["_ai_provider"] = provider
+            result["_ai_model"] = model
+            result["_ai_fallback"] = (provider != "OpenRouter")
+            return result
         except Exception as e:  # noqa: BLE001
             last_err = e
             print(f"[AO_DRAFTER] {provider} échec ({model}): {e}")

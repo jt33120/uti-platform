@@ -76,6 +76,47 @@ _XLSX_LINE_NOISE = (
 )
 
 
+# Champs clés des modèles de marché (label → alias possibles, en minuscules).
+# Pré-extraits de façon déterministe et placés EN TÊTE pour guider le LLM.
+_XLSX_KEY_LABELS = [
+    ("Référence", ("références de la consultation", "référence de la consultation")),
+    ("Objet", ("objet de la consultation", "objet de la prestation", "objet du marché")),
+    ("Direction", ("direction/support technique", "direction / support technique")),
+    ("Interlocuteur", ("interlocuteur technique",)),
+    ("Catégorie", ("catégorie concernée",)),
+    ("UO", ("uo concernée",)),
+    ("Profil", ("profil",)),
+    ("Lieu", ("lieu de la prestation",)),
+    ("Durée", ("durée du marché",)),
+    ("Montant (total)", ("montant maximum pour la durée", "valeur estimée du marché")),
+    ("Date limite de remise des offres", ("date de limite de remise des offres", "date limite de remise des offres")),
+]
+
+
+def _xlsx_key_fields(lines: list[str]) -> str:
+    """Extrait les champs clés d'un modèle de marché (lignes 'Label : | valeur')
+    et les renvoie sous forme d'un bloc synthétique. '' si rien trouvé."""
+    found: dict[str, str] = {}
+    for line in lines:
+        parts = [p.strip() for p in line.split("|")]
+        if len(parts) < 2:
+            continue
+        label = parts[0].rstrip(" :").lower()
+        value = " ".join(p for p in parts[1:] if p).strip()
+        if not value:
+            continue
+        for name, aliases in _XLSX_KEY_LABELS:
+            if name in found:
+                continue
+            if any(label == a or label.startswith(a) for a in aliases):
+                found[name] = value[:400]
+                break
+    if not found:
+        return ""
+    ordered = [f"{name} : {found[name]}" for name, _ in _XLSX_KEY_LABELS if name in found]
+    return "[Champs clés extraits du modèle de marché]\n" + "\n".join(ordered)
+
+
 def extract_text_from_xlsx(file_bytes: bytes) -> str:
     """
     Extract text from a .xlsx workbook: every sheet, each non-empty row rendered
@@ -92,6 +133,7 @@ def extract_text_from_xlsx(file_bytes: bytes) -> str:
 
     wb = load_workbook(io.BytesIO(file_bytes), read_only=True, data_only=True)
     main_parts: list[str] = []
+    main_lines: list[str] = []
     ref_parts: list[str] = []
     try:
         for ws in wb.worksheets:
@@ -117,13 +159,18 @@ def extract_text_from_xlsx(file_bytes: bytes) -> str:
                 ref_parts.append(block[:_XLSX_REF_MAX_CHARS])
             else:
                 main_parts.append(block)
+                main_lines.extend(lines)
     finally:
         try:
             wb.close()
         except Exception:
             pass
 
-    parts = list(main_parts)
+    parts: list[str] = []
+    key_block = _xlsx_key_fields(main_lines)
+    if key_block:
+        parts.append(key_block)
+    parts.extend(main_parts)
     if ref_parts:
         parts.append(
             "[Listes de référence / valeurs possibles — annexes, à ignorer pour l'extraction des champs de l'AO]"
