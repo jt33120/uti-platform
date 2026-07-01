@@ -51,6 +51,8 @@ async def create_submission(
     availability: Optional[str] = Form(None),
     worked_at_client: Optional[bool] = Form(None),
     worked_at_client_exit_date: Optional[str] = Form(None),
+    points_forts: Optional[str] = Form(None),
+    elements_differenciants: Optional[str] = Form(None),
     consent: bool = Form(False),
     cv_file: Optional[UploadFile] = File(None),
     user: dict = Depends(get_current_user),
@@ -169,6 +171,9 @@ async def create_submission(
             # Historique d'intervention chez le client (demande Sullyvan)
             "worked_at_client": worked_at_client,
             "worked_at_client_exit_date": (worked_at_client_exit_date or None),
+            # Évaluation renseignée par le partenaire à la soumission
+            "points_forts": (points_forts or "").strip() or None,
+            "elements_differenciants": (elements_differenciants or "").strip() or None,
         }).execute().data[0]
     except Exception as e:
         try:
