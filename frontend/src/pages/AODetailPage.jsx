@@ -1054,6 +1054,28 @@ function ValidationTab({ aoId, submissions, clientId }) {
   const [states, setStates] = useState({})
   const [busy, setBusy] = useState(null)
   const [clientModalSub, setClientModalSub] = useState(null)
+  const [selected, setSelected] = useState(() => new Set())
+  const toggleSel = (cid) => setSelected(p => { const n = new Set(p); n.has(cid) ? n.delete(cid) : n.add(cid); return n })
+
+  const bulkReject = async (ids) => {
+    if (!ids.length) return
+    const ok = await confirm({
+      title: `Marquer ${ids.length} CV comme « Non retenu » ?`,
+      message: 'Les partenaires porteurs de ces profils seront notifiés par email.',
+      confirmLabel: 'Confirmer et notifier',
+    })
+    if (!ok) return
+    setBusy('__bulk__')
+    try {
+      await api.post(`/matching/${aoId}/validation-bulk`, { consultant_ids: ids, validation: 'non_retenu', notify: true })
+      setStates(s => { const n = { ...s }; ids.forEach(cid => { n[cid] = { ...(n[cid] || {}), validation: 'non_retenu' } }); return n })
+      setSelected(new Set())
+    } catch (e) {
+      alert(e.response?.data?.detail || 'Erreur lors de la mise à jour groupée')
+    } finally {
+      setBusy(null)
+    }
+  }
 
   useEffect(() => {
     api.get(`/matching/${aoId}/states`)
@@ -1072,6 +1094,14 @@ function ValidationTab({ aoId, submissions, clientId }) {
     } finally {
       setBusy(null)
     }
+  }
+
+  // Commentaire d'évaluation libre : édition locale immédiate + sauvegarde au blur.
+  const setEvalLocal = (cid, key, val) =>
+    setStates(s => ({ ...s, [cid]: { ...(s[cid] || {}), [key]: val } }))
+  const saveEval = async (cid, patch) => {
+    try { await api.post(`/matching/${aoId}/validation`, { consultant_id: cid, ...patch }) }
+    catch { /* champ libre : on n'interrompt pas la saisie sur erreur réseau */ }
   }
 
   // Action qui notifie le partenaire : confirmation avant envoi (décision « auto + confirmation »).
@@ -1098,8 +1128,21 @@ function ValidationTab({ aoId, submissions, clientId }) {
 
   return (
     <div className="card p-4">
-      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">
-        Validation CV ({rows.length})
+      <div className="flex items-center justify-between gap-2 mb-3 flex-wrap">
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-semibold text-slate-400 uppercase tracking-wide">Validation CV ({rows.length})</span>
+          <button className="text-[11px] text-slate-400 hover:text-white"
+            onClick={() => setSelected(selected.size === rows.length ? new Set() : new Set(rows.map(r => r.consultant_id)))}>
+            {selected.size === rows.length && rows.length > 0 ? 'Tout désélectionner' : 'Tout sélectionner'}
+          </button>
+        </div>
+        {selected.size > 0 && (
+          <button className={PILL} style={TONE.red} disabled={busy === '__bulk__'}
+            onClick={() => bulkReject([...selected])}>
+            {busy === '__bulk__' ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
+            Marquer {selected.size} « Non retenu »
+          </button>
+        )}
       </div>
       <div className="space-y-2">
         {rows.map(s => {
@@ -1111,6 +1154,10 @@ function ValidationTab({ aoId, submissions, clientId }) {
           return (
             <div key={s.consultant_id} className="p-3 rounded-lg bg-white/3 border border-white/5">
               <div className="flex items-center gap-3 flex-wrap">
+                <input type="checkbox" checked={selected.has(s.consultant_id)}
+                  onChange={() => toggleSel(s.consultant_id)}
+                  className="shrink-0 w-4 h-4 cursor-pointer" style={{ accentColor: 'var(--accent)' }}
+                  title="Sélectionner pour une action groupée" />
                 <UserCircle2 size={26} className="text-slate-500 shrink-0" />
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -1182,6 +1229,28 @@ function ValidationTab({ aoId, submissions, clientId }) {
                     : act(s.consultant_id, { deal_status: 'perdue' }, "Marquer l'affaire comme perdue ?")}>
                   Affaire perdue
                 </button>
+              </div>
+
+              {/* Commentaires d'évaluation — libres, toujours éditables (Sullyvan) */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 mt-3 sm:pl-9">
+                <div>
+                  <label className="text-[11px] font-medium text-slate-400">Points forts du CV</label>
+                  <textarea rows={2}
+                    className="input mt-1 text-xs resize-y"
+                    placeholder="Atouts, expériences clés…"
+                    value={st.eval_points_forts || ''}
+                    onChange={e => setEvalLocal(s.consultant_id, 'eval_points_forts', e.target.value)}
+                    onBlur={e => saveEval(s.consultant_id, { eval_points_forts: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[11px] font-medium text-slate-400">Éléments différenciants</label>
+                  <textarea rows={2}
+                    className="input mt-1 text-xs resize-y"
+                    placeholder="Ce qui distingue ce profil…"
+                    value={st.eval_differenciants || ''}
+                    onChange={e => setEvalLocal(s.consultant_id, 'eval_differenciants', e.target.value)}
+                    onBlur={e => saveEval(s.consultant_id, { eval_differenciants: e.target.value })} />
+                </div>
               </div>
             </div>
           )

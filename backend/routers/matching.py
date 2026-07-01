@@ -269,6 +269,8 @@ class ValidationRequest(BaseModel):
     sent_to_client: Optional[bool] = None      # True → horodate l'envoi client
     commercial_exchange: Optional[bool] = None  # échange commercial Oui/Non
     deal_status: Optional[str] = None          # 'gagnee' | 'perdue' | 'none'
+    eval_points_forts: Optional[str] = None     # commentaire libre « Points forts »
+    eval_differenciants: Optional[str] = None   # commentaire libre « Éléments différenciants »
     notify: bool = False                        # True → notifie le partenaire par email
 
 
@@ -308,6 +310,14 @@ async def set_cv_validation(ao_id: str, body: ValidationRequest, user: dict = De
             raise HTTPException(status_code=422, detail=f"deal_status doit être l'un de {VALID_DEAL}")
         payload["deal_status"] = None if body.deal_status == "none" else body.deal_status
         changed["deal_status"] = payload["deal_status"]
+
+    # Commentaires d'évaluation libres (aucune notification).
+    if body.eval_points_forts is not None:
+        payload["eval_points_forts"] = body.eval_points_forts.strip() or None
+        changed["eval_points_forts"] = True
+    if body.eval_differenciants is not None:
+        payload["eval_differenciants"] = body.eval_differenciants.strip() or None
+        changed["eval_differenciants"] = True
 
     if not changed:
         raise HTTPException(status_code=422, detail="Aucun champ à mettre à jour.")
@@ -389,8 +399,53 @@ async def get_ao_states(ao_id: str, user: dict = Depends(require_staff)):
     try:
         rows = supabase.table("ao_consultant_state").select(
             "consultant_id, human_rank, contact_status, validation, "
-            "sent_to_client_at, commercial_exchange, deal_status"
+            "sent_to_client_at, commercial_exchange, deal_status, "
+            "eval_points_forts, eval_differenciants"
         ).eq("ao_id", ao_id).execute().data or []
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"states": {r["consultant_id"]: r for r in rows if r.get("consultant_id")}}
+
+
+class BulkValidationRequest(BaseModel):
+    consultant_ids: list[str]
+    validation: str            # 'retenu' | 'non_retenu' | 'none'
+    notify: bool = False
+
+
+@router.post("/{ao_id}/validation-bulk")
+async def set_cv_validation_bulk(ao_id: str, body: BulkValidationRequest, user: dict = Depends(require_staff)):
+    """Marque plusieurs CV d'un coup (ex. « Non retenu » en masse). Notifie
+    éventuellement chaque partenaire porteur (best-effort)."""
+    if body.validation not in VALID_VALIDATION:
+        raise HTTPException(status_code=422, detail=f"validation doit être l'un de {VALID_VALIDATION}")
+    ids = [c for c in (body.consultant_ids or []) if c]
+    if not ids:
+        raise HTTPException(status_code=422, detail="Aucun consultant sélectionné.")
+
+    val = None if body.validation == "none" else body.validation
+    now = _now_iso()
+    updated = 0
+    for cid in ids:
+        try:
+            supabase.table("ao_consultant_state").upsert({
+                "ao_id": ao_id, "consultant_id": cid, "validation": val,
+                "decided_by": user["sub"], "updated_at": now,
+            }, on_conflict="ao_id,consultant_id").execute()
+            updated += 1
+        except Exception:
+            pass
+
+    notified = 0
+    if body.notify and val in ("retenu", "non_retenu"):
+        from services import cv_notifications
+        for cid in ids:
+            ok, _err = cv_notifications.notify_event(ao_id, cid, val)
+            if ok:
+                notified += 1
+
+    audit.log_event(
+        "cv_validation_bulk", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
+        payload={"count": updated, "validation": val, "notified": notified},
+    )
+    return {"updated": updated, "notified": notified, "validation": val}
