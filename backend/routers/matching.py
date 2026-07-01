@@ -394,3 +394,47 @@ async def get_ao_states(ao_id: str, user: dict = Depends(require_staff)):
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
     return {"states": {r["consultant_id"]: r for r in rows if r.get("consultant_id")}}
+
+
+class BulkValidationRequest(BaseModel):
+    consultant_ids: list[str]
+    validation: str            # 'retenu' | 'non_retenu' | 'none'
+    notify: bool = False
+
+
+@router.post("/{ao_id}/validation-bulk")
+async def set_cv_validation_bulk(ao_id: str, body: BulkValidationRequest, user: dict = Depends(require_staff)):
+    """Marque plusieurs CV d'un coup (ex. « Non retenu » en masse). Notifie
+    éventuellement chaque partenaire porteur (best-effort)."""
+    if body.validation not in VALID_VALIDATION:
+        raise HTTPException(status_code=422, detail=f"validation doit être l'un de {VALID_VALIDATION}")
+    ids = [c for c in (body.consultant_ids or []) if c]
+    if not ids:
+        raise HTTPException(status_code=422, detail="Aucun consultant sélectionné.")
+
+    val = None if body.validation == "none" else body.validation
+    now = _now_iso()
+    updated = 0
+    for cid in ids:
+        try:
+            supabase.table("ao_consultant_state").upsert({
+                "ao_id": ao_id, "consultant_id": cid, "validation": val,
+                "decided_by": user["sub"], "updated_at": now,
+            }, on_conflict="ao_id,consultant_id").execute()
+            updated += 1
+        except Exception:
+            pass
+
+    notified = 0
+    if body.notify and val in ("retenu", "non_retenu"):
+        from services import cv_notifications
+        for cid in ids:
+            ok, _err = cv_notifications.notify_event(ao_id, cid, val)
+            if ok:
+                notified += 1
+
+    audit.log_event(
+        "cv_validation_bulk", audit.new_run_id(), ao_id=ao_id, actor_id=user["sub"],
+        payload={"count": updated, "validation": val, "notified": notified},
+    )
+    return {"updated": updated, "notified": notified, "validation": val}
