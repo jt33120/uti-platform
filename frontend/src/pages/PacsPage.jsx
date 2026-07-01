@@ -279,7 +279,7 @@ function PacEditor({ pacId, onClose, onChanged }) {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
-export default function PacsPage() {
+export default function PacsPage({ embedded = false }) {
   const confirm = useConfirm()
   const [pacs, setPacs] = useState([])
   const [loading, setLoading] = useState(true)
@@ -330,20 +330,31 @@ export default function PacsPage() {
   }
 
   return (
-    <div className="animate-slide-up">
-      <div className="page-header">
-        <div>
-          <h1 className="section-title flex items-center gap-2">
-            <Package size={20} className="text-brand-400" /> PACs
-          </h1>
-          <p className="text-sm text-slate-500 mt-0.5">
-            Packages d'affectation client : listes prédéfinies à appliquer à un partenaire en un clic.
+    <div className={embedded ? '' : 'animate-slide-up'}>
+      {embedded ? (
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <p className="text-sm text-slate-500">
+            Modèles d'habilitation : listes prédéfinies de clients (avec leur priorité) à appliquer à un partenaire en un clic.
           </p>
+          <button onClick={() => setShowCreate(true)} className="btn-primary text-xs flex items-center gap-1.5 shrink-0">
+            <Plus size={13} /> Nouveau modèle
+          </button>
         </div>
-        <button onClick={() => setShowCreate(true)} className="btn-primary text-xs flex items-center gap-1.5">
-          <Plus size={13} /> Nouveau PAC
-        </button>
-      </div>
+      ) : (
+        <div className="page-header">
+          <div>
+            <h1 className="section-title flex items-center gap-2">
+              <Package size={20} className="text-brand-400" /> Modèles d'habilitation
+            </h1>
+            <p className="text-sm text-slate-500 mt-0.5">
+              Listes prédéfinies de clients à appliquer à un partenaire en un clic.
+            </p>
+          </div>
+          <button onClick={() => setShowCreate(true)} className="btn-primary text-xs flex items-center gap-1.5">
+            <Plus size={13} /> Nouveau modèle
+          </button>
+        </div>
+      )}
 
       {pacs.length > 0 && (
         <div className="relative mb-4">
