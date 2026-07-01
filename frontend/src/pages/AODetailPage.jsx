@@ -691,7 +691,7 @@ function MatchCarousel({ results: incoming, aoId, isAdmin, ao }) {
 }
 
 // ─── Submission modal (partner submits a CV to this AO) ─────────
-function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
+function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill, clientName }) {
   const fileRef = useRef(null)
   const [mode, setMode] = useState(prefill ? 'new' : (vivier.length > 0 ? 'existing' : 'new'))
   const [consultantId, setConsultantId] = useState(vivier[0]?.id || '')
@@ -702,6 +702,8 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
   })
   const [cvFile, setCvFile] = useState(null)
   const [consent, setConsent] = useState(false)
+  const [workedAtClient, setWorkedAtClient] = useState(false)
+  const [exitDate, setExitDate] = useState('')
   const [dragOver, setDragOver] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
@@ -739,6 +741,8 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
         if (form.employment_type) fd.append('employment_type', form.employment_type)
         if (form.availability) fd.append('availability', form.availability)
       }
+      fd.append('worked_at_client', workedAtClient ? 'true' : 'false')
+      if (workedAtClient && exitDate) fd.append('worked_at_client_exit_date', exitDate)
       await api.post('/submissions', fd, { headers: { 'Content-Type': 'multipart/form-data' } })
       onSubmitted()
     } catch (err) {
@@ -835,6 +839,25 @@ function SubmitModal({ aoId, vivier, onClose, onSubmitted, prefill }) {
               </div>
             </>
           )}
+
+          {/* Historique d'intervention chez le client (demande Sullyvan) */}
+          <div className="rounded-lg border p-3" style={{ borderColor: 'var(--border)' }}>
+            <label className="flex items-start gap-2 cursor-pointer">
+              <input type="checkbox" checked={workedAtClient}
+                onChange={e => setWorkedAtClient(e.target.checked)}
+                className="mt-0.5 w-4 h-4 shrink-0" style={{ accentColor: 'var(--accent)' }} />
+              <span className="text-xs text-slate-300">
+                Le candidat est-il déjà intervenu en prestation chez <strong>{clientName || 'ce client'}</strong> ?
+              </span>
+            </label>
+            {workedAtClient && (
+              <div className="mt-2 pl-6">
+                <label className="label">Dernière date de sortie</label>
+                <input type="date" className="input" value={exitDate}
+                  onChange={e => setExitDate(e.target.value)} />
+              </div>
+            )}
+          </div>
 
           <div>
             <label className="label">
@@ -940,6 +963,11 @@ function SubmissionRow({ sub, onDelete, canDelete, isAdmin, aoSkillsRequired }) 
             {c.tjm && (
               <span className="text-[10px] text-emerald-400 inline-flex items-center gap-0.5">
                 <Euro size={9} />{c.tjm}/j
+              </span>
+            )}
+            {isAdmin && sub.worked_at_client && (
+              <span className="badge text-[10px] bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                Déjà intervenu chez le client{sub.worked_at_client_exit_date ? ` · sortie ${formatDate(sub.worked_at_client_exit_date)}` : ''}
               </span>
             )}
           </div>
@@ -2368,7 +2396,7 @@ export default function AODetailPage() {
       )}
 
       {showSubmitModal && (
-        <SubmitModal aoId={id} vivier={vivier} prefill={submitPrefill}
+        <SubmitModal aoId={id} vivier={vivier} prefill={submitPrefill} clientName={ao.clients?.name}
           onClose={() => { setShowSubmitModal(false); setSubmitPrefill(null) }}
           onSubmitted={handleSubmissionSuccess} />
       )}

@@ -4,10 +4,14 @@ from typing import Literal, Optional
 from routers.auth import get_current_user
 from services.supabase_client import supabase
 from services.email import send_email, render_email_html
-from services.ratelimit import rate_limit
+from services.ratelimit import rate_limit, rate_limit_public
 from config import settings
+import html as _html
 
 router = APIRouter(prefix="/support", tags=["support"])
+
+# Destination des demandes de contact publiques (futurs partenaires).
+PARTNER_CONTACT_EMAIL = "contact@groupement-it.com"
 
 _TYPES = Literal["bug", "question", "suggestion", "other"]
 _TYPE_LABELS = {
@@ -108,3 +112,63 @@ async def contact(body: ContactRequest, user: dict = Depends(get_current_user)):
         print(f"[SUPPORT] Email transmis à {settings.admin_email}")
 
     return {"message": "Message envoyé avec succès."}
+
+
+class PartnerRequest(BaseModel):
+    nom: str
+    prenom: str
+    email: str
+    phone: Optional[str] = None
+    company: str
+    siret: Optional[str] = None
+    message: Optional[str] = None
+
+
+@router.post("/partner-request", dependencies=[Depends(rate_limit_public(3, 300))])
+async def partner_request(body: PartnerRequest):
+    """Formulaire de contact PUBLIC (futurs partenaires) → email à l'équipe.
+    Aucune authentification ; limité par IP."""
+    nom = (body.nom or "").strip()
+    prenom = (body.prenom or "").strip()
+    email = (body.email or "").strip()
+    company = (body.company or "").strip()
+    if not nom or not prenom:
+        raise HTTPException(status_code=422, detail="Nom et prénom sont requis.")
+    if "@" not in email or "." not in email:
+        raise HTTPException(status_code=422, detail="Adresse e-mail invalide.")
+    if not company:
+        raise HTTPException(status_code=422, detail="Le nom de la société est requis.")
+
+    def row(label, value):
+        return (f'<tr><td style="padding:4px 0;color:#6e6e73;width:130px;">{_html.escape(label)}</td>'
+                f'<td style="color:#1d1d1f;">{_html.escape(value or "—")}</td></tr>')
+
+    body_html = (
+        '<table cellpadding="0" cellspacing="0" style="width:100%;font-size:13px;margin-bottom:12px;">'
+        + row("Nom", nom) + row("Prénom", prenom) + row("Email", email)
+        + row("Téléphone", body.phone) + row("Société", company) + row("SIRET", body.siret)
+        + '</table>'
+    )
+    if (body.message or "").strip():
+        body_html += (f'<div style="background:#f5f5f7;border-radius:8px;padding:16px;font-size:14px;'
+                      f'line-height:1.6;color:#1d1d1f;white-space:pre-wrap;">{_html.escape(body.message.strip())}</div>')
+
+    html = render_email_html(
+        title="Nouvelle demande de partenariat",
+        body_html=body_html,
+        footer_note=f"Répondez directement à {email}",
+    )
+    text = (
+        "Nouvelle demande de partenariat\n\n"
+        f"Nom : {nom}\nPrénom : {prenom}\nEmail : {email}\n"
+        f"Téléphone : {body.phone or '—'}\nSociété : {company}\nSIRET : {body.siret or '—'}\n\n"
+        f"{(body.message or '').strip()}\n"
+    )
+    ok, err = send_email(
+        PARTNER_CONTACT_EMAIL,
+        f"[Contact partenaire] {company} — {prenom} {nom}",
+        html, text=text, reply_to=email,
+    )
+    if not ok:
+        raise HTTPException(status_code=502, detail=f"Échec de l'envoi : {err}")
+    return {"message": "Votre demande a bien été envoyée. Nous vous recontacterons rapidement."}

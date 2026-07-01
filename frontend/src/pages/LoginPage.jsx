@@ -232,6 +232,10 @@ export default function LoginPage() {
             <p className="text-center text-[12px] text-[var(--text-faint)] mt-6">
               L'accès à la plateforme se fait uniquement sur invitation.
             </p>
+            <p className="text-center text-[12px] text-[var(--text-muted)] mt-2">
+              Vous souhaitez devenir partenaire ?{' '}
+              <Link to="/contact" className="font-medium" style={{ color: 'var(--accent-text)' }}>Nous contacter</Link>
+            </p>
           </>
         )}
       </div>
