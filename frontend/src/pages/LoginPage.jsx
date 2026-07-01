@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
+import { Link, useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Eye, EyeOff, ArrowRight, ShieldCheck, ArrowLeft, Loader2 } from 'lucide-react'
+import { Eye, EyeOff, ArrowRight, ShieldCheck, ArrowLeft, Loader2, Clock } from 'lucide-react'
 
 function CodeInput({ value, onChange, autoFocus }) {
   return (
@@ -93,6 +93,8 @@ function MfaStep({ mfa, onSubmit, onBack, error }) {
 export default function LoginPage() {
   const { login, verifyMfa, enrollMfa, loading } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
+  const sessionExpired = searchParams.get('reason') === 'expired'
   const [form, setForm] = useState({ email: '', password: '' })
   const [showPassword, setShowPassword] = useState(false)
   const [error, setError] = useState('')
@@ -143,6 +145,16 @@ export default function LoginPage() {
           <MfaStep mfa={mfa} onSubmit={submitCode} onBack={backToLogin} error={error} />
         ) : (
           <>
+            {sessionExpired && (
+              <div className="mb-5 flex items-start gap-2.5 rounded-lg px-3.5 py-3 text-[13px]"
+                style={{ background: 'var(--accent-soft)', color: 'var(--accent-text)', border: '1px solid var(--border)' }}>
+                <Clock size={15} className="shrink-0 mt-0.5" />
+                <span>
+                  <strong className="font-semibold">Vous avez été déconnecté.</strong><br />
+                  Votre session a expiré après 3 heures (pour des raisons de sécurité). Reconnectez-vous pour continuer.
+                </span>
+              </div>
+            )}
             <h1 className="text-[22px] font-semibold tracking-tightest text-[var(--text)] mb-1">Se connecter</h1>
             <p className="text-[13px] text-[var(--text-muted)] mb-6">
               Accédez à votre espace partenaire
