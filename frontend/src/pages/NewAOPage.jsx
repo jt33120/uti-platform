@@ -7,6 +7,7 @@ import {
   Sparkles, UploadCloud, X, Target
 } from 'lucide-react'
 import ScoringPriorities, { DEFAULT_STARS } from '../components/ScoringPriorities'
+import { formatDateFR } from '../lib/date'
 
 export default function NewAOPage() {
   const navigate = useNavigate()
@@ -439,7 +440,7 @@ export default function NewAOPage() {
               <div className="space-y-2 text-xs">
                 {form.deadline && (
                   <div className="flex items-center gap-2 font-medium" style={{ color: 'var(--danger)' }}>
-                    <CalendarClock size={11} /> Échéance : {form.deadline}
+                    <CalendarClock size={11} /> Échéance : {formatDateFR(form.deadline)}
                   </div>
                 )}
                 {form.ao_type && (
